@@ -17,7 +17,7 @@ services:
     networks:
       - enrichment-network
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p$${MYSQL_ROOT_PASSWORD:-rootpassword}"]
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$${MYSQL_ROOT_PASSWORD:-rootpassword} --silent"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -34,6 +34,19 @@ services:
     environment:
       SERVER_PORT: 9741
       SPRING_APPLICATION_NAME: research-service
+      AI_INTELLIGENT_SERVICE_URL: http://ai-intelligent-service:9742
+      DATASET_SERVICE_URL: http://dataset-service:9743
+    volumes:
+      - maven_cache:/root/.m2
+    develop:
+      watch:
+        - path: ../../apps/backend/research-service/pom.xml
+          action: rebuild
+        - path: ../../apps/backend/research-service/Dockerfile
+          action: rebuild
+        - path: ../../apps/backend/research-service/src
+          target: /app/src
+          action: sync+restart
     networks:
       - enrichment-network
 
@@ -48,7 +61,18 @@ services:
     environment:
       SERVER_PORT: 9742
       SPRING_APPLICATION_NAME: ai-intelligent-service
-      GEMINI_API_KEY: ${GEMINI_API_KEY:-dev-placeholder-key}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-mock-key}
+    volumes:
+      - maven_cache:/root/.m2
+    develop:
+      watch:
+        - path: ../../apps/backend/ai-intelligent-service/pom.xml
+          action: rebuild
+        - path: ../../apps/backend/ai-intelligent-service/Dockerfile
+          action: rebuild
+        - path: ../../apps/backend/ai-intelligent-service/src
+          target: /app/src
+          action: sync+restart
     networks:
       - enrichment-network
 
@@ -63,12 +87,23 @@ services:
     environment:
       SERVER_PORT: 9743
       SPRING_APPLICATION_NAME: dataset-service
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-enrichment_db}
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-enrichment_db}?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
       SPRING_DATASOURCE_USERNAME: ${MYSQL_USER:-enrichment_user}
       SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:-enrichment_password}
     depends_on:
       mysql:
         condition: service_healthy
+    volumes:
+      - maven_cache:/root/.m2
+    develop:
+      watch:
+        - path: ../../apps/backend/dataset-service/pom.xml
+          action: rebuild
+        - path: ../../apps/backend/dataset-service/Dockerfile
+          action: rebuild
+        - path: ../../apps/backend/dataset-service/src
+          target: /app/src
+          action: sync+restart
     networks:
       - enrichment-network
 
@@ -84,14 +119,33 @@ services:
       NODE_ENV: development
       PORT: 3000
       HOSTNAME: "0.0.0.0"
+      WATCHPACK_POLLING: "true"
       NEXT_PUBLIC_RESEARCH_SERVICE_URL: ${NEXT_PUBLIC_RESEARCH_SERVICE_URL:-http://localhost:9741}
       NEXT_PUBLIC_AI_INTELLIGENT_SERVICE_URL: ${NEXT_PUBLIC_AI_INTELLIGENT_SERVICE_URL:-http://localhost:9742}
       NEXT_PUBLIC_DATASET_SERVICE_URL: ${NEXT_PUBLIC_DATASET_SERVICE_URL:-http://localhost:9743}
+    develop:
+      watch:
+        - path: ../../apps/frontend/package.json
+          action: rebuild
+        - path: ../../apps/frontend/package-lock.json
+          action: rebuild
+        - path: ../../apps/frontend/Dockerfile
+          action: rebuild
+        - path: ../../apps/frontend/next.config.ts
+          action: rebuild
+        - path: ../../apps/frontend
+          target: /app
+          action: sync
+          ignore:
+            - node_modules/
+            - .next/
     networks:
       - enrichment-network
 
 volumes:
   mysql_data:
+    driver: local
+  maven_cache:
     driver: local
 
 networks:

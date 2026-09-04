@@ -1,219 +1,160 @@
 # Docker Development Commands
 
 > Status: Active
-> Version: 0.1
+> Version: 0.2
 > Last Updated: 2026-09-04
 
 ## Purpose
 
-This document provides the minimal reference commands for running and managing the local Docker development infrastructure (MySQL) for the Data Enrichment & Research Engine.
+This document provides the reference commands and workflows for running the Data Enrichment & Research Engine local development environment using Docker Compose and Docker Compose Watch.
 
 ---
 
 ## Prerequisites
 
-* **Docker** installed and running.
-* **Docker Compose** v2+ accessible via the `docker compose` CLI.
-* Local environment configuration file present at `infrastructure/docker/.env`.
+* **Docker** installed and running (Docker Desktop 25+ or Docker Engine).
+* **Docker Compose** v2.22+ supporting `docker compose watch`.
+* Environment file configured at `infrastructure/docker/.env`.
 
 ---
 
 ## First-Time Setup
 
-Before starting the container for the first time, ensure the environment file exists in the Docker directory:
+Before starting the containers for the first time, ensure `infrastructure/docker/.env` exists:
 
 ```powershell
-# Copy the example environment template to .env (if not already created)
+# Copy template to .env
 Copy-Item infrastructure/docker/.env.example infrastructure/docker/.env
 ```
 
-The environment file requires the following configuration variables:
-* `MYSQL_ROOT_PASSWORD`: Root user password.
-* `MYSQL_DATABASE`: Default application database name (e.g., `enrichment_db`).
-* `MYSQL_USER`: Application database username (e.g., `enrichment_user`).
-* `MYSQL_PASSWORD`: Application database user password.
+Review and adjust any credentials if desired (defaults are pre-configured for local development). Note that `MYSQL_USER` must remain a non-root user (e.g., `enrichment_user`), as official MySQL images reject `MYSQL_USER=root`.
 
 ---
 
-## Development Commands (Run from Project Root)
+## Primary Development Workflow (Run from Project Root)
 
 All commands below are intended to be executed from the **repository root**:
 `P:\Agentic AI\Enrichment Platform\data-enrichment-ai-intelligence`
 
-### Start Infrastructure
+### 1. Start Complete Stack with Automatic Watch (Recommended)
 
-Start the MySQL service in detached mode:
+Start all services (MySQL, research-service, ai-intelligent-service, dataset-service, frontend) and continuously watch for file changes:
 
 ```powershell
-docker compose -f infrastructure/docker/docker-compose-dev.yml up -d
+docker compose --env-file infrastructure/docker/.env -f infrastructure/docker/docker-compose-dev-all.yml up --watch
 ```
 
-*(Note: `--build` is omitted as the infrastructure utilizes official pre-built images with no local Dockerfile build steps).*
+#### How Automatic Change Detection Works:
+* **Java Source Changes (`apps/backend/*/src/**`)**:
+  Compose Watch syncs the modified `.java` file directly into `/app/src` and restarts only that specific service container (`action: sync+restart`). Maven recompiles the updated file using the cached dependency layer and restarts the service. **Other services, frontend, and MySQL are not touched or rebuilt.**
+* **Backend Build Changes (`pom.xml` / `Dockerfile`)**:
+  Compose Watch detects manifest changes and triggers an in-place `rebuild` for that specific backend service only.
+* **Frontend Source Changes (`apps/frontend/**`)**:
+  Compose Watch syncs modified files (`.tsx`, `.ts`, `.css`) into the running frontend container (`action: sync`). Next.js Fast Refresh automatically reloads in the browser without container restarts or image rebuilds.
+* **Frontend Build Changes (`package.json` / `package-lock.json` / `Dockerfile`)**:
+  Compose Watch triggers an automatic `rebuild` of the frontend image.
 
-### Check Status
+---
 
-List running containers and their current state:
+### 2. Start in Detached Mode (Background)
+
+To run the complete platform in the background without active log streaming:
 
 ```powershell
-docker compose -f infrastructure/docker/docker-compose-dev.yml ps
+docker compose --env-file infrastructure/docker/.env -f infrastructure/docker/docker-compose-dev-all.yml up -d
 ```
 
-### Check MySQL Health
-
-Inspect the container healthcheck status:
+To run only the infrastructure (MySQL database):
 
 ```powershell
-docker inspect --format "{{.State.Health.Status}}" enrichment-mysql
-```
-
-### View Logs
-
-Display recent logs for the MySQL service:
-
-```powershell
-docker compose -f infrastructure/docker/docker-compose-dev.yml logs mysql
-```
-
-### Follow Logs
-
-Continuously stream logs from the MySQL service:
-
-```powershell
-docker compose -f infrastructure/docker/docker-compose-dev.yml logs -f mysql
-```
-
-### Restart Service
-
-Restart the running MySQL container:
-
-```powershell
-docker compose -f infrastructure/docker/docker-compose-dev.yml restart mysql
-```
-
-### Stop Infrastructure
-
-Halt running containers without removing them or discarding container state:
-
-```powershell
-docker compose -f infrastructure/docker/docker-compose-dev.yml stop
-```
-
-### Down (Tear Down Containers & Network)
-
-Stop and remove the container and bridge network (`enrichment-network`), preserving the persistent data volume:
-
-```powershell
-docker compose -f infrastructure/docker/docker-compose-dev.yml down
-```
-
-> **Difference between `stop` and `down`:**
-> * `stop`: Pauses the running container processes. Container instances and networks remain intact.
-> * `down`: Stops and completely removes the containers and network. The named volume (`mysql_data`) remains intact.
-
-### Validate Compose Configuration
-
-Verify and render the resolved Compose configuration:
-
-```powershell
-docker compose -f infrastructure/docker/docker-compose-dev.yml config
+docker compose --env-file infrastructure/docker/.env -f infrastructure/docker/docker-compose-dev.yml up -d
 ```
 
 ---
 
-## Persistent Data Warning
+### 3. Check Service Status
+
+View the status of all running services, ports, and healthchecks:
+
+```powershell
+docker compose --env-file infrastructure/docker/.env -f infrastructure/docker/docker-compose-dev-all.yml ps
+```
+
+---
+
+### 4. View Service Logs
+
+Stream logs for a specific service:
+
+```powershell
+# MySQL logs
+docker compose --env-file infrastructure/docker/.env -f infrastructure/docker/docker-compose-dev-all.yml logs -f mysql
+
+# Research service logs
+docker compose --env-file infrastructure/docker/.env -f infrastructure/docker/docker-compose-dev-all.yml logs -f research-service
+
+# AI Intelligent service logs
+docker compose --env-file infrastructure/docker/.env -f infrastructure/docker/docker-compose-dev-all.yml logs -f ai-intelligent-service
+
+# Dataset service logs
+docker compose --env-file infrastructure/docker/.env -f infrastructure/docker/docker-compose-dev-all.yml logs -f dataset-service
+
+# Frontend logs
+docker compose --env-file infrastructure/docker/.env -f infrastructure/docker/docker-compose-dev-all.yml logs -f frontend
+```
+
+---
+
+### 5. Rebuild One Service Manually
+
+To manually force a clean rebuild of a single service without rebuilding the rest of the stack:
+
+```powershell
+# Rebuild research-service only
+docker compose --env-file infrastructure/docker/.env -f infrastructure/docker/docker-compose-dev-all.yml build research-service
+
+# Rebuild frontend only
+docker compose --env-file infrastructure/docker/.env -f infrastructure/docker/docker-compose-dev-all.yml build frontend
+```
+
+---
+
+### 6. Stop Stack (Preserve Persistent Data)
+
+Stop and remove running containers and networks while preserving database data:
+
+```powershell
+docker compose --env-file infrastructure/docker/.env -f infrastructure/docker/docker-compose-dev-all.yml down
+```
+
+---
+
+### 7. Reset Development Database (Delete Volume)
+
+To completely reset the development database from scratch (e.g., to purge test records or repair corrupt redo logs):
+
+```powershell
+docker compose --env-file infrastructure/docker/.env -f infrastructure/docker/docker-compose-dev-all.yml down -v
+```
 
 > [!WARNING]
-> Database records are persisted in the named Docker volume `mysql_data`.
-> * Normal development commands such as `stop` and `down` preserve this volume and its stored data.
-> * Manually deleting this volume destroys all local MySQL database tables and ingested entity records.
-> * Do not execute destructive volume pruning or removal commands as part of routine development.
+> The `-v` flag deletes all Docker named volumes (`mysql_data` and `maven_cache`).
+> * On the subsequent `up`, MySQL will perform a clean initialization from scratch.
+> * Never run `-v` in normal everyday stopping workflows unless you intend to wipe local test database state.
 
 ---
 
-## Alternative: Running from `infrastructure/docker/`
+### 8. Validate Compose Configuration
 
-If operating directly inside the `infrastructure/docker` directory:
+Render and validate the resolved Compose configuration:
 
 ```powershell
-cd infrastructure/docker
-
-# Start
-docker compose -f docker-compose-dev.yml up -d
-
-# Stop
-docker compose -f docker-compose-dev.yml stop
-
-# Down
-docker compose -f docker-compose-dev.yml down
+docker compose --env-file infrastructure/docker/.env -f infrastructure/docker/docker-compose-dev-all.yml config
 ```
 
 ---
 
-## Complete Development Stack
+## Maven & Layer Caching Architecture
 
-The all-in-one local development stack (`docker-compose-dev-all.yml`) orchestrates MySQL, all three backend microservices (`research-service`, `ai-intelligent-service`, `dataset-service`), and the Next.js frontend together.
-
-### Start Everything
-
-Build images (if modified) and run the complete stack in detached mode:
-
-```powershell
-docker compose -f infrastructure/docker/docker-compose-dev-all.yml up -d --build
-```
-
-### Check Status
-
-List running containers across the full stack and their current state:
-
-```powershell
-docker compose -f infrastructure/docker/docker-compose-dev-all.yml ps
-```
-
-### View Logs
-
-Display and follow real-time logs across all services:
-
-```powershell
-docker compose -f infrastructure/docker/docker-compose-dev-all.yml logs -f
-```
-
-To stream logs from an individual service (e.g., `research-service`):
-
-```powershell
-docker compose -f infrastructure/docker/docker-compose-dev-all.yml logs -f research-service
-```
-
-### Stop Everything
-
-Stop active containers without tearing down networks or removing container states:
-
-```powershell
-docker compose -f infrastructure/docker/docker-compose-dev-all.yml stop
-```
-
-### Down (Tear Down All Containers & Network)
-
-Stop and remove all containers and the shared bridge network (`enrichment-network`), while preserving the persistent `mysql_data` volume:
-
-```powershell
-docker compose -f infrastructure/docker/docker-compose-dev-all.yml down
-```
-
-### Running from `infrastructure/docker/` Directly
-
-```powershell
-cd infrastructure/docker
-
-# Start all
-docker compose -f docker-compose-dev-all.yml up -d
-
-# Check status
-docker compose -f docker-compose-dev-all.yml ps
-
-# View logs
-docker compose -f docker-compose-dev-all.yml logs -f
-
-# Down
-docker compose -f docker-compose-dev-all.yml down
-```
-
+1. **Docker Layer Cache**: Each backend Dockerfile executes `./mvnw dependency:resolve dependency:resolve-plugins -B` *before* copying `src/`. As long as `pom.xml` does not change, this layer is `CACHED` by Docker, skipping all remote repository downloads during image builds.
+2. **Runtime Volume Cache (`maven_cache`)**: A shared named volume `maven_cache` is mounted at `/root/.m2` across all Spring Boot services. Any runtime plugins or dependencies downloaded during execution persist across container restarts, eliminating repeat downloads.

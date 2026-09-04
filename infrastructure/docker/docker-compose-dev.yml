@@ -1,3 +1,5 @@
+name: data-enrich-intell-project
+
 services:
   mysql:
     image: mysql:latest
@@ -15,7 +17,7 @@ services:
     networks:
       - enrichment-network
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p$${MYSQL_ROOT_PASSWORD:-rootpassword}"]
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$${MYSQL_ROOT_PASSWORD:-rootpassword} --silent"]
       interval: 10s
       timeout: 5s
       retries: 5
