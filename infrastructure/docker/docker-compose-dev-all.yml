@@ -1,0 +1,99 @@
+name: data-enrich-intell-project
+
+services:
+  mysql:
+    image: mysql:latest
+    container_name: enrichment-mysql
+    restart: unless-stopped
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-enrichment_db}
+      MYSQL_USER: ${MYSQL_USER:-enrichment_user}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-enrichment_password}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - enrichment-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p$${MYSQL_ROOT_PASSWORD:-rootpassword}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  research-service:
+    build:
+      context: ../../apps/backend/research-service
+      dockerfile: Dockerfile
+    container_name: enrichment-research-service
+    restart: unless-stopped
+    ports:
+      - "9741:9741"
+    environment:
+      SERVER_PORT: 9741
+      SPRING_APPLICATION_NAME: research-service
+    networks:
+      - enrichment-network
+
+  ai-intelligent-service:
+    build:
+      context: ../../apps/backend/ai-intelligent-service
+      dockerfile: Dockerfile
+    container_name: enrichment-ai-intelligent-service
+    restart: unless-stopped
+    ports:
+      - "9742:9742"
+    environment:
+      SERVER_PORT: 9742
+      SPRING_APPLICATION_NAME: ai-intelligent-service
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-dev-placeholder-key}
+    networks:
+      - enrichment-network
+
+  dataset-service:
+    build:
+      context: ../../apps/backend/dataset-service
+      dockerfile: Dockerfile
+    container_name: enrichment-dataset-service
+    restart: unless-stopped
+    ports:
+      - "9743:9743"
+    environment:
+      SERVER_PORT: 9743
+      SPRING_APPLICATION_NAME: dataset-service
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-enrichment_db}
+      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER:-enrichment_user}
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:-enrichment_password}
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - enrichment-network
+
+  frontend:
+    build:
+      context: ../../apps/frontend
+      dockerfile: Dockerfile
+    container_name: enrichment-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      HOSTNAME: "0.0.0.0"
+      NEXT_PUBLIC_RESEARCH_SERVICE_URL: ${NEXT_PUBLIC_RESEARCH_SERVICE_URL:-http://localhost:9741}
+      NEXT_PUBLIC_AI_INTELLIGENT_SERVICE_URL: ${NEXT_PUBLIC_AI_INTELLIGENT_SERVICE_URL:-http://localhost:9742}
+      NEXT_PUBLIC_DATASET_SERVICE_URL: ${NEXT_PUBLIC_DATASET_SERVICE_URL:-http://localhost:9743}
+    networks:
+      - enrichment-network
+
+volumes:
+  mysql_data:
+    driver: local
+
+networks:
+  enrichment-network:
+    driver: bridge

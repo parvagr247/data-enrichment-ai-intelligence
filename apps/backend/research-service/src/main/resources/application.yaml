@@ -1,0 +1,13 @@
+server:
+  port: 9741
+
+spring:
+  application:
+    name: research-service
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
