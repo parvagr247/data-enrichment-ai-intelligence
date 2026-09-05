@@ -88,17 +88,36 @@ public class DefaultEntityPersistenceService implements EntityPersistenceService
     @Override
     @Transactional(readOnly = true)
     public List<EntitySummaryResponse> listAll() {
-        return entityRepository.findAll().stream()
-                .map(e -> new EntitySummaryResponse(
-                        e.getEntityId(),
-                        e.getDisplayName(),
-                        e.getEntityType(),
-                        e.getCanonicalUrl(),
-                        e.getSources() != null ? e.getSources().size() : 0,
-                        e.getAttributes() != null ? e.getAttributes().size() : 0,
-                        e.getUpdatedAt()
-                ))
+        return entityRepository.findAll(org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "updatedAt"))
+                .stream()
+                .map(this::toSummaryResponse)
                 .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<EntitySummaryResponse> list(int page, int size) {
+        int safePage = Math.max(0, page);
+        int safeSize = Math.max(1, Math.min(100, size));
+        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(
+                safePage, safeSize, org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "updatedAt")
+        );
+
+        return entityRepository.findAll(pageable)
+                .map(this::toSummaryResponse)
+                .getContent();
+    }
+
+    private EntitySummaryResponse toSummaryResponse(EnrichedEntity e) {
+        return new EntitySummaryResponse(
+                e.getEntityId(),
+                e.getDisplayName(),
+                e.getEntityType(),
+                e.getCanonicalUrl(),
+                e.getSources() != null ? e.getSources().size() : 0,
+                e.getAttributes() != null ? e.getAttributes().size() : 0,
+                e.getUpdatedAt()
+        );
     }
 
     private EntityDetailResponse toDetailResponse(EnrichedEntity entity) {

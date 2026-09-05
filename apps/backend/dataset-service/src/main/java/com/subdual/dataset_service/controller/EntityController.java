@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -39,7 +40,15 @@ public class EntityController {
     }
 
     @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<List<EntitySummaryResponse>> listEntities() {
+    public ResponseEntity<List<EntitySummaryResponse>> listEntities(
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size
+    ) {
+        if (page != null || size != null) {
+            int p = page != null ? page : 0;
+            int s = size != null ? size : 20;
+            return ResponseEntity.ok(persistenceService.list(p, s));
+        }
         return ResponseEntity.ok(persistenceService.listAll());
     }
 }

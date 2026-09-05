@@ -121,53 +121,65 @@ public class DefaultResearchService implements ResearchService {
     @Override
     public ResearchResponse executeResearch(ResearchRequest request) {
         long startTime = System.currentTimeMillis();
+        List<String> warnings = new ArrayList<>();
 
         // 1. Request Validation
         validateRequest(request);
 
         // 2. Entity Normalization
         ResearchTarget target = entityNormalizer.normalize(request);
-        log.info("[Pipeline: NORMALIZED] EntityId='{}', CanonicalUrl='{}', DisplayName='{}', Type='{}'",
-                target.entityId(), target.canonicalUrl(), target.displayName(), target.entityType());
+        org.slf4j.MDC.put("entityId", target.entityId());
+        try {
+            log.info("[Pipeline: NORMALIZED] EntityId='{}', CanonicalUrl='{}', DisplayName='{}', Type='{}'",
+                    target.entityId(), target.canonicalUrl(), target.displayName(), target.entityType());
 
-        // 3. Search Discovery
-        String query = queryBuilder.buildDiscoveryQuery(target);
-        log.info("[Pipeline: DISCOVERY] Searching provider '{}' with query: '{}'",
-                discoveryProperties.provider(), query);
-        List<DiscoveredSource> rawDiscoveredSources = discoverSources(query);
-
-        // 4. Source Collection, Normalization, Classification, and Relevance Scoring
-        log.info("[Pipeline: SOURCE_PROCESSING] Processing {} discovered candidate sources for entityId: '{}'",
-                rawDiscoveredSources.size(), target.entityId());
-        List<ResearchSource> rankedSources = sourceProcessor.processSources(
-                rawDiscoveredSources,
-                target,
-                pipelineProperties.maxSources(),
-                discoveryProperties.provider()
-        );
-
-        // 5. Evidence Extraction (Grounded attribute extraction from ranked sources)
-        log.info("[Pipeline: EVIDENCE_EXTRACTION] Extracting evidence from {} ranked sources for entityId: '{}'",
-                rankedSources.size(), target.entityId());
-        Map<String, EvidenceTuple> attributes = extractEvidence(target, rankedSources);
-
-        // 6. Response Aggregation
-        long executionTimeMs = System.currentTimeMillis() - startTime;
-        ResearchResponse response = aggregateResponse(target, rankedSources, attributes, rawDiscoveredSources.size(), executionTimeMs);
-
-        // 7. Relational Persistence Boundary (non-blocking)
-        if (datasetPersistenceClient != null) {
-            try {
-                datasetPersistenceClient.persistEntity(target, rankedSources, attributes);
-            } catch (Exception ex) {
-                log.warn("[Pipeline: PERSISTENCE_FAILED] Non-blocking dataset persistence failed: {}", ex.getMessage());
+            // 3. Search Discovery
+            long discoveryStart = System.currentTimeMillis();
+            String query = queryBuilder.buildDiscoveryQuery(target);
+            log.info("[Pipeline: DISCOVERY] Searching provider '{}' with query: '{}'",
+                    discoveryProperties.provider(), query);
+            List<DiscoveredSource> rawDiscoveredSources = discoverSources(query);
+            long discoveryDuration = System.currentTimeMillis() - discoveryStart;
+            if (rawDiscoveredSources.isEmpty()) {
+                warnings.add("Search provider '" + discoveryProperties.provider() + "' returned 0 candidate sources");
             }
+
+            // 4. Source Collection, Normalization, Classification, and Relevance Scoring
+            log.info("[Pipeline: SOURCE_PROCESSING] Processing {} discovered candidate sources for entityId: '{}' (discovery: {}ms)",
+                    rawDiscoveredSources.size(), target.entityId(), discoveryDuration);
+            List<ResearchSource> rankedSources = sourceProcessor.processSources(
+                    rawDiscoveredSources,
+                    target,
+                    pipelineProperties.maxSources(),
+                    discoveryProperties.provider()
+            );
+
+            // 5. Evidence Extraction (Grounded attribute extraction from ranked sources)
+            log.info("[Pipeline: EVIDENCE_EXTRACTION] Extracting evidence from {} ranked sources for entityId: '{}'",
+                    rankedSources.size(), target.entityId());
+            Map<String, EvidenceTuple> attributes = extractEvidence(target, rankedSources, warnings);
+
+            // 6. Response Aggregation
+            long executionTimeMs = System.currentTimeMillis() - startTime;
+            ResearchResponse response = aggregateResponse(target, rankedSources, attributes, rawDiscoveredSources.size(), executionTimeMs, warnings);
+
+            // 7. Relational Persistence Boundary (non-blocking)
+            if (datasetPersistenceClient != null) {
+                try {
+                    datasetPersistenceClient.persistEntity(target, rankedSources, attributes);
+                } catch (Exception ex) {
+                    log.warn("[Pipeline: PERSISTENCE_FAILED] Non-blocking dataset persistence failed: {}", ex.getMessage());
+                    warnings.add("Failed to persist entity to dataset-service: " + ex.getMessage());
+                }
+            }
+
+            log.info("[Pipeline: COMPLETED] Research finished for entityId: '{}' in {}ms (sources: {}, attributes: {}, warnings: {})",
+                    target.entityId(), executionTimeMs, response.sources().size(), response.result().attributes().size(), warnings.size());
+
+            return response;
+        } finally {
+            org.slf4j.MDC.remove("entityId");
         }
-
-        log.info("[Pipeline: COMPLETED] Research finished for entityId: '{}' in {}ms (sources: {}, attributes: {})",
-                target.entityId(), executionTimeMs, response.sources().size(), response.result().attributes().size());
-
-        return response;
     }
 
     private void validateRequest(ResearchRequest request) {
@@ -196,7 +208,7 @@ public class DefaultResearchService implements ResearchService {
         }
     }
 
-    private Map<String, EvidenceTuple> extractEvidence(ResearchTarget target, List<ResearchSource> rankedSources) {
+    private Map<String, EvidenceTuple> extractEvidence(ResearchTarget target, List<ResearchSource> rankedSources, List<String> warnings) {
         List<ExtractedDocument> extractedDocuments = new ArrayList<>();
         Map<String, EntityResolver.ResolutionResult> resolutions = new HashMap<>();
 
@@ -209,7 +221,11 @@ public class DefaultResearchService implements ResearchService {
                 EntityResolver.ResolutionResult resolution = entityResolver.resolve(target, doc);
                 resolutions.put(source.url(), resolution);
             } else {
-                log.debug("Skipping unretrievable source URL '{}'", source.url());
+                String errorMsg = fetched != null ? fetched.errorMessage() : "Inaccessible";
+                log.debug("Skipping unretrievable source URL '{}': {}", source.url(), errorMsg);
+                if (warnings != null) {
+                    warnings.add("Source skipped (" + source.domain() + "): " + errorMsg);
+                }
             }
         }
 
@@ -226,7 +242,8 @@ public class DefaultResearchService implements ResearchService {
             List<ResearchSource> rankedSources,
             Map<String, EvidenceTuple> attributes,
             int totalDiscovered,
-            long executionTimeMs
+            long executionTimeMs,
+            List<String> warnings
     ) {
         List<SourceItem> sourceItems = rankedSources.stream()
                 .map(this::toSourceItem)
@@ -244,14 +261,20 @@ public class DefaultResearchService implements ResearchService {
         metadata.put("totalSourcesDiscovered", totalDiscovered);
         metadata.put("totalSourcesRanked", rankedSources.size());
         metadata.put("attributesExtracted", attributes.size());
+        metadata.put("warningsCount", warnings != null ? warnings.size() : 0);
+
+        ResearchStatus status = (warnings != null && !warnings.isEmpty() && (rankedSources.isEmpty() || attributes.isEmpty()))
+                ? ResearchStatus.PARTIAL
+                : ResearchStatus.COMPLETED;
 
         return new ResearchResponse(
-                ResearchStatus.COMPLETED,
+                status,
                 target.entityId(),
                 result,
                 sourceItems,
                 executionTimeMs,
-                metadata
+                metadata,
+                warnings != null ? List.copyOf(warnings) : List.of()
         );
     }
 

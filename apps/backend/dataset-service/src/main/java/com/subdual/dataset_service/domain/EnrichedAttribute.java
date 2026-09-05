@@ -7,6 +7,7 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
@@ -20,7 +21,10 @@ import lombok.Setter;
  * JPA entity representing a verified fact attribute and its evidence citation.
  */
 @Entity
-@Table(name = "entity_attributes")
+@Table(name = "entity_attributes", indexes = {
+        @Index(name = "idx_attributes_entity_id", columnList = "entity_id"),
+        @Index(name = "idx_attributes_name", columnList = "attribute_name")
+})
 @Getter
 @Setter
 @NoArgsConstructor

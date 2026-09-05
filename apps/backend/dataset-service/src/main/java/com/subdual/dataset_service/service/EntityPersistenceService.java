@@ -11,4 +11,5 @@ public interface EntityPersistenceService {
     EntityDetailResponse persistOrUpdate(PersistEntityRequest request);
     Optional<EntityDetailResponse> findById(String entityId);
     List<EntitySummaryResponse> listAll();
+    List<EntitySummaryResponse> list(int page, int size);
 }

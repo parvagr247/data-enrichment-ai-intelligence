@@ -7,6 +7,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
+import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -22,7 +23,9 @@ import java.util.List;
  * JPA entity representing a canonical research entity persisted in MySQL.
  */
 @Entity
-@Table(name = "entities")
+@Table(name = "entities", indexes = {
+        @Index(name = "idx_entities_type", columnList = "entity_type")
+})
 @Getter
 @Setter
 @NoArgsConstructor

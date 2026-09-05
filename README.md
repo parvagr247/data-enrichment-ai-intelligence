@@ -105,32 +105,71 @@ data-enrichment-ai-intelligence/
 
 ---
 
-## 6. Current Status
+---
 
-* **Status**: Current / Phase 0 Completed &rarr; Phase 1 (Web Source Discovery)
-* **Next Implementation Milestone**: Phase 1 — Web Source Discovery (discovering candidate sources and returning populated `sources[]` with metadata).
-* **Technical Roadmap**: Detailed in [Research Workflow & Target Pipeline](docs/setup/research-workflow.md).
+## 6. Current Status & Verification
+
+* **Status**: Complete & Production-Hardened (Phases 1–8 verified)
+* **Architecture**: 3 Modular Spring Boot Microservices (`research-service` :9741, `ai-intelligent-service` :9742, `dataset-service` :9743) + Next.js App Router Frontend (:3000) + MySQL (:3306).
+* **Core Capabilities**:
+  - Deterministic entity normalization, tracking parameter stripping, and canonical SHA-256 ID generation.
+  - Multi-source search discovery (Tavily provider + Mock fallback) with polite web scraping and bounded HTTP guardrails.
+  - LLM extraction via Google Gemini with deterministic heuristic fallback.
+  - Multi-source evidence corroboration engine with source agreement confidence boosting and conflict tracking.
+  - Diagnostic warning collection and partial failure resiliency.
+  - Bounded async research job execution (`ThreadPoolExecutor`) with non-blocking status polling.
+  - Relational MySQL persistence with index optimizations and paginated catalog exploration.
+  - Rich interactive frontend with dual async/sync execution modes, confidence badges, exact evidence quotes, and catalog inspector.
 
 ---
 
-## 7. Documentation Index
+## 7. Quick Start
+
+### 1. Environment Configuration
+Copy the template to create your `.env` file:
+```bash
+cp .env.example .env
+```
+*(Optional: Add your `SEARCH_PROVIDER_API_KEY` for Tavily or `GEMINI_API_KEY` for live Google Gemini).*
+
+### 2. Start Services via Docker Compose
+To start the full stack (MySQL, all 3 backend services, and the Next.js frontend):
+```bash
+docker compose -f infrastructure/docker/docker-compose-dev-all.yml up -d
+```
+Or start only MySQL if running services locally from your IDE / terminal:
+```bash
+docker compose -f infrastructure/docker/docker-compose-dev.yml up -d
+```
+
+### 3. Service Endpoints
+* **Web UI**: [http://localhost:3000](http://localhost:3000)
+* **Research Service**: [http://localhost:9741](http://localhost:9741)
+* **AI Intelligent Service**: [http://localhost:9742](http://localhost:9742)
+* **Dataset Service**: [http://localhost:9743](http://localhost:9743)
+* **MySQL Database**: `localhost:3306` (database: `enrichment_db`, user: `enrichment_user`)
+
+---
+
+## 8. Documentation Index
 
 The canonical platform documentation is centrally organized under `docs/`:
 
 ### Technical Setup & Architecture
 * 🏛️ **[Project Structure & Service Responsibilities](docs/setup/project-structure.md)**: Canonical directory ownership, backend service boundaries, port mapping, and environment strategies.
-* 🚀 **[Research Workflow & Target Pipeline](docs/setup/research-workflow.md)**: Production-oriented technical roadmap for turning the Research API into an active discovery, retrieval, and enrichment pipeline.
-* 📐 **[Entity Model](docs/setup/entity-model.md)**: Minimal generic domain concepts (Entity, Research Request, Evidence, Enrichment Result) and in-memory vs. persistent design.
-* 🔌 **[API Design](docs/setup/api-design.md)**: Minimal synchronous research API endpoint (`POST /api/v1/research`), request/response schemas, and future microservice boundaries.
+* 🚀 **[Research Workflow & Target Pipeline](docs/setup/research-workflow.md)**: Production-oriented technical roadmap for discovery, retrieval, and enrichment.
+* 📐 **[Entity Model](docs/setup/entity-model.md)**: Generic domain concepts, evidence tuples, multi-source corroboration, and relational schema.
+* 🔌 **[API Design](docs/setup/api-design.md)**: Complete HTTP API specification across all microservices (sync, async jobs, entities, and extraction).
 
-### Initial Foundations
+### Foundations & Architecture
 * 📄 **[Problem Statement & Scope](docs/initial/problem.md)**: Problem analysis, generic entity goals, scope boundaries, and reality constraints.
-* 🏗️ **[Architecture & Decisions](docs/initial/architecture.md)**: System design, Spring ecosystem direction, authoritative project structure, roadmap, and ADRs.
-* 🔍 **[Enrichment & Research Engine](docs/initial/enrichment.md)**: Autonomous research engine, Spring AI tool calling, evidence tuple pattern, confidence tiers, and research limitations.
+* 🏗️ **[Architecture & Decisions](docs/initial/architecture.md)**: System design, Spring ecosystem direction, authoritative structure, and ADRs.
+* 🔍 **[Enrichment & Research Engine](docs/initial/enrichment.md)**: Autonomous research engine, Spring AI tool calling, evidence schema, and limitations.
 
 ### Learning Guides
 * 🌐 **[HTTP Media Type Negotiation](docs/learning/http-media-type-negotiation.md)**: Deep dive on `consumes` and `produces` content negotiation guards and RFC 7807 error handling in Spring Boot.
 * 📚 **[Concepts 01–10: Web & Retrieval Foundations](docs/learning/concepts-01-10.md)**
 * 🤖 **[Concepts 11–20: AI Research & Evidence](docs/learning/concepts-11-20.md)**
 * ⚙️ **[Concepts 21–30: Spring Implementation & Reliability](docs/learning/concepts-21-30.md)**
+
 

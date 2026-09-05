@@ -105,19 +105,102 @@ public class EvidenceExtractor {
                                     ? "AI Quote: \"" + fact.exactQuote() + "\""
                                     : "AI Structured Extraction";
 
-                            if (!attributes.containsKey(factKey)) {
-                                attributes.put(factKey, new EvidenceTuple(fact.value(), doc.url(), snippet, tier));
-                            } else if ("description".equalsIgnoreCase(factKey)) {
-                                EvidenceTuple existingDesc = attributes.get("description");
-                                if (existingDesc.confidence() == ConfidenceTier.LOW && tier != ConfidenceTier.LOW) {
-                                    attributes.put("description", new EvidenceTuple(fact.value(), doc.url(), snippet, tier));
-                                }
-                            }
+                            mergeAttribute(attributes, factKey, fact.value(), doc.url(), snippet, tier);
                         }
                     });
                 }
             }
         }
+    }
+
+    private void mergeAttribute(
+            Map<String, EvidenceTuple> attributes,
+            String key,
+            String value,
+            String sourceUrl,
+            String snippet,
+            ConfidenceTier tier
+    ) {
+        if (value == null || value.isBlank()) {
+            return;
+        }
+
+        EvidenceTuple existing = attributes.get(key);
+        if (existing == null) {
+            attributes.put(key, new EvidenceTuple(value, sourceUrl, snippet, tier));
+            return;
+        }
+
+        // Multi-Source Corroboration & Conflict Resolution
+        List<String> sources = new java.util.ArrayList<>(existing.corroboratingSources() != null ? existing.corroboratingSources() : List.of());
+        if (sourceUrl != null && !sources.contains(sourceUrl)) {
+            sources.add(sourceUrl);
+        }
+
+        if (isAgreement(existing.value(), value)) {
+            // Agreement detected -> boost confidence
+            ConfidenceTier current = existing.confidence() != null ? existing.confidence() : ConfidenceTier.LOW;
+            ConfidenceTier boostedTier = switch (current) {
+                case UNKNOWN, LOW -> ConfidenceTier.MEDIUM;
+                case MEDIUM, HIGH -> ConfidenceTier.HIGH;
+            };
+
+            String combinedSnippet = existing.evidenceSnippet() != null ? existing.evidenceSnippet() : snippet;
+            if (snippet != null && !combinedSnippet.contains(snippet)) {
+                combinedSnippet += " | Corroborating: " + snippet;
+            }
+
+            attributes.put(key, new EvidenceTuple(
+                    existing.value(),
+                    existing.sourceUrl(),
+                    combinedSnippet,
+                    boostedTier,
+                    sources,
+                    existing.conflictDetected()
+            ));
+        } else {
+            // Disagreement detected -> resolve based on tier precedence
+            int comp = compareConfidence(tier, existing.confidence());
+            if (comp > 0) {
+                // New incoming evidence is stronger
+                String conflictSnippet = snippet + " (Alternative '" + existing.value() + "' found in " + existing.sourceUrl() + ")";
+                attributes.put(key, new EvidenceTuple(
+                        value,
+                        sourceUrl,
+                        conflictSnippet,
+                        tier == ConfidenceTier.HIGH ? ConfidenceTier.MEDIUM : ConfidenceTier.LOW,
+                        sources,
+                        true
+                ));
+            } else {
+                // Existing evidence is stronger or equal
+                String conflictSnippet = existing.evidenceSnippet() + " (Conflict: alternative '" + value + "' reported in " + sourceUrl + ")";
+                ConfidenceTier resolvedTier = comp == 0 && existing.confidence() == ConfidenceTier.HIGH ? ConfidenceTier.MEDIUM : existing.confidence();
+                attributes.put(key, new EvidenceTuple(
+                        existing.value(),
+                        existing.sourceUrl(),
+                        conflictSnippet,
+                        resolvedTier,
+                        sources,
+                        true
+                ));
+            }
+        }
+    }
+
+    private boolean isAgreement(String v1, String v2) {
+        if (v1 == null || v2 == null) return false;
+        String s1 = v1.trim().toLowerCase(java.util.Locale.ROOT);
+        String s2 = v2.trim().toLowerCase(java.util.Locale.ROOT);
+        return s1.equals(s2) || (s1.length() > 10 && s2.length() > 10 && (s1.contains(s2) || s2.contains(s1)));
+    }
+
+    private int compareConfidence(ConfidenceTier t1, ConfidenceTier t2) {
+        if (t1 == t2) return 0;
+        if (t1 == ConfidenceTier.HIGH) return 1;
+        if (t2 == ConfidenceTier.HIGH) return -1;
+        if (t1 == ConfidenceTier.MEDIUM) return 1;
+        return -1;
     }
 
     private EvidenceTuple extractDescription(

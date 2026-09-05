@@ -38,6 +38,11 @@ public class DefaultEntityNormalizer implements EntityNormalizer {
         return new ResearchTarget(rawUrl, canonicalUrl, entityId, type, displayName, metadata);
     }
 
+    private static final java.util.Set<String> TRACKING_PARAMS = java.util.Set.of(
+            "utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content",
+            "ref_src", "fbclid", "gclid", "mc_eid", "_ga", "_gl"
+    );
+
     public String canonicalizeUrl(String rawUrl) {
         if (rawUrl == null || rawUrl.isBlank()) {
             return "";
@@ -47,11 +52,30 @@ public class DefaultEntityNormalizer implements EntityNormalizer {
             String scheme = uri.getScheme() != null ? uri.getScheme().toLowerCase(Locale.ROOT) : "https";
             String host = uri.getHost() != null ? uri.getHost().toLowerCase(Locale.ROOT) : "";
             int port = uri.getPort();
+
             String path = uri.getPath();
             if (path == null || path.isEmpty()) {
                 path = "/";
+            } else if (path.length() > 1 && path.endsWith("/")) {
+                // Strip trailing slash on non-root paths for identity deduplication
+                path = path.substring(0, path.length() - 1);
             }
-            String query = uri.getQuery() != null ? "?" + uri.getQuery() : "";
+
+            // Strip tracking parameters and sort remaining query parameters alphabetically
+            String query = "";
+            if (uri.getQuery() != null && !uri.getQuery().isBlank()) {
+                String cleanParams = java.util.Arrays.stream(uri.getQuery().split("&"))
+                        .filter(param -> !param.isBlank())
+                        .filter(param -> {
+                            String key = param.split("=")[0].toLowerCase(Locale.ROOT);
+                            return !TRACKING_PARAMS.contains(key);
+                        })
+                        .sorted()
+                        .collect(java.util.stream.Collectors.joining("&"));
+                if (!cleanParams.isBlank()) {
+                    query = "?" + cleanParams;
+                }
+            }
 
             String portPart = (port == -1 || (scheme.equals("http") && port == 80) || (scheme.equals("https") && port == 443))
                     ? "" : ":" + port;
