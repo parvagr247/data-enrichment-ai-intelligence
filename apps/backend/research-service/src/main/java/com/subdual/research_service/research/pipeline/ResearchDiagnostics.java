@@ -4,10 +4,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-/**
- * Execution-scoped container for collecting research warnings, diagnostic notices,
- * and determining degraded execution states.
- */
 public class ResearchDiagnostics {
 
     private final List<String> warnings = new ArrayList<>();

@@ -10,10 +10,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Execution-scoped state container representing the lifecycle of one research operation.
- * Eliminates parameter explosion across pipeline stages while keeping state strictly bounded.
- */
 public class ResearchContext {
 
     private final ResearchRequest request;

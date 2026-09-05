@@ -4,9 +4,7 @@ import com.subdual.research_service.api.dto.EvidenceTuple;
 import com.subdual.research_service.research.model.ResearchSource;
 import com.subdual.research_service.research.model.ResearchTarget;
 import com.subdual.research_service.research.pipeline.ResearchDiagnostics;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -18,19 +16,13 @@ import java.util.Map;
  * record diagnostics warnings and never fail an otherwise successful research execution.
  */
 @Component
+@Slf4j
 public class DefaultResearchSnapshotPersister implements ResearchSnapshotPersister {
-
-    private static final Logger log = LoggerFactory.getLogger(DefaultResearchSnapshotPersister.class);
 
     private final DatasetPersistenceClient persistenceClient;
 
-    @Autowired
     public DefaultResearchSnapshotPersister(DatasetPersistenceClient persistenceClient) {
         this.persistenceClient = persistenceClient != null ? persistenceClient : new NoOpDatasetPersistenceClient();
-    }
-
-    public DefaultResearchSnapshotPersister() {
-        this(new NoOpDatasetPersistenceClient());
     }
 
     @Override

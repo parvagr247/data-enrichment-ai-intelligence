@@ -19,9 +19,6 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * JPA entity representing a canonical research entity persisted in MySQL.
- */
 @Entity
 @Table(name = "entities", indexes = {
         @Index(name = "idx_entities_type", columnList = "entity_type")

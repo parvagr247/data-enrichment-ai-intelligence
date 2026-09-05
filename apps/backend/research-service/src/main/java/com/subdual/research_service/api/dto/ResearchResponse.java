@@ -4,9 +4,6 @@ import com.subdual.research_service.research.model.ResearchStatus;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Top-level response returned by the research endpoint.
- */
 public record ResearchResponse(
         ResearchStatus status,
         String entityId,

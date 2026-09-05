@@ -19,7 +19,7 @@ class SourceProcessorTest {
 
     @BeforeEach
     void setUp() {
-        sourceProcessor = new SourceProcessor();
+        sourceProcessor = new SourceProcessor(new DeterministicSourceClassifier(), new DeterministicRelevanceEvaluator());
     }
 
     @Test

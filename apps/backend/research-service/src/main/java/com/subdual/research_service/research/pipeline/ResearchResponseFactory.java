@@ -13,10 +13,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Factory responsible for creating ResearchResponse DTOs,
- * mapping domain representations to response views, and calculating status.
- */
 @Component
 public class ResearchResponseFactory {
 

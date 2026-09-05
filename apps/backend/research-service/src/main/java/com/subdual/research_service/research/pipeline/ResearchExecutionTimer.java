@@ -1,9 +1,5 @@
 package com.subdual.research_service.research.pipeline;
 
-/**
- * Clean timer abstraction for tracking pipeline execution durations
- * without scattering System.currentTimeMillis() across business logic.
- */
 public class ResearchExecutionTimer {
 
     private final long startNanos;

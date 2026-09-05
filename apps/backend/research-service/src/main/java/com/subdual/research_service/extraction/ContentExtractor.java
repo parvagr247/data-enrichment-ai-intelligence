@@ -8,51 +8,54 @@ import org.springframework.stereotype.Component;
 
 import java.time.Instant;
 
-/**
- * Extracts structured textual content, semantic metadata, and titles from raw HTML/JSON fetched pages.
- * Strips script tags, navigation boilerplate, headers, and footers.
- */
 @Component
 public class ContentExtractor {
 
     public ExtractedDocument extract(FetchedContent fetched, int maxContentLength) {
-        if (fetched == null || !fetched.success() || fetched.rawBody() == null || fetched.rawBody().isBlank()) {
-            return new ExtractedDocument(
-                    fetched != null ? fetched.url() : "",
-                    null,
-                    "",
-                    null,
-                    null
-            );
+        if (!isValidFetch(fetched)) {
+            return createEmptyDocument(fetched);
         }
 
         try {
             Document doc = Jsoup.parse(fetched.rawBody(), fetched.url());
-
-            // Extract semantic metadata tags
             String title = extractTitle(doc);
-            String metaDescription = extractMetaTag(doc, "name", "description");
-            if (metaDescription == null || metaDescription.isBlank()) {
-                metaDescription = extractMetaTag(doc, "property", "og:description");
-            }
-
+            String metaDescription = extractMetaDescription(doc);
             String siteName = extractMetaTag(doc, "property", "og:site_name");
-
-            // Strip noise and boilerplate tags before extracting clean body text
-            doc.select("script, style, nav, header, footer, noscript, svg, form").remove();
-
-            Element body = doc.body();
-            String rawText = body != null ? body.text() : doc.text();
-            String cleanText = rawText.replaceAll("\\s+", " ").trim();
-
-            if (maxContentLength > 0 && cleanText.length() > maxContentLength) {
-                cleanText = cleanText.substring(0, maxContentLength);
-            }
+            String cleanText = extractCleanBodyText(doc, maxContentLength);
 
             return new ExtractedDocument(fetched.url(), title, metaDescription, siteName, cleanText, Instant.now());
         } catch (Exception ex) {
-            return new ExtractedDocument(fetched.url(), null, null, null, "", Instant.now());
+            return createEmptyDocument(fetched);
         }
+    }
+
+    private boolean isValidFetch(FetchedContent fetched) {
+        return fetched != null
+                && fetched.success()
+                && fetched.rawBody() != null
+                && !fetched.rawBody().isBlank();
+    }
+
+    private ExtractedDocument createEmptyDocument(FetchedContent fetched) {
+        String url = fetched != null ? fetched.url() : "";
+        return new ExtractedDocument(url, null, null, null, "", Instant.now());
+    }
+
+    private String extractCleanBodyText(Document doc, int maxContentLength) {
+        stripNoiseTags(doc);
+
+        Element body = doc.body();
+        String rawText = body != null ? body.text() : doc.text();
+        String cleanText = rawText.replaceAll("\\s+", " ").trim();
+
+        if (maxContentLength > 0 && cleanText.length() > maxContentLength) {
+            return cleanText.substring(0, maxContentLength);
+        }
+        return cleanText;
+    }
+
+    private void stripNoiseTags(Document doc) {
+        doc.select("script, style, nav, header, footer, noscript, svg, form").remove();
     }
 
     private String extractTitle(Document doc) {
@@ -69,6 +72,14 @@ public class ContentExtractor {
             return h1.text().trim();
         }
         return null;
+    }
+
+    private String extractMetaDescription(Document doc) {
+        String metaDescription = extractMetaTag(doc, "name", "description");
+        if (metaDescription == null || metaDescription.isBlank()) {
+            metaDescription = extractMetaTag(doc, "property", "og:description");
+        }
+        return metaDescription;
     }
 
     private String extractMetaTag(Document doc, String attrKey, String attrValue) {

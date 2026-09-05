@@ -17,9 +17,6 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-/**
- * JPA entity representing a verified fact attribute and its evidence citation.
- */
 @Entity
 @Table(name = "entity_attributes", indexes = {
         @Index(name = "idx_attributes_entity_id", columnList = "entity_id"),

@@ -5,7 +5,6 @@ import com.subdual.research_service.integration.ai.dto.AiExtractedFact;
 import com.subdual.research_service.integration.ai.dto.AiExtractionRequest;
 import com.subdual.research_service.integration.ai.dto.AiExtractionResponse;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
@@ -23,34 +22,9 @@ public class RestAiExtractionClient implements AiExtractionClient {
     private final RestClient restClient;
     private final String serviceUrl;
 
-    @Autowired
     public RestAiExtractionClient(ServiceMeshProperties properties, RestClient.Builder restClientBuilder) {
         this.serviceUrl = properties != null ? properties.aiIntelligentServiceUrl() : "http://localhost:9742";
-        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
-        requestFactory.setConnectTimeout(Duration.ofMillis(3000));
-        requestFactory.setReadTimeout(Duration.ofMillis(5000));
-
-        RestClient.Builder builder = restClientBuilder != null ? restClientBuilder : RestClient.builder();
-        this.restClient = builder
-                .baseUrl(this.serviceUrl)
-                .requestFactory(requestFactory)
-                .build();
-    }
-
-    public RestAiExtractionClient(ServiceMeshProperties properties) {
-        this(properties, RestClient.builder());
-    }
-
-    public RestAiExtractionClient(String serviceUrl) {
-        this.serviceUrl = serviceUrl;
-        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
-        requestFactory.setConnectTimeout(Duration.ofMillis(3000));
-        requestFactory.setReadTimeout(Duration.ofMillis(5000));
-
-        this.restClient = RestClient.builder()
-                .baseUrl(this.serviceUrl)
-                .requestFactory(requestFactory)
-                .build();
+        this.restClient = createHttpClient(this.serviceUrl, restClientBuilder);
     }
 
     @Override
@@ -61,15 +35,19 @@ public class RestAiExtractionClient implements AiExtractionClient {
             String textContent,
             List<String> targetFields
     ) {
-        try {
-            AiExtractionRequest request = new AiExtractionRequest(
-                    entityName,
-                    entityType,
-                    sourceUrl,
-                    textContent,
-                    targetFields
-            );
+        AiExtractionRequest request = new AiExtractionRequest(
+                entityName,
+                entityType,
+                sourceUrl,
+                textContent,
+                targetFields
+        );
 
+        return executeExtraction(request, entityName);
+    }
+
+    private Map<String, AiExtractedFact> executeExtraction(AiExtractionRequest request, String entityName) {
+        try {
             log.info("[ServiceMesh: AI_EXTRACTION] Requesting fact extraction from {} for entity '{}'",
                     serviceUrl, entityName);
 
@@ -91,5 +69,17 @@ public class RestAiExtractionClient implements AiExtractionClient {
         }
 
         return Collections.emptyMap();
+    }
+
+    private static RestClient createHttpClient(String serviceUrl, RestClient.Builder restClientBuilder) {
+        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(Duration.ofMillis(3000));
+        requestFactory.setReadTimeout(Duration.ofMillis(5000));
+
+        RestClient.Builder builder = restClientBuilder != null ? restClientBuilder : RestClient.builder();
+        return builder
+                .baseUrl(serviceUrl)
+                .requestFactory(requestFactory)
+                .build();
     }
 }

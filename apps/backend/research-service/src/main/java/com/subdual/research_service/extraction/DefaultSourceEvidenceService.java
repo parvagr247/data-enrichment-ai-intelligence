@@ -16,10 +16,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Default implementation of SourceEvidenceService coordinating web fetching,
- * document extraction, entity resolution, and grounded evidence extraction.
- */
 @Component
 @RequiredArgsConstructor
 @Slf4j

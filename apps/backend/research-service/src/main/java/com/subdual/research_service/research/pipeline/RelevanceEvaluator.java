@@ -3,9 +3,6 @@ package com.subdual.research_service.research.pipeline;
 import com.subdual.research_service.research.model.DiscoveredSource;
 import com.subdual.research_service.research.model.ResearchTarget;
 
-/**
- * Strategy interface for scoring and ranking candidate sources relative to a target entity.
- */
 public interface RelevanceEvaluator {
 
     double evaluateRelevance(DiscoveredSource source, String classifiedType, ResearchTarget target);

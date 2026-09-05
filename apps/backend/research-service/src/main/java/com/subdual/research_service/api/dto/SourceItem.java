@@ -4,9 +4,6 @@ import java.net.URI;
 import java.time.Instant;
 import java.util.Locale;
 
-/**
- * Normalized representation of a discovered research source.
- */
 public record SourceItem(
         String url,
         String title,

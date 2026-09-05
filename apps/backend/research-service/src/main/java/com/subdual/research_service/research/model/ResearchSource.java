@@ -4,9 +4,6 @@ import java.net.URI;
 import java.time.Instant;
 import java.util.Locale;
 
-/**
- * Internal domain representation of a processed research source.
- */
 public record ResearchSource(
         String url,
         String title,

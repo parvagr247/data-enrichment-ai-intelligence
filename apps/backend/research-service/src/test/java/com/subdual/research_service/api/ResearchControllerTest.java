@@ -6,6 +6,8 @@ import com.subdual.research_service.api.dto.ResearchResult;
 import com.subdual.research_service.api.dto.SourceItem;
 import com.subdual.research_service.common.exception.ExternalServiceException;
 import com.subdual.research_service.common.exception.GlobalExceptionHandler;
+import com.subdual.research_service.research.InMemoryResearchJobService;
+import com.subdual.research_service.research.ResearchJobService;
 import com.subdual.research_service.research.ResearchService;
 import com.subdual.research_service.research.model.EntityType;
 import com.subdual.research_service.research.model.ResearchStatus;
@@ -23,6 +25,7 @@ import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeoutException;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -45,7 +48,8 @@ class ResearchControllerTest {
         LocalValidatorFactoryBean validator = new LocalValidatorFactoryBean();
         validator.afterPropertiesSet();
 
-        mockMvc = MockMvcBuilders.standaloneSetup(new ResearchController(researchService))
+        ResearchJobService researchJobService = new InMemoryResearchJobService(researchService, Executors.newSingleThreadExecutor());
+        mockMvc = MockMvcBuilders.standaloneSetup(new ResearchController(researchService, researchJobService))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .setValidator(validator)
                 .build();
@@ -142,7 +146,7 @@ class ResearchControllerTest {
                 "Jane Doe",
                 EntityType.PERSON,
                 "urn:entity:person:jane-doe",
-                java.util.Map.of()
+                Map.of()
         );
         ResearchResponse mockResponse = new ResearchResponse(
                 ResearchStatus.COMPLETED,

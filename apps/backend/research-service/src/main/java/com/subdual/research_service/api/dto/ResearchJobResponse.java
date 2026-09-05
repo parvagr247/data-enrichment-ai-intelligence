@@ -2,6 +2,7 @@ package com.subdual.research_service.api.dto;
 
 import com.subdual.research_service.research.model.ResearchJobStatus;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 
@@ -17,7 +18,6 @@ public record ResearchJobResponse(
         List<String> warnings
 ) {
 
-        // created constructor with these 7 parameters only
     public ResearchJobResponse(
             String jobId,
             ResearchJobStatus status,
@@ -33,7 +33,7 @@ public record ResearchJobResponse(
                 progress,
                 createdAt,
                 completedAt,
-                completedAt != null && createdAt != null ? java.time.Duration.between(createdAt, completedAt).toMillis() : null,
+                completedAt != null && createdAt != null ? Duration.between(createdAt, completedAt).toMillis() : null,
                 result,
                 error,
                 result != null && result.warnings() != null ? result.warnings() : List.of()

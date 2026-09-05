@@ -1,38 +1,26 @@
-package com.subdual.research_service.discovery;
+package com.subdual.research_service.discovery.service;
 
-import com.subdual.research_service.config.ResearchDiscoveryProperties;
-import com.subdual.research_service.research.model.DiscoveredSource;
-import com.subdual.research_service.research.model.ResearchTarget;
 import com.subdual.research_service.common.exception.BusinessRuleException;
 import com.subdual.research_service.common.exception.ExternalServiceException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.subdual.research_service.config.ResearchDiscoveryProperties;
+import com.subdual.research_service.discovery.QueryBuilder;
+import com.subdual.research_service.discovery.provider.SearchProvider;
+import com.subdual.research_service.research.model.DiscoveredSource;
+import com.subdual.research_service.research.model.ResearchTarget;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 
-/**
- * Default implementation of ResearchDiscoveryService isolating query generation,
- * search provider invocation, and error handling.
- */
 @Service
+@RequiredArgsConstructor
+@Slf4j
 public class DefaultResearchDiscoveryService implements ResearchDiscoveryService {
-
-    private static final Logger log = LoggerFactory.getLogger(DefaultResearchDiscoveryService.class);
 
     private final SearchProvider searchProvider;
     private final QueryBuilder queryBuilder;
     private final ResearchDiscoveryProperties discoveryProperties;
-
-    public DefaultResearchDiscoveryService(
-            SearchProvider searchProvider,
-            QueryBuilder queryBuilder,
-            ResearchDiscoveryProperties discoveryProperties
-    ) {
-        this.searchProvider = searchProvider;
-        this.queryBuilder = queryBuilder;
-        this.discoveryProperties = discoveryProperties;
-    }
 
     @Override
     public List<DiscoveredSource> discoverSources(ResearchTarget target) {
@@ -41,7 +29,7 @@ public class DefaultResearchDiscoveryService implements ResearchDiscoveryService
                 discoveryProperties.provider(), query);
 
         try {
-            return searchProvider.discoverSources(query, discoveryProperties.maxResults());
+            return searchProvider.search(query, discoveryProperties.maxResults());
         } catch (BusinessRuleException ex) {
             throw ex;
         } catch (ExternalServiceException ex) {

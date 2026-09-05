@@ -1,5 +1,6 @@
 package com.subdual.research_service.integration.web;
 
+import com.subdual.research_service.config.ResearchDiscoveryProperties;
 import com.subdual.research_service.config.WebFetchProperties;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -14,7 +15,7 @@ class DefaultWebContentFetcherTest {
     @BeforeEach
     void setUp() {
         WebFetchProperties properties = new WebFetchProperties(3000, 5000, 5, "TestBot/1.0");
-        fetcher = new DefaultWebContentFetcher(properties, true); // mockMode = true
+        fetcher = new DefaultWebContentFetcher(properties, new ResearchDiscoveryProperties("mock", null, null, 5, 4000));
     }
 
     @Test
@@ -34,7 +35,7 @@ class DefaultWebContentFetcherTest {
     void shouldBlockSsrfHosts() {
         // Create a non-mock fetcher to test SSRF hostname validation
         WebFetchProperties properties = new WebFetchProperties(3000, 5000, 5, "TestBot/1.0");
-        DefaultWebContentFetcher liveFetcher = new DefaultWebContentFetcher(properties, false);
+        DefaultWebContentFetcher liveFetcher = new DefaultWebContentFetcher(properties, new ResearchDiscoveryProperties("tavily", null, null, 5, 4000));
 
         FetchedContent localhostResult = liveFetcher.fetch("http://localhost:8080/actuator");
         assertThat(localhostResult.success()).isFalse();
@@ -54,7 +55,7 @@ class DefaultWebContentFetcherTest {
     @DisplayName("Should reject invalid or unsupported URI schemes")
     void shouldRejectInvalidSchemes() {
         WebFetchProperties properties = new WebFetchProperties(3000, 5000, 5, "TestBot/1.0");
-        DefaultWebContentFetcher liveFetcher = new DefaultWebContentFetcher(properties, false);
+        DefaultWebContentFetcher liveFetcher = new DefaultWebContentFetcher(properties, new ResearchDiscoveryProperties("tavily", null, null, 5, 4000));
 
         FetchedContent ftpResult = liveFetcher.fetch("ftp://ftp.example.com/file");
         assertThat(ftpResult.success()).isFalse();

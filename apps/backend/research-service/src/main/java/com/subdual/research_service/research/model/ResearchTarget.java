@@ -2,9 +2,6 @@ package com.subdual.research_service.research.model;
 
 import java.util.Map;
 
-/**
- * Normalized internal entity target driving research and discovery.
- */
 public record ResearchTarget(
         String rawUrl,
         String canonicalUrl,

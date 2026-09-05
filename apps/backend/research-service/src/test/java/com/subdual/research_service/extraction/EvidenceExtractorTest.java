@@ -5,6 +5,7 @@ import com.subdual.research_service.research.model.ConfidenceTier;
 import com.subdual.research_service.research.model.EntityType;
 import com.subdual.research_service.research.model.ResearchSource;
 import com.subdual.research_service.research.model.ResearchTarget;
+import com.subdual.research_service.integration.ai.NoOpAiExtractionClient;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -21,7 +22,7 @@ class EvidenceExtractorTest {
 
     @BeforeEach
     void setUp() {
-        extractor = new EvidenceExtractor();
+        extractor = new EvidenceExtractor(new NoOpAiExtractionClient());
     }
 
     @Test

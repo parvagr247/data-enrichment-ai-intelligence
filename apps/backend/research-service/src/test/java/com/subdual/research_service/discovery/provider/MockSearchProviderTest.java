@@ -1,4 +1,4 @@
-package com.subdual.research_service.discovery;
+package com.subdual.research_service.discovery.provider;
 
 import com.subdual.research_service.common.exception.ExternalServiceException;
 import com.subdual.research_service.research.model.DiscoveredSource;
@@ -12,19 +12,19 @@ import java.util.concurrent.TimeoutException;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-class MockResearchSourceClientTest {
+class MockSearchProviderTest {
 
-    private MockResearchSourceClient client;
+    private MockSearchProvider provider;
 
     @BeforeEach
     void setUp() {
-        client = new MockResearchSourceClient();
+        provider = new MockSearchProvider();
     }
 
     @Test
     @DisplayName("Should return realistic sources for Spring Boot query")
     void shouldReturnSourcesForSpringBootQuery() {
-        List<DiscoveredSource> sources = client.discoverSources("spring-projects/spring-boot repository", 5);
+        List<DiscoveredSource> sources = provider.search("spring-projects/spring-boot repository", 5);
 
         assertThat(sources).isNotEmpty();
         assertThat(sources).anyMatch(s -> s.url().contains("github.com/spring-projects/spring-boot") && s.sourceType().equals("GITHUB"));
@@ -35,7 +35,7 @@ class MockResearchSourceClientTest {
     @Test
     @DisplayName("Should return realistic sources for LinkedIn / Example organization query")
     void shouldReturnSourcesForLinkedInQuery() {
-        List<DiscoveredSource> sources = client.discoverSources("example linkedin organization", 5);
+        List<DiscoveredSource> sources = provider.search("example linkedin organization", 5);
 
         assertThat(sources).isNotEmpty();
         assertThat(sources).anyMatch(s -> s.sourceType().equals("OFFICIAL_WEBSITE"));
@@ -46,17 +46,17 @@ class MockResearchSourceClientTest {
     @Test
     @DisplayName("Should return empty list for empty or obscure query")
     void shouldReturnEmptyListForObscureQuery() {
-        List<DiscoveredSource> sources = client.discoverSources("obscure-zero-results", 5);
+        List<DiscoveredSource> sources = provider.search("obscure-zero-results", 5);
         assertThat(sources).isEmpty();
 
-        List<DiscoveredSource> nullSources = client.discoverSources(null, 5);
+        List<DiscoveredSource> nullSources = provider.search(null, 5);
         assertThat(nullSources).isEmpty();
     }
 
     @Test
     @DisplayName("Should throw ExternalServiceException on failure simulation query")
     void shouldThrowOnSimulatedFailure() {
-        assertThatThrownBy(() -> client.discoverSources("simulate-failure-provider", 5))
+        assertThatThrownBy(() -> provider.search("simulate-failure-provider", 5))
                 .isInstanceOf(ExternalServiceException.class)
                 .hasMessageContaining("502 Bad Gateway");
     }
@@ -64,7 +64,7 @@ class MockResearchSourceClientTest {
     @Test
     @DisplayName("Should throw ExternalServiceException with TimeoutException on timeout simulation query")
     void shouldThrowOnSimulatedTimeout() {
-        assertThatThrownBy(() -> client.discoverSources("simulate-timeout-provider", 5))
+        assertThatThrownBy(() -> provider.search("simulate-timeout-provider", 5))
                 .isInstanceOf(ExternalServiceException.class)
                 .hasCauseInstanceOf(TimeoutException.class)
                 .hasMessageContaining("timed out");
@@ -73,7 +73,7 @@ class MockResearchSourceClientTest {
     @Test
     @DisplayName("Should respect maxResults limit")
     void shouldRespectMaxResultsLimit() {
-        List<DiscoveredSource> sources = client.discoverSources("spring-boot", 2);
+        List<DiscoveredSource> sources = provider.search("spring-boot", 2);
         assertThat(sources).hasSize(2);
     }
 }

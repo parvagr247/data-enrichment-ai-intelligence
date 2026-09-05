@@ -11,6 +11,7 @@ import com.subdual.research_service.research.model.ResearchSource;
 import com.subdual.research_service.research.model.ResearchTarget;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.web.client.RestClient;
 
 import java.time.Instant;
 import java.util.List;
@@ -26,7 +27,7 @@ class RestClientsTest {
     void restAiExtractionClientShouldFallbackGracefullyWhenOffline() {
         // Pointing to a dummy port that is definitely closed
         ServiceMeshProperties properties = new ServiceMeshProperties("http://127.0.0.1:59998", "http://127.0.0.1:59999");
-        RestAiExtractionClient client = new RestAiExtractionClient(properties);
+        RestAiExtractionClient client = new RestAiExtractionClient(properties, RestClient.builder());
 
         Map<String, AiExtractedFact> facts = client.extractFacts(
                 "Acme Corp",
@@ -44,7 +45,7 @@ class RestClientsTest {
     @DisplayName("RestDatasetPersistenceClient should gracefully swallow network errors when upstream is offline")
     void restDatasetPersistenceClientShouldFallbackGracefullyWhenOffline() {
         ServiceMeshProperties properties = new ServiceMeshProperties("http://127.0.0.1:59998", "http://127.0.0.1:59999");
-        RestDatasetPersistenceClient client = new RestDatasetPersistenceClient(properties);
+        RestDatasetPersistenceClient client = new RestDatasetPersistenceClient(properties, RestClient.builder());
 
         ResearchTarget target = new ResearchTarget(
                 "https://acme.org",

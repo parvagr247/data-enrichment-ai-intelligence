@@ -3,9 +3,6 @@ package com.subdual.ai_intelligent_service.dto;
 import jakarta.validation.constraints.NotBlank;
 import java.util.List;
 
-/**
- * Request payload for structured fact extraction from cleaned text.
- */
 public record ExtractionRequest(
         @NotBlank(message = "Field 'entityName' must not be blank")
         String entityName,

@@ -10,16 +10,18 @@ import com.subdual.research_service.common.validation.ResearchRequestValidator;
 import com.subdual.research_service.config.ResearchDiscoveryProperties;
 import com.subdual.research_service.config.ResearchPipelineProperties;
 import com.subdual.research_service.config.WebFetchProperties;
-import com.subdual.research_service.discovery.DefaultResearchDiscoveryService;
 import com.subdual.research_service.discovery.QueryBuilder;
-import com.subdual.research_service.discovery.ResearchDiscoveryService;
-import com.subdual.research_service.discovery.ResearchSourceClient;
+import com.subdual.research_service.discovery.provider.SearchProvider;
+import com.subdual.research_service.discovery.service.DefaultResearchDiscoveryService;
+import com.subdual.research_service.discovery.service.ResearchDiscoveryService;
 import com.subdual.research_service.extraction.ContentExtractor;
 import com.subdual.research_service.extraction.DefaultSourceEvidenceService;
 import com.subdual.research_service.extraction.EntityResolver;
 import com.subdual.research_service.extraction.EvidenceExtractor;
 import com.subdual.research_service.extraction.SourceEvidenceService;
+import com.subdual.research_service.integration.ai.NoOpAiExtractionClient;
 import com.subdual.research_service.integration.persistence.DefaultResearchSnapshotPersister;
+import com.subdual.research_service.integration.persistence.NoOpDatasetPersistenceClient;
 import com.subdual.research_service.integration.persistence.ResearchSnapshotPersister;
 import com.subdual.research_service.integration.web.DefaultWebContentFetcher;
 import com.subdual.research_service.research.model.ConfidenceTier;
@@ -27,6 +29,8 @@ import com.subdual.research_service.research.model.DiscoveredSource;
 import com.subdual.research_service.research.model.EntityType;
 import com.subdual.research_service.research.model.ResearchStatus;
 import com.subdual.research_service.research.pipeline.DefaultEntityNormalizer;
+import com.subdual.research_service.research.pipeline.DeterministicRelevanceEvaluator;
+import com.subdual.research_service.research.pipeline.DeterministicSourceClassifier;
 import com.subdual.research_service.research.pipeline.EntityNormalizer;
 import com.subdual.research_service.research.pipeline.ResearchResponseFactory;
 import com.subdual.research_service.research.pipeline.SourceProcessor;
@@ -51,7 +55,7 @@ import static org.mockito.Mockito.when;
 class ResearchServiceTest {
 
     @Mock
-    private ResearchSourceClient researchSourceClient;
+    private SearchProvider searchProvider;
 
     private ResearchService researchService;
 
@@ -64,16 +68,19 @@ class ResearchServiceTest {
         ResearchRequestValidator validator = new ResearchRequestValidator();
         EntityNormalizer entityNormalizer = new DefaultEntityNormalizer();
         ResearchDiscoveryService discoveryService = new DefaultResearchDiscoveryService(
-                researchSourceClient, new QueryBuilder(), discoveryProperties);
-        SourceProcessor sourceProcessor = new SourceProcessor();
+                searchProvider, new QueryBuilder(), discoveryProperties);
+        SourceProcessor sourceProcessor = new SourceProcessor(
+                new DeterministicSourceClassifier(),
+                new DeterministicRelevanceEvaluator()
+        );
         SourceEvidenceService sourceEvidenceService = new DefaultSourceEvidenceService(
-                new DefaultWebContentFetcher(webProperties, true),
+                new DefaultWebContentFetcher(webProperties, discoveryProperties),
                 new ContentExtractor(),
                 new EntityResolver(),
-                new EvidenceExtractor(),
+                new EvidenceExtractor(new NoOpAiExtractionClient()),
                 pipelineProperties
         );
-        ResearchSnapshotPersister persister = new DefaultResearchSnapshotPersister();
+        ResearchSnapshotPersister persister = new DefaultResearchSnapshotPersister(new NoOpDatasetPersistenceClient());
         ResearchResponseFactory responseFactory = new ResearchResponseFactory();
 
         researchService = new ResearchOrchestrator(
@@ -102,7 +109,7 @@ class ResearchServiceTest {
                         "Spring Boot Reference", "DOCUMENTATION", now, 0.90)
         );
 
-        when(researchSourceClient.discoverSources(anyString(), anyInt())).thenReturn(mockSources);
+        when(searchProvider.search(anyString(), anyInt())).thenReturn(mockSources);
 
         ResearchRequest request = new ResearchRequest(
                 "https://github.com/spring-projects/spring-boot",
@@ -127,13 +134,13 @@ class ResearchServiceTest {
         assertThat(firstSource.sourceType()).isEqualTo("GITHUB");
         assertThat(firstSource.relevance()).isEqualTo(1.00);
 
-        verify(researchSourceClient).discoverSources(anyString(), anyInt());
+        verify(searchProvider).search(anyString(), anyInt());
     }
 
     @Test
     @DisplayName("Should handle empty discovered sources gracefully")
     void shouldHandleEmptyDiscoveredSourcesGracefully() {
-        when(researchSourceClient.discoverSources(anyString(), anyInt())).thenReturn(List.of());
+        when(searchProvider.search(anyString(), anyInt())).thenReturn(List.of());
 
         ResearchRequest request = new ResearchRequest(
                 "https://example.com/obscure-item",
@@ -161,7 +168,7 @@ class ResearchServiceTest {
                         "Spring Boot Docs", "DOCUMENTATION", now, 0.90)
         );
 
-        when(researchSourceClient.discoverSources(anyString(), anyInt())).thenReturn(mockSources);
+        when(searchProvider.search(anyString(), anyInt())).thenReturn(mockSources);
 
         ResearchRequest request = new ResearchRequest("https://spring.io", EntityType.ORGANIZATION, "Spring");
         ResearchResponse response = researchService.executeResearch(request);
@@ -183,7 +190,7 @@ class ResearchServiceTest {
                 new DiscoveredSource("https://example.com/valid", "Valid", "OFFICIAL_WEBSITE", now, 0.90)
         );
 
-        when(researchSourceClient.discoverSources(anyString(), anyInt())).thenReturn(mockSources);
+        when(searchProvider.search(anyString(), anyInt())).thenReturn(mockSources);
 
         ResearchRequest request = new ResearchRequest("https://example.com", EntityType.WEBSITE, "Example");
         ResearchResponse response = researchService.executeResearch(request);
@@ -195,7 +202,7 @@ class ResearchServiceTest {
     @Test
     @DisplayName("Should propagate ExternalServiceException when discovery provider fails")
     void shouldPropagateExternalServiceException() {
-        when(researchSourceClient.discoverSources(anyString(), anyInt()))
+        when(searchProvider.search(anyString(), anyInt()))
                 .thenThrow(new ExternalServiceException("Upstream search provider returned 502 Bad Gateway"));
 
         ResearchRequest request = new ResearchRequest("https://example.com/fail", EntityType.OTHER, "Fail");
@@ -208,7 +215,7 @@ class ResearchServiceTest {
     @Test
     @DisplayName("Should default entityType to OTHER and displayName to canonicalUrl when omitted")
     void shouldHandleDefaultEntityTypeAndNullName() {
-        when(researchSourceClient.discoverSources(anyString(), anyInt())).thenReturn(List.of());
+        when(searchProvider.search(anyString(), anyInt())).thenReturn(List.of());
 
         ResearchRequest request = new ResearchRequest(
                 "https://example.com/company",
@@ -227,7 +234,7 @@ class ResearchServiceTest {
     @Test
     @DisplayName("Should produce consistent deterministic entityId for same canonical URL")
     void shouldProduceDeterministicEntityId() {
-        when(researchSourceClient.discoverSources(anyString(), anyInt())).thenReturn(List.of());
+        when(searchProvider.search(anyString(), anyInt())).thenReturn(List.of());
 
         ResearchRequest request1 = new ResearchRequest("https://example.com/test", EntityType.ORGANIZATION, "Test Org");
         ResearchRequest request2 = new ResearchRequest("https://example.com/test", EntityType.OTHER, "Different Name");
@@ -261,7 +268,7 @@ class ResearchServiceTest {
                         "Spring Boot makes it easy to create stand-alone applications.")
         );
 
-        when(researchSourceClient.discoverSources(anyString(), anyInt())).thenReturn(mockSources);
+        when(searchProvider.search(anyString(), anyInt())).thenReturn(mockSources);
 
         ResearchRequest request = new ResearchRequest(
                 "https://github.com/spring-projects/spring-boot",

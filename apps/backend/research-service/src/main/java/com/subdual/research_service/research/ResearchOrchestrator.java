@@ -6,7 +6,7 @@ import com.subdual.research_service.api.dto.ResearchResponse;
 import com.subdual.research_service.common.validation.ResearchRequestValidator;
 import com.subdual.research_service.config.ResearchDiscoveryProperties;
 import com.subdual.research_service.config.ResearchPipelineProperties;
-import com.subdual.research_service.discovery.ResearchDiscoveryService;
+import com.subdual.research_service.discovery.service.ResearchDiscoveryService;
 import com.subdual.research_service.extraction.SourceEvidenceService;
 import com.subdual.research_service.integration.persistence.ResearchSnapshotPersister;
 import com.subdual.research_service.research.model.DiscoveredSource;
@@ -26,10 +26,6 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Clean, intention-revealing pipeline orchestrator coordinating the research lifecycle.
- * Executes steps: validate -> normalize -> discover -> process sources -> extract evidence -> persist -> assemble response.
- */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -47,23 +43,7 @@ public class ResearchOrchestrator implements ResearchService {
 
     @Override
     public ResearchResponse executeResearch(ResearchRequest request) {
-        ResearchExecutionTimer timer = ResearchExecutionTimer.start();
-        ResearchDiagnostics diagnostics = new ResearchDiagnostics();
-
-        validate(request);
-        ResearchTarget target = normalize(request);
-
-        MDC.put("entityId", target.entityId());
-        try {
-            List<DiscoveredSource> rawSources = discover(target);
-            List<ResearchSource> rankedSources = processSources(rawSources, target);
-            Map<String, EvidenceTuple> attributes = extractEvidence(target, rankedSources, diagnostics);
-            persistSnapshot(target, rankedSources, attributes, diagnostics);
-
-            return assembleResponse(target, rankedSources, attributes, rawSources.size(), timer.elapsedMillis(), diagnostics);
-        } finally {
-            MDC.remove("entityId");
-        }
+        return execute(new ResearchContext(request));
     }
 
     public ResearchResponse execute(ResearchContext context) {

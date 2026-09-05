@@ -1,109 +1,162 @@
 # Research Service
 
-## 1. Why This Service Exists
-The **Research Service** is the core orchestrator of the entire platform. It coordinates discovery, web page retrieval, grounded attribute extraction, multi-source corroboration, and persistence.
-* **Separation of Concerns**: Orchestrates the workflow across external search APIs (Tavily/Mock), the AI extraction engine (`ai-intelligent-service`), and the relational store (`dataset-service`).
-* **Asynchronous & Synchronous Execution**: Supports both real-time synchronous enrichment and non-blocking asynchronous background jobs with bounded concurrency.
+Production-grade entity discovery, content extraction, and grounded evidence enrichment microservice.
 
 ---
 
-## 2. API Specifications
+## 1. What This Service Does
 
-### `POST /api/v1/research`
-Executes synchronous end-to-end research for an entity.
-* **Request Body** (`ResearchRequest`):
-  ```json
-  {
-    "name": "Spring Boot",
-    "url": "https://spring.io/projects/spring-boot?utm_source=docs",
-    "entityType": "FRAMEWORK"
-  }
-  ```
-* **Response**: `200 OK` [`ResearchResponse`](file:///P:/Agentic%20AI/Enrichment%20Platform/data-enrichment-ai-intelligence/apps/backend/research-service/src/main/java/com/subdual/research_service/dto/response/ResearchResponse.java) (includes target info, ranked sources, grounded evidence tuples, and diagnostic timings).
-
-### `POST /api/v1/research/jobs`
-Submits an asynchronous research task.
-* **Request Body**: Same as `ResearchRequest`.
-* **Response**: `202 Accepted` [`ResearchJobResponse`](file:///P:/Agentic%20AI/Enrichment%20Platform/data-enrichment-ai-intelligence/apps/backend/research-service/src/main/java/com/subdual/research_service/dto/response/ResearchJobResponse.java) with `jobId`, `status: SUBMITTED`, `progress: 0`.
-
-### `GET /api/v1/research/jobs/{jobId}`
-Polls the execution status of an asynchronous research job.
-* **Response**: `200 OK` (`ResearchJobResponse` with `status: IN_PROGRESS | COMPLETED | FAILED`, duration, and completed result).
+The **Research Service** is responsible for autonomous, grounded entity intelligence gathering across the web and enterprise data repositories:
+- **Canonical Identity Resolution:** Normalizes dirty input URLs, cleans tracking parameters, and computes deterministic SHA-256 entity hashes.
+- **Multi-Source Discovery:** Queries external search providers (e.g. Tavily or local mock) to discover official websites, repositories, documentation, and profiles.
+- **Content Ingestion & Cleansing:** Safely fetches web resources with built-in SSRF protection, parses HTML/JSON via Jsoup, strips boilerplate/navigation, and produces structured documents.
+- **Heuristic & AI Evidence Extraction:** Resolves entities to pages and extracts structured evidence tuples with confidence tiers (`HIGH`, `MEDIUM`, `LOW`, `UNKNOWN`), snippets, and corroborating citations.
+- **Asynchronous Job Scheduling:** Supports synchronous REST execution (`POST /api/v1/research`) as well as bounded thread pool asynchronous execution (`POST /api/v1/research/jobs`, `GET /api/v1/research/jobs/{id}`).
+- **Resilient Persistence Integration:** Emits enriched entity snapshots to `dataset-service` via non-blocking HTTP REST integration.
 
 ---
 
-## 3. Service Flow (Short)
+## 2. Package Structure & Architectural Boundaries
+
+`research-service` is organized into **7 distinct, cohesive architectural boundaries** within a single deployable Spring Boot module:
+
+```text
+com.subdual.research_service/
+├── api/                  # Inbound REST layer
+│   ├── ResearchController.java
+│   └── dto/              # Public JSON contracts (Request, Response, Evidence, Job)
+├── research/             # Core business boundary & lifecycle orchestration
+│   ├── ResearchService.java
+│   ├── ResearchOrchestrator.java
+│   ├── ResearchJobService.java
+│   ├── InMemoryResearchJobService.java
+│   ├── model/            # Immutable domain representations (records & enums)
+│   └── pipeline/         # Intention-revealing pipeline steps, diagnostics & timer
+├── discovery/            # Strategy-based search query builder and provider clients
+│   ├── service/          # Discovery service contract and orchestration
+│   │   ├── ResearchDiscoveryService.java
+│   │   └── DefaultResearchDiscoveryService.java
+│   ├── provider/         # Strategy abstraction & search provider implementations
+│   │   ├── SearchProvider.java
+│   │   ├── TavilySearchProvider.java
+│   │   └── MockSearchProvider.java
+│   └── QueryBuilder.java # Shared discovery query generation
+├── extraction/           # HTML extraction, entity resolution, evidence harvesting
+│   ├── ExtractedDocument.java
+│   ├── ContentExtractor.java
+│   ├── EntityResolver.java
+│   ├── EvidenceExtractor.java
+│   └── SourceEvidenceService.java
+├── integration/          # Outbound network integration clients
+│   ├── web/              # SSRF-guarded HTTP fetcher and FetchedContent
+│   ├── ai/               # REST client for downstream ai-intelligent-service
+│   └── persistence/      # REST client & persister for dataset-service
+├── config/               # Type-safe @ConfigurationProperties and Spring @Configuration
+│   ├── ResearchConfiguration.java
+│   ├── ResearchDiscoveryProperties.java
+│   ├── ResearchPipelineProperties.java
+│   ├── WebFetchProperties.java
+│   └── ServiceMeshProperties.java
+└── common/               # Shared cross-cutting concerns
+    ├── exception/        # BusinessRuleException, ExternalServiceException, RFC 7807 handler
+    └── validation/       # Request validation rules
+```
+
+---
+
+## 3. High-Level Flow
+
+Every research operation follows a clean, 7-step sequential pipeline coordinated by `ResearchOrchestrator`:
 
 ```
-[Client Request]
+ResearchRequest
    │
-   ├─► Sync: ResearchController.executeResearch ──┐
-   └─► Async: InMemoryResearchJobService.submitJob ─┤
-                                                    ▼
-                                     DefaultResearchPipeline.execute(context)
-                                                    │
-    ┌───────────────────────────────────────────────┴───────────────────────────────────────────────┐
-    ▼ 1. VALIDATE: ResearchRequestValidator checks format and constraints                           │
-    ▼ 2. NORMALIZE: EntityNormalizer cleans URL, strips tracking tags, hashes SHA-256 entityId     │
-    ▼ 3. DISCOVER: ResearchDiscoveryService queries TavilySearchProvider or MockSearchProvider      │
-    ▼ 4. PROCESS SOURCES: SourceProcessor fetches web HTML, cleans text, and ranks sources         │
-    ▼ 5. EXTRACT EVIDENCE: SourceEvidenceService delegates to AiExtractionClient (port 9742)       │
-    │     └── Applies multi-source corroboration and conflict resolution                            │
-    ▼ 6. PERSIST SNAPSHOT: ResearchSnapshotPersister sends payload to dataset-service (port 9743)  │
-    ▼ 7. ASSEMBLE: Bundles EvidenceTuples, execution time, and diagnostic warnings into response     │
-    └───────────────────────────────────────────────────────────────────────────────────────────────┘
+   ▼
+[1. Validate]           ──> Enforces URL format, entity type, and required fields
+   │
+   ▼
+[2. Normalize]          ──> Strips tracking query params, derives canonical URN/URL, computes SHA-256 ID
+   │
+   ▼
+[3. Discover]           ──> Formulates domain search query; fetches candidate URLs via SearchProvider
+   │
+   ▼
+[4. Process Sources]    ──> Deduplicates, classifies domain category, evaluates composite quality score
+   │
+   ▼
+[5. Extract Evidence]   ──> SSRF-safe content fetch -> DOM cleanup -> Entity resolution -> Evidence tuples
+   │
+   ▼
+[6. Persist Snapshot]   ──> Asynchronous / non-blocking persistence to dataset-service (resilient to failure)
+   │
+   ▼
+[7. Assemble Response]  ──> Binds metadata (timing, counts, provider), sets status (COMPLETED/PARTIAL)
+   │
+   ▼
+ResearchResponse
 ```
 
 ---
 
-## 4. Critical & Non-Trivial Code (Why Only This)
+## 4. Why We Chose a Single Module
 
-### A. Grounded Evidence Tuple with Multi-Source Corroboration & Conflict Resolution
-* **Location**: [`EvidenceExtractor.java`](file:///P:/Agentic%20AI/Enrichment%20Platform/data-enrichment-ai-intelligence/apps/backend/research-service/src/main/java/com/subdual/research_service/extraction/EvidenceExtractor.java#L133-L188)
-```java
-if (isAgreement(existing.value(), value)) {
-    // Agreement detected -> boost confidence tier (LOW -> MEDIUM -> HIGH)
-    ConfidenceTier boostedTier = switch (current) {
-        case UNKNOWN, LOW -> ConfidenceTier.MEDIUM;
-        case MEDIUM, HIGH -> ConfidenceTier.HIGH;
-    };
-    attributes.put(key, new EvidenceTuple(existing.value(), existing.sourceUrl(), combinedSnippet, boostedTier, sources, false));
-} else {
-    // Disagreement detected -> resolve based on tier precedence and flag conflict
-    attributes.put(key, new EvidenceTuple(chosenValue, chosenSource, conflictSnippet, resolvedTier, sources, true));
-}
-```
-* **Why only this**: Raw web extraction produces conflicting or low-quality data. Rather than blindly overwriting keys, this algorithm corroborates claims across distinct URLs. Agreement boosts confidence tier, while disagreement retains the competing fact in the snippet and explicitly sets `conflictDetected = true`.
+Rather than prematurely splitting this service into multiple Maven submodules (e.g. `research-api`, `research-core`, `research-infra`), we adopted a **modular-monolith architecture within a single Spring Boot service**:
+1. **Zero Multi-Module Overhead:** Eliminates complex Maven pom interdependencies, circular references, version skew, and duplicate plugin configurations.
+2. **Fast Development & Build Cycles:** Compilation, test execution (`mvn test`), and container packaging remain instantaneous.
+3. **Rigorous Encapsulation Without Bureaucracy:** Package-private visibility and cohesive package boundaries provide strong architectural isolation without runtime friction.
+4. **Single Unit of Deployment:** Directly builds into a single self-contained executable JAR and Docker image.
 
-### B. URL Canonicalization & Tracking Stripping
-* **Location**: [`DefaultEntityNormalizer.java`](file:///P:/Agentic%20AI/Enrichment%20Platform/data-enrichment-ai-intelligence/apps/backend/research-service/src/main/java/com/subdual/research_service/normalization/DefaultEntityNormalizer.java#L53-L92)
-```java
-private static final Set<String> TRACKING_PARAMS = Set.of(
-    "utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content",
-    "ref_src", "fbclid", "gclid", "mc_eid", "_ga", "_gl"
-);
-```
-* **Why only this**: Research requests submitted with marketing tracking query parameters (e.g. `?utm_source=twitter`) would otherwise generate different SHA-256 entity hashes, causing duplicate database entries and cache misses for the exact same target webpage.
+---
 
-### C. Bounded Thread Pool with Backpressure (`CallerRunsPolicy`)
-* **Location**: [`InMemoryResearchJobService.java`](file:///P:/Agentic%20AI/Enrichment%20Platform/data-enrichment-ai-intelligence/apps/backend/research-service/src/main/java/com/subdual/research_service/service/InMemoryResearchJobService.java#L49-L57)
-```java
-this.executor = new ThreadPoolExecutor(
-    4,
-    16,
-    60L, TimeUnit.SECONDS,
-    new LinkedBlockingQueue<>(500),
-    threadFactory,
-    new ThreadPoolExecutor.CallerRunsPolicy()
-);
-```
-* **Why only this**: Scraping and AI extraction are high-latency I/O operations. An unbounded queue or thread pool causes thread starvation and OutOfMemoryError under burst traffic. Bounding the queue to 500 and using `CallerRunsPolicy` forces the submitting HTTP thread to execute tasks when overloaded, applying natural backpressure.
+## 5. Key Design Principles
 
-### D. Pluggable Service Mesh & Mock Adaptability
-* **Location**: [`ServiceMeshConfiguration.java`](file:///P:/Agentic%20AI/Enrichment%20Platform/data-enrichment-ai-intelligence/apps/backend/research-service/src/main/java/com/subdual/research_service/configuration/ServiceMeshConfiguration.java) & [`ResearchDiscoveryConfiguration.java`](file:///P:/Agentic%20AI/Enrichment%20Platform/data-enrichment-ai-intelligence/apps/backend/research-service/src/main/java/com/subdual/research_service/configuration/ResearchDiscoveryConfiguration.java)
-```java
-// Dynamically wires TavilySearchProvider vs MockSearchProvider
-// Dynamically wires RestAiExtractionClient vs NoOpAiExtractionClient
-// Dynamically wires RestDatasetPersistenceClient vs NoOpDatasetPersistenceClient
+- **Constructor Injection:** No `@Autowired` on private fields; all beans use constructor injection.
+- **Immutability First:** Domain state, contracts, and intermediate values are immutable Java `record`s.
+- **Intention-Revealing Methods:** Step methods in `ResearchOrchestrator` are short (5–15 lines), clearly communicating *what* is happening at every stage.
+- **Resilience & Non-Blocking Fallback:** Outbound HTTP failures to `dataset-service` or `ai-intelligent-service` log warnings and degrade to `PARTIAL` status rather than crashing user requests.
+- **Zero Hallucination / Evidence Provenance:** Every extracted attribute explicitly cites its origin URL, exact textual snippet, and confidence tier.
+- **Security / SSRF Hardening:** `WebContentFetcher` strictly rejects non-HTTP protocols, private IP ranges (RFC 1918), localhost/loopback, and internal container hostnames.
+
+---
+
+## 6. How to Run & Test
+
+### Local Maven Commands
+```bash
+# Compile and check dependencies
+mvn clean compile -DskipTests
+
+# Run the complete test suite (92 tests)
+mvn test
+
+# Package standalone executable JAR
+mvn clean package -DskipTests
 ```
-* **Why only this**: Allows the entire research pipeline to run in offline local development or unit test suites without requiring paid API tokens (Tavily, Gemini) or active remote microservices.
+
+### Docker Execution
+```bash
+# Build and start container via root compose
+docker compose -f infrastructure/docker/docker-compose-dev-all.yml up -d --build research-service
+
+# Check service logs
+docker compose -f infrastructure/docker/docker-compose-dev-all.yml logs -f research-service
+```
+
+---
+
+## 7. Configuration Reference
+
+Configuration properties defined in `application.yml`:
+
+| Property | Default | Description |
+| :--- | :--- | :--- |
+| `research.discovery.provider` | `mock` | Active search provider (`mock` or `tavily`) |
+| `research.discovery.api-key` | `${TAVILY_API_KEY:}` | API key for Tavily search provider |
+| `research.discovery.max-results` | `5` | Maximum candidate search results per query |
+| `research.pipeline.max-sources` | `5` | Maximum ranked sources to ingest and extract |
+| `research.pipeline.max-content-length` | `50000` | Maximum clean text character limit per document |
+| `research.fetch.connect-timeout-ms` | `3000` | Web content fetch connection timeout |
+| `research.fetch.read-timeout-ms` | `5000` | Web content fetch read timeout |
+| `research.fetch.max-redirects` | `5` | Maximum HTTP redirect hops permitted |
+| `service-mesh.dataset-service-url` | `http://localhost:9743` | Endpoint for downstream dataset persistence |
+| `service-mesh.ai-service-url` | `http://localhost:9742` | Endpoint for downstream AI extraction service |

@@ -18,10 +18,6 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-/**
- * Normalizes discovered search results, applies source classification,
- * evaluates composite relevance/quality scores, deduplicates, and ranks sources.
- */
 @Component
 @RequiredArgsConstructor
 @Slf4j
@@ -34,10 +30,6 @@ public class SourceProcessor {
 
     private final SourceClassifier sourceClassifier;
     private final RelevanceEvaluator relevanceEvaluator;
-
-    public SourceProcessor() {
-        this(new DeterministicSourceClassifier(), new DeterministicRelevanceEvaluator());
-    }
 
     public List<ResearchSource> processSources(List<DiscoveredSource> rawSources, ResearchTarget target, int maxSources) {
         return processSources(rawSources, target, maxSources, null);
@@ -52,90 +44,110 @@ public class SourceProcessor {
         List<ResearchSource> processed = new ArrayList<>();
 
         for (DiscoveredSource ds : rawSources) {
-            if (ds == null || ds.url() == null || ds.url().isBlank()) {
+            if (!isValidSource(ds)) {
                 continue;
             }
 
-            // 1. URL Normalization
             String normalizedUrl = normalizeDiscoveredUrl(ds.url());
-            if (normalizedUrl == null || seenUrls.contains(normalizedUrl)) {
+            if (normalizedUrl == null || !seenUrls.add(normalizedUrl)) {
                 continue;
             }
-            seenUrls.add(normalizedUrl);
 
-            String title = (ds.title() != null && !ds.title().isBlank())
-                    ? ds.title().trim()
-                    : normalizedUrl;
-
-            // 2. Source Classification
-            String sourceType = classifySourceType(normalizedUrl, ds.sourceType(), target);
-
-            // 3. Relevance & Quality Evaluation
-            Instant retrievedAt = ds.retrievedAt() != null ? ds.retrievedAt() : Instant.now();
-            double providerRelevance = ds.relevance() != null ? ds.relevance() : 0.80;
-            double qualityScore = calculateRankedScore(providerRelevance, sourceType, target);
-
-            String domain = ResearchSource.extractDomain(normalizedUrl);
-
-            processed.add(new ResearchSource(
-                    normalizedUrl,
-                    title,
-                    sourceType,
-                    retrievedAt,
-                    providerRelevance,
-                    qualityScore,
-                    ds.snippet(),
-                    domain,
-                    provider
-            ));
+            processed.add(buildResearchSource(ds, normalizedUrl, target, provider));
         }
 
-        // 4. Rank by composite quality score descending
-        processed.sort(Comparator.comparingDouble(ResearchSource::qualityScore).reversed());
+        return rankAndLimit(processed, maxSources);
+    }
 
-        int limit = Math.min(processed.size(), Math.max(1, maxSources));
-        return processed.subList(0, limit);
+    private boolean isValidSource(DiscoveredSource ds) {
+        return ds != null && ds.url() != null && !ds.url().isBlank();
+    }
+
+    private ResearchSource buildResearchSource(DiscoveredSource ds, String normalizedUrl, ResearchTarget target, String provider) {
+        String title = resolveTitle(ds.title(), normalizedUrl);
+        String sourceType = classifySourceType(normalizedUrl, ds.sourceType(), target);
+
+        Instant retrievedAt = ds.retrievedAt() != null ? ds.retrievedAt() : Instant.now();
+        double providerRelevance = ds.relevance() != null ? ds.relevance() : 0.80;
+        double qualityScore = calculateRankedScore(providerRelevance, sourceType, target);
+        String domain = ResearchSource.extractDomain(normalizedUrl);
+
+        return new ResearchSource(
+                normalizedUrl,
+                title,
+                sourceType,
+                retrievedAt,
+                providerRelevance,
+                qualityScore,
+                ds.snippet(),
+                domain,
+                provider
+        );
+    }
+
+    private String resolveTitle(String candidateTitle, String fallbackUrl) {
+        return (candidateTitle != null && !candidateTitle.isBlank())
+                ? candidateTitle.trim()
+                : fallbackUrl;
+    }
+
+    private List<ResearchSource> rankAndLimit(List<ResearchSource> sources, int maxSources) {
+        sources.sort(Comparator.comparingDouble(ResearchSource::qualityScore).reversed());
+        int limit = Math.min(sources.size(), Math.max(1, maxSources));
+        return sources.subList(0, limit);
     }
 
     public String normalizeDiscoveredUrl(String rawUrl) {
         try {
             URI uri = URI.create(rawUrl.trim());
             String scheme = uri.getScheme() != null ? uri.getScheme().toLowerCase(Locale.ROOT) : null;
-            if (scheme == null || (!scheme.equals("http") && !scheme.equals("https"))) {
+            if (!isSupportedScheme(scheme)) {
                 return null;
             }
+
             String host = uri.getHost() != null ? uri.getHost().toLowerCase(Locale.ROOT) : null;
             if (host == null || host.isBlank()) {
                 return null;
             }
 
-            int port = uri.getPort();
-            String portPart = (port == -1 || (scheme.equals("http") && port == 80) || (scheme.equals("https") && port == 443))
-                    ? "" : ":" + port;
-
-            String path = uri.getPath();
-            if (path == null || path.isEmpty()) {
-                path = "/";
-            }
-
-            // Strip tracking query parameters
-            String cleanQuery = "";
-            if (uri.getQuery() != null && !uri.getQuery().isBlank()) {
-                String filtered = Arrays.stream(uri.getQuery().split("&"))
-                        .filter(param -> {
-                            String paramName = param.split("=")[0].toLowerCase(Locale.ROOT);
-                            return !TRACKING_PARAMS.contains(paramName);
-                        })
-                        .collect(Collectors.joining("&"));
-                if (!filtered.isBlank()) {
-                    cleanQuery = "?" + filtered;
-                }
-            }
+            String portPart = formatPort(scheme, uri.getPort());
+            String path = normalizePath(uri.getPath());
+            String cleanQuery = cleanTrackingQuery(uri.getQuery());
 
             return scheme + "://" + host + portPart + path + cleanQuery;
         } catch (Exception ex) {
             return null;
         }
+    }
+
+    private boolean isSupportedScheme(String scheme) {
+        return "http".equals(scheme) || "https".equals(scheme);
+    }
+
+    private String normalizePath(String path) {
+        return (path == null || path.isEmpty()) ? "/" : path;
+    }
+
+    private String formatPort(String scheme, int port) {
+        boolean isDefaultPort = port == -1
+                || ("http".equals(scheme) && port == 80)
+                || ("https".equals(scheme) && port == 443);
+        return isDefaultPort ? "" : ":" + port;
+    }
+
+    private String cleanTrackingQuery(String rawQuery) {
+        if (rawQuery == null || rawQuery.isBlank()) {
+            return "";
+        }
+
+        String filtered = Arrays.stream(rawQuery.split("&"))
+                .filter(param -> {
+                    String paramName = param.split("=")[0].toLowerCase(Locale.ROOT);
+                    return !TRACKING_PARAMS.contains(paramName);
+                })
+                .collect(Collectors.joining("&"));
+
+        return filtered.isBlank() ? "" : "?" + filtered;
     }
 
     public String classifySourceType(String url, String candidateType, ResearchTarget target) {

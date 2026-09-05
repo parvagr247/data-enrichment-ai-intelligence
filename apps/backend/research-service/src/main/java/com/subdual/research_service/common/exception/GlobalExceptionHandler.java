@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.net.URI;
+import java.util.concurrent.TimeoutException;
 
 @RestControllerAdvice
 @Slf4j
@@ -77,7 +78,7 @@ public class GlobalExceptionHandler {
         log.error("External service failure on {}: {}", INSTANCE_PATH, ex.getMessage());
 
         HttpStatus status = HttpStatus.BAD_GATEWAY;
-        if (ex.getCause() instanceof java.util.concurrent.TimeoutException
+        if (ex.getCause() instanceof TimeoutException
                 || (ex.getMessage() != null && ex.getMessage().toLowerCase().contains("timeout"))) {
             status = HttpStatus.GATEWAY_TIMEOUT;
         }

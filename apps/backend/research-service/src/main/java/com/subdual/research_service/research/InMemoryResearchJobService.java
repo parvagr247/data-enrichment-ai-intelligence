@@ -5,10 +5,10 @@ import com.subdual.research_service.api.dto.ResearchRequest;
 import com.subdual.research_service.api.dto.ResearchResponse;
 import com.subdual.research_service.research.model.ResearchJob;
 import com.subdual.research_service.research.model.ResearchJobStatus;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
 import org.springframework.beans.factory.DisposableBean;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -18,51 +18,17 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.UnaryOperator;
 
-/**
- * Production-oriented in-memory asynchronous job service.
- * Manages background execution of multi-source research tasks with bounded concurrency,
- * lifecycle state tracking, duration diagnostics, and SLF4J MDC job correlation.
- */
 @Service
+@RequiredArgsConstructor
 @Slf4j
 public class InMemoryResearchJobService implements ResearchJobService, DisposableBean {
 
     private final ResearchService researchService;
-    private final Map<String, ResearchJob> jobs = new ConcurrentHashMap<>();
     private final ExecutorService executor;
-
-    @Autowired
-    public InMemoryResearchJobService(ResearchService researchService) {
-        this.researchService = researchService;
-        AtomicInteger workerNumber = new AtomicInteger(1);
-        ThreadFactory threadFactory = runnable -> {
-            Thread thread = new Thread(runnable, "research-worker-" + workerNumber.getAndIncrement());
-            thread.setDaemon(true);
-            return thread;
-        };
-
-        // Bounded executor to prevent uncontrolled thread explosion and OutOfMemoryError
-        this.executor = new ThreadPoolExecutor(
-                4,
-                16,
-                60L,
-                TimeUnit.SECONDS,
-                new LinkedBlockingQueue<>(500),
-                threadFactory,
-                new ThreadPoolExecutor.CallerRunsPolicy()
-        );
-    }
-
-    public InMemoryResearchJobService(ResearchService researchService, ExecutorService executor) {
-        this.researchService = researchService;
-        this.executor = executor;
-    }
+    private final Map<String, ResearchJob> jobs = new ConcurrentHashMap<>();
 
     @Override
     public ResearchJobResponse submitJob(ResearchRequest request) {
@@ -102,7 +68,7 @@ public class InMemoryResearchJobService implements ResearchJobService, Disposabl
         }
     }
 
-    private void updateJob(String jobId, java.util.function.UnaryOperator<ResearchJob> updater) {
+    private void updateJob(String jobId, UnaryOperator<ResearchJob> updater) {
         jobs.computeIfPresent(jobId, (id, current) -> updater.apply(current));
     }
 

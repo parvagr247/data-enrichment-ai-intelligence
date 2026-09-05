@@ -8,12 +8,13 @@ import com.subdual.research_service.research.model.ConfidenceTier;
 import com.subdual.research_service.research.model.EntityType;
 import com.subdual.research_service.research.model.ResearchSource;
 import com.subdual.research_service.research.model.ResearchTarget;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 @Component
@@ -21,11 +22,6 @@ public class EvidenceExtractor {
 
     private final AiExtractionClient aiExtractionClient;
 
-    public EvidenceExtractor() {
-        this(new NoOpAiExtractionClient());
-    }
-
-    @Autowired
     public EvidenceExtractor(AiExtractionClient aiExtractionClient) {
         this.aiExtractionClient = aiExtractionClient != null ? aiExtractionClient : new NoOpAiExtractionClient();
     }
@@ -42,38 +38,25 @@ public class EvidenceExtractor {
             return attributes;
         }
 
-        // 1. Extract Description Attribute
-        EvidenceTuple descriptionEvidence = extractDescription(target, documents, sources, resolutions);
-        if (descriptionEvidence != null) {
-            attributes.put("description", descriptionEvidence);
-        }
+        putIfPresent(attributes, "description", extractDescription(target, documents, sources, resolutions));
+        putIfPresent(attributes, "title", extractTitle(target, documents, sources, resolutions));
+        putIfPresent(attributes, "site_name", extractSiteName(documents, resolutions));
 
-        // 2. Extract Title / Display Name Attribute
-        EvidenceTuple titleEvidence = extractTitle(target, documents, sources, resolutions);
-        if (titleEvidence != null) {
-            attributes.put("title", titleEvidence);
-        }
-
-        // 3. Extract Site / Publisher Name Attribute
-        EvidenceTuple siteNameEvidence = extractSiteName(documents, resolutions);
-        if (siteNameEvidence != null) {
-            attributes.put("site_name", siteNameEvidence);
-        }
-
-        // 4. Extract Entity-Specific Attributes
         if (target.entityType() == EntityType.REPOSITORY) {
-            EvidenceTuple repoEvidence = extractRepositoryInfo(target, documents);
-            if (repoEvidence != null) {
-                attributes.put("repository", repoEvidence);
-            }
+            putIfPresent(attributes, "repository", extractRepositoryInfo(target, documents));
         }
 
-        // 5. Enhance with Structured AI Extraction from Matched Documents
         if (aiExtractionClient != null) {
             enrichWithAiExtraction(target, documents, resolutions, attributes);
         }
 
         return attributes;
+    }
+
+    private void putIfPresent(Map<String, EvidenceTuple> attributes, String key, EvidenceTuple evidence) {
+        if (evidence != null) {
+            attributes.put(key, evidence);
+        }
     }
 
     private void enrichWithAiExtraction(
@@ -83,35 +66,51 @@ public class EvidenceExtractor {
             Map<String, EvidenceTuple> attributes
     ) {
         for (ExtractedDocument doc : documents) {
-            EntityResolver.ResolutionResult res = resolutions.getOrDefault(doc.url(),
-                    new EntityResolver.ResolutionResult(ConfidenceTier.LOW, false, "Unknown"));
-
-            if (res.matched() && doc.cleanText() != null && !doc.cleanText().isBlank()) {
-                Map<String, AiExtractedFact> facts = aiExtractionClient.extractFacts(
-                        target.displayName(),
-                        target.entityType() != null ? target.entityType().name() : "OTHER",
-                        doc.url(),
-                        doc.cleanText(),
-                        List.of("role", "organization", "description", "summary", "headquarters", "technologies")
-                );
-
-                if (facts != null) {
-                    facts.forEach((factKey, fact) -> {
-                        if (fact != null && fact.value() != null && !fact.value().isBlank()) {
-                            ConfidenceTier tier = fact.confidenceScore() >= 0.8
-                                    ? ConfidenceTier.HIGH
-                                    : (fact.confidenceScore() >= 0.5 ? ConfidenceTier.MEDIUM : ConfidenceTier.LOW);
-
-                            String snippet = (fact.exactQuote() != null && !fact.exactQuote().isBlank())
-                                    ? "AI Quote: \"" + fact.exactQuote() + "\""
-                                    : "AI Structured Extraction";
-
-                            mergeAttribute(attributes, factKey, fact.value(), doc.url(), snippet, tier);
-                        }
-                    });
-                }
+            if (!isMatchedDocument(doc, resolutions)) {
+                continue;
             }
+
+            Map<String, AiExtractedFact> facts = aiExtractionClient.extractFacts(
+                    target.displayName(),
+                    target.entityType() != null ? target.entityType().name() : "OTHER",
+                    doc.url(),
+                    doc.cleanText(),
+                    List.of("role", "organization", "description", "summary", "headquarters", "technologies")
+            );
+
+            mergeAiFacts(facts, doc.url(), attributes);
         }
+    }
+
+    private boolean isMatchedDocument(ExtractedDocument doc, Map<String, EntityResolver.ResolutionResult> resolutions) {
+        EntityResolver.ResolutionResult res = getResolution(doc.url(), resolutions);
+        return res.matched() && doc.cleanText() != null && !doc.cleanText().isBlank();
+    }
+
+    private void mergeAiFacts(Map<String, AiExtractedFact> facts, String sourceUrl, Map<String, EvidenceTuple> attributes) {
+        if (facts == null) {
+            return;
+        }
+
+        facts.forEach((factKey, fact) -> {
+            if (fact != null && fact.value() != null && !fact.value().isBlank()) {
+                ConfidenceTier tier = resolveAiConfidenceTier(fact.confidenceScore());
+                String snippet = resolveAiSnippet(fact.exactQuote());
+                mergeAttribute(attributes, factKey, fact.value(), sourceUrl, snippet, tier);
+            }
+        });
+    }
+
+    private ConfidenceTier resolveAiConfidenceTier(double score) {
+        if (score >= 0.8) return ConfidenceTier.HIGH;
+        if (score >= 0.5) return ConfidenceTier.MEDIUM;
+        return ConfidenceTier.LOW;
+    }
+
+    private String resolveAiSnippet(String exactQuote) {
+        return (exactQuote != null && !exactQuote.isBlank())
+                ? "AI Quote: \"" + exactQuote + "\""
+                : "AI Structured Extraction";
     }
 
     private void mergeAttribute(
@@ -132,67 +131,75 @@ public class EvidenceExtractor {
             return;
         }
 
-        // Multi-Source Corroboration & Conflict Resolution
-        List<String> sources = new java.util.ArrayList<>(existing.corroboratingSources() != null ? existing.corroboratingSources() : List.of());
+        List<String> sources = buildCorroboratingSources(existing, sourceUrl);
+        if (isAgreement(existing.value(), value)) {
+            attributes.put(key, corroborateAgreement(existing, value, snippet, sources));
+        } else {
+            attributes.put(key, resolveDisagreement(existing, value, sourceUrl, snippet, tier, sources));
+        }
+    }
+
+    private List<String> buildCorroboratingSources(EvidenceTuple existing, String sourceUrl) {
+        List<String> sources = new ArrayList<>(existing.corroboratingSources() != null ? existing.corroboratingSources() : List.of());
         if (sourceUrl != null && !sources.contains(sourceUrl)) {
             sources.add(sourceUrl);
         }
+        return sources;
+    }
 
-        if (isAgreement(existing.value(), value)) {
-            // Agreement detected -> boost confidence
-            ConfidenceTier current = existing.confidence() != null ? existing.confidence() : ConfidenceTier.LOW;
-            ConfidenceTier boostedTier = switch (current) {
-                case UNKNOWN, LOW -> ConfidenceTier.MEDIUM;
-                case MEDIUM, HIGH -> ConfidenceTier.HIGH;
-            };
+    private EvidenceTuple corroborateAgreement(
+            EvidenceTuple existing,
+            String value,
+            String snippet,
+            List<String> sources
+    ) {
+        ConfidenceTier current = existing.confidence() != null ? existing.confidence() : ConfidenceTier.LOW;
+        ConfidenceTier boostedTier = switch (current) {
+            case UNKNOWN, LOW -> ConfidenceTier.MEDIUM;
+            case MEDIUM, HIGH -> ConfidenceTier.HIGH;
+        };
 
-            String combinedSnippet = existing.evidenceSnippet() != null ? existing.evidenceSnippet() : snippet;
-            if (snippet != null && !combinedSnippet.contains(snippet)) {
-                combinedSnippet += " | Corroborating: " + snippet;
-            }
-
-            attributes.put(key, new EvidenceTuple(
-                    existing.value(),
-                    existing.sourceUrl(),
-                    combinedSnippet,
-                    boostedTier,
-                    sources,
-                    existing.conflictDetected()
-            ));
-        } else {
-            // Disagreement detected -> resolve based on tier precedence
-            int comp = compareConfidence(tier, existing.confidence());
-            if (comp > 0) {
-                // New incoming evidence is stronger
-                String conflictSnippet = snippet + " (Alternative '" + existing.value() + "' found in " + existing.sourceUrl() + ")";
-                attributes.put(key, new EvidenceTuple(
-                        value,
-                        sourceUrl,
-                        conflictSnippet,
-                        tier == ConfidenceTier.HIGH ? ConfidenceTier.MEDIUM : ConfidenceTier.LOW,
-                        sources,
-                        true
-                ));
-            } else {
-                // Existing evidence is stronger or equal
-                String conflictSnippet = existing.evidenceSnippet() + " (Conflict: alternative '" + value + "' reported in " + sourceUrl + ")";
-                ConfidenceTier resolvedTier = comp == 0 && existing.confidence() == ConfidenceTier.HIGH ? ConfidenceTier.MEDIUM : existing.confidence();
-                attributes.put(key, new EvidenceTuple(
-                        existing.value(),
-                        existing.sourceUrl(),
-                        conflictSnippet,
-                        resolvedTier,
-                        sources,
-                        true
-                ));
-            }
+        String combinedSnippet = existing.evidenceSnippet() != null ? existing.evidenceSnippet() : snippet;
+        if (snippet != null && !combinedSnippet.contains(snippet)) {
+            combinedSnippet += " | Corroborating: " + snippet;
         }
+
+        return new EvidenceTuple(
+                existing.value(),
+                existing.sourceUrl(),
+                combinedSnippet,
+                boostedTier,
+                sources,
+                existing.conflictDetected()
+        );
+    }
+
+    private EvidenceTuple resolveDisagreement(
+            EvidenceTuple existing,
+            String value,
+            String sourceUrl,
+            String snippet,
+            ConfidenceTier tier,
+            List<String> sources
+    ) {
+        int comp = compareConfidence(tier, existing.confidence());
+        if (comp > 0) {
+            String conflictSnippet = snippet + " (Alternative '" + existing.value() + "' found in " + existing.sourceUrl() + ")";
+            ConfidenceTier resolvedTier = tier == ConfidenceTier.HIGH ? ConfidenceTier.MEDIUM : ConfidenceTier.LOW;
+            return new EvidenceTuple(value, sourceUrl, conflictSnippet, resolvedTier, sources, true);
+        }
+
+        String conflictSnippet = existing.evidenceSnippet() + " (Conflict: alternative '" + value + "' reported in " + sourceUrl + ")";
+        ConfidenceTier resolvedTier = (comp == 0 && existing.confidence() == ConfidenceTier.HIGH)
+                ? ConfidenceTier.MEDIUM
+                : existing.confidence();
+        return new EvidenceTuple(existing.value(), existing.sourceUrl(), conflictSnippet, resolvedTier, sources, true);
     }
 
     private boolean isAgreement(String v1, String v2) {
         if (v1 == null || v2 == null) return false;
-        String s1 = v1.trim().toLowerCase(java.util.Locale.ROOT);
-        String s2 = v2.trim().toLowerCase(java.util.Locale.ROOT);
+        String s1 = v1.trim().toLowerCase(Locale.ROOT);
+        String s2 = v2.trim().toLowerCase(Locale.ROOT);
         return s1.equals(s2) || (s1.length() > 10 && s2.length() > 10 && (s1.contains(s2) || s2.contains(s1)));
     }
 
@@ -210,27 +217,43 @@ public class EvidenceExtractor {
             List<ResearchSource> sources,
             Map<String, EntityResolver.ResolutionResult> resolutions
     ) {
-        // Look for strongest meta description or content excerpt from matched sources
+        EvidenceTuple metaDesc = extractMetaDescription(documents, resolutions);
+        if (metaDesc != null) {
+            return metaDesc;
+        }
+
+        EvidenceTuple excerpt = extractParagraphExcerpt(documents, resolutions);
+        if (excerpt != null) {
+            return excerpt;
+        }
+
+        return extractSearchSnippet(sources, resolutions);
+    }
+
+    private EvidenceTuple extractMetaDescription(
+            List<ExtractedDocument> documents,
+            Map<String, EntityResolver.ResolutionResult> resolutions
+    ) {
         for (ExtractedDocument doc : documents) {
             if (doc.metaDescription() != null && !doc.metaDescription().isBlank()) {
-                EntityResolver.ResolutionResult res = resolutions.getOrDefault(doc.url(),
-                        new EntityResolver.ResolutionResult(ConfidenceTier.LOW, false, "Unknown"));
-
+                EntityResolver.ResolutionResult res = getResolution(doc.url(), resolutions);
                 if (res.matched()) {
                     ConfidenceTier tier = res.confidence() == ConfidenceTier.HIGH
                             ? ConfidenceTier.HIGH
                             : (res.confidence() == ConfidenceTier.MEDIUM ? ConfidenceTier.MEDIUM : ConfidenceTier.LOW);
-
-                    String snippet = "Meta description: \"" + doc.metaDescription() + "\"";
-                    return new EvidenceTuple(doc.metaDescription(), doc.url(), snippet, tier);
+                    return new EvidenceTuple(doc.metaDescription(), doc.url(), "Meta description: \"" + doc.metaDescription() + "\"", tier);
                 }
             }
         }
+        return null;
+    }
 
-        // Fallback 1: extract first substantial paragraph from a matched document
+    private EvidenceTuple extractParagraphExcerpt(
+            List<ExtractedDocument> documents,
+            Map<String, EntityResolver.ResolutionResult> resolutions
+    ) {
         for (ExtractedDocument doc : documents) {
-            EntityResolver.ResolutionResult res = resolutions.getOrDefault(doc.url(),
-                    new EntityResolver.ResolutionResult(ConfidenceTier.LOW, false, "Unknown"));
+            EntityResolver.ResolutionResult res = getResolution(doc.url(), resolutions);
             if (res.matched() && doc.cleanText() != null && doc.cleanText().length() > 40) {
                 String text = doc.cleanText();
                 int endIdx = Math.min(text.length(), 200);
@@ -239,31 +262,31 @@ public class EvidenceExtractor {
                     endIdx = periodIdx + 1;
                 }
                 String excerpt = text.substring(0, endIdx).trim();
-
-                ConfidenceTier tier = res.confidence() == ConfidenceTier.HIGH
-                        ? ConfidenceTier.MEDIUM
-                        : ConfidenceTier.LOW;
-
+                ConfidenceTier tier = res.confidence() == ConfidenceTier.HIGH ? ConfidenceTier.MEDIUM : ConfidenceTier.LOW;
                 return new EvidenceTuple(excerpt, doc.url(), "Excerpt: \"" + excerpt + "\"", tier);
             }
         }
+        return null;
+    }
 
-        // Fallback 2: Check if any matched source has a search snippet
-        if (sources != null) {
-            for (ResearchSource src : sources) {
-                EntityResolver.ResolutionResult res = resolutions.getOrDefault(src.url(),
-                        new EntityResolver.ResolutionResult(ConfidenceTier.LOW, false, "Unknown"));
-                if (res.matched() && src.snippet() != null && !src.snippet().isBlank()) {
-                    return new EvidenceTuple(
-                            src.snippet(),
-                            src.url(),
-                            "Search snippet: \"" + src.snippet() + "\"",
-                            ConfidenceTier.LOW
-                    );
-                }
+    private EvidenceTuple extractSearchSnippet(
+            List<ResearchSource> sources,
+            Map<String, EntityResolver.ResolutionResult> resolutions
+    ) {
+        if (sources == null) {
+            return null;
+        }
+        for (ResearchSource src : sources) {
+            EntityResolver.ResolutionResult res = getResolution(src.url(), resolutions);
+            if (res.matched() && src.snippet() != null && !src.snippet().isBlank()) {
+                return new EvidenceTuple(
+                        src.snippet(),
+                        src.url(),
+                        "Search snippet: \"" + src.snippet() + "\"",
+                        ConfidenceTier.LOW
+                );
             }
         }
-
         return null;
     }
 
@@ -273,11 +296,20 @@ public class EvidenceExtractor {
             List<ResearchSource> sources,
             Map<String, EntityResolver.ResolutionResult> resolutions
     ) {
+        EvidenceTuple docTitle = extractDocumentTitle(documents, resolutions);
+        if (docTitle != null) {
+            return docTitle;
+        }
+        return extractSourceTitle(sources, resolutions);
+    }
+
+    private EvidenceTuple extractDocumentTitle(
+            List<ExtractedDocument> documents,
+            Map<String, EntityResolver.ResolutionResult> resolutions
+    ) {
         for (ExtractedDocument doc : documents) {
             if (doc.title() != null && !doc.title().isBlank()) {
-                EntityResolver.ResolutionResult res = resolutions.getOrDefault(doc.url(),
-                        new EntityResolver.ResolutionResult(ConfidenceTier.LOW, false, "Unknown"));
-
+                EntityResolver.ResolutionResult res = getResolution(doc.url(), resolutions);
                 if (res.matched()) {
                     ConfidenceTier tier = res.confidence() == ConfidenceTier.HIGH
                             ? ConfidenceTier.HIGH
@@ -286,17 +318,22 @@ public class EvidenceExtractor {
                 }
             }
         }
+        return null;
+    }
 
-        if (sources != null) {
-            for (ResearchSource src : sources) {
-                EntityResolver.ResolutionResult res = resolutions.getOrDefault(src.url(),
-                        new EntityResolver.ResolutionResult(ConfidenceTier.LOW, false, "Unknown"));
-                if (res.matched() && src.title() != null && !src.title().isBlank()) {
-                    return new EvidenceTuple(src.title(), src.url(), "Source title: \"" + src.title() + "\"", ConfidenceTier.LOW);
-                }
+    private EvidenceTuple extractSourceTitle(
+            List<ResearchSource> sources,
+            Map<String, EntityResolver.ResolutionResult> resolutions
+    ) {
+        if (sources == null) {
+            return null;
+        }
+        for (ResearchSource src : sources) {
+            EntityResolver.ResolutionResult res = getResolution(src.url(), resolutions);
+            if (res.matched() && src.title() != null && !src.title().isBlank()) {
+                return new EvidenceTuple(src.title(), src.url(), "Source title: \"" + src.title() + "\"", ConfidenceTier.LOW);
             }
         }
-
         return null;
     }
 
@@ -306,9 +343,7 @@ public class EvidenceExtractor {
     ) {
         for (ExtractedDocument doc : documents) {
             if (doc.siteName() != null && !doc.siteName().isBlank()) {
-                EntityResolver.ResolutionResult res = resolutions.getOrDefault(doc.url(),
-                        new EntityResolver.ResolutionResult(ConfidenceTier.LOW, false, "Unknown"));
-
+                EntityResolver.ResolutionResult res = getResolution(doc.url(), resolutions);
                 if (res.matched()) {
                     return new EvidenceTuple(
                             doc.siteName(),
@@ -319,7 +354,6 @@ public class EvidenceExtractor {
                 }
             }
         }
-
         return null;
     }
 
@@ -338,7 +372,12 @@ public class EvidenceExtractor {
                 }
             }
         } catch (Exception ignored) {}
-
         return null;
+    }
+
+    private EntityResolver.ResolutionResult getResolution(String url, Map<String, EntityResolver.ResolutionResult> resolutions) {
+        return resolutions != null
+                ? resolutions.getOrDefault(url, new EntityResolver.ResolutionResult(ConfidenceTier.LOW, false, "Unknown"))
+                : new EntityResolver.ResolutionResult(ConfidenceTier.LOW, false, "Unknown");
     }
 }

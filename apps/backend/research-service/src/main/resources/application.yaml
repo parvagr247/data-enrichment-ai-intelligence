@@ -23,7 +23,7 @@ research:
     read-timeout-ms: ${WEB_FETCH_READ_TIMEOUT_MS:5000}
     max-response-size-mb: ${WEB_FETCH_MAX_RESPONSE_SIZE_MB:5}
   pipeline:
-    max-sources: ${RESEARCH_MAX_SOURCES:5}
+    max-sources: ${RESEARCH_MAX_SOURCES:10}
     max-content-length: ${RESEARCH_MAX_CONTENT_LENGTH:50000}
   services:
     ai-intelligent-service-url: ${AI_INTELLIGENT_SERVICE_URL:http://localhost:9742}

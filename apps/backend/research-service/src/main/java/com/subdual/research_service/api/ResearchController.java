@@ -3,12 +3,11 @@ package com.subdual.research_service.api;
 import com.subdual.research_service.api.dto.ResearchJobResponse;
 import com.subdual.research_service.api.dto.ResearchRequest;
 import com.subdual.research_service.api.dto.ResearchResponse;
-import com.subdual.research_service.research.InMemoryResearchJobService;
 import com.subdual.research_service.research.ResearchJobService;
 import com.subdual.research_service.research.ResearchService;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -23,21 +22,12 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/v1/research")
+@RequiredArgsConstructor
 @Slf4j
 public class ResearchController {
 
     private final ResearchService researchService;
     private final ResearchJobService researchJobService;
-
-    @Autowired
-    public ResearchController(ResearchService researchService, ResearchJobService researchJobService) {
-        this.researchService = researchService;
-        this.researchJobService = researchJobService;
-    }
-
-    public ResearchController(ResearchService researchService) {
-        this(researchService, new InMemoryResearchJobService(researchService));
-    }
 
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<ResearchResponse> executeResearch(@Valid @RequestBody ResearchRequest request) {
