@@ -1,16 +1,14 @@
 package com.subdual.research_service.extraction;
 
-import com.subdual.research_service.configuration.ResearchPipelineProperties;
-import com.subdual.research_service.diagnostics.ResearchDiagnostics;
-import com.subdual.research_service.domain.ConfidenceTier;
-import com.subdual.research_service.domain.EntityType;
-import com.subdual.research_service.domain.ResearchSource;
-import com.subdual.research_service.domain.ResearchTarget;
-import com.subdual.research_service.dto.response.EvidenceTuple;
-import com.subdual.research_service.source.ContentExtractor;
-import com.subdual.research_service.source.ExtractedDocument;
-import com.subdual.research_service.source.FetchedContent;
-import com.subdual.research_service.source.WebContentFetcher;
+import com.subdual.research_service.api.dto.EvidenceTuple;
+import com.subdual.research_service.config.ResearchPipelineProperties;
+import com.subdual.research_service.integration.web.FetchedContent;
+import com.subdual.research_service.integration.web.WebContentFetcher;
+import com.subdual.research_service.research.model.ConfidenceTier;
+import com.subdual.research_service.research.model.EntityType;
+import com.subdual.research_service.research.model.ResearchSource;
+import com.subdual.research_service.research.model.ResearchTarget;
+import com.subdual.research_service.research.pipeline.ResearchDiagnostics;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

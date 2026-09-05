@@ -1,10 +1,10 @@
 package com.subdual.research_service.discovery;
 
-import com.subdual.research_service.configuration.ResearchDiscoveryProperties;
-import com.subdual.research_service.domain.DiscoveredSource;
-import com.subdual.research_service.domain.ResearchTarget;
-import com.subdual.research_service.exception.BusinessRuleException;
-import com.subdual.research_service.exception.ExternalServiceException;
+import com.subdual.research_service.config.ResearchDiscoveryProperties;
+import com.subdual.research_service.research.model.DiscoveredSource;
+import com.subdual.research_service.research.model.ResearchTarget;
+import com.subdual.research_service.common.exception.BusinessRuleException;
+import com.subdual.research_service.common.exception.ExternalServiceException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;

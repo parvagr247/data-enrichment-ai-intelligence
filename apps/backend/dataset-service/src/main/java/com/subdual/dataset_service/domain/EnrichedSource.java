@@ -19,9 +19,6 @@ import lombok.Setter;
 
 import java.time.Instant;
 
-/**
- * JPA entity representing a discovered web source tied to an enriched entity.
- */
 @Entity
 @Table(name = "entity_sources", indexes = {
         @Index(name = "idx_sources_entity_id", columnList = "entity_id")

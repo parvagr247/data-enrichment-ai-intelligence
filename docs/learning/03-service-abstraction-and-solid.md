@@ -1,60 +1,103 @@
-# Concept 03: Service Abstraction and SOLID Principles in Practice
+# Concept 03: Service Abstraction & Pragmatic SOLID Principles
 
-To avoid messy monolithic classes (such as 500-line "God services"), our services adhere to pragmatic SOLID principles that directly improve code readability, testability, and maintainability.
+Complex workflows tend to attract massive "God classes"—single 1,000-line services that handle validation, network calls, data parsing, and database transactions all at once.
 
----
-
-## 1. Single Responsibility Principle (SRP)
-
-Instead of a single monolithic orchestration method executing normalization, querying, HTTP calls, parsing, resolution, and persistence sequentially, each responsibility is isolated into a focused class or method:
-
-| Class | Single Responsibility |
-| :--- | :--- |
-| `ResearchRequestValidator` | Validates target presence and well-formed HTTP/HTTPS URL formats. |
-| `DefaultEntityNormalizer` | Normalizes URLs, generates entity slugs and deterministic URNs / SHA-256 IDs. |
-| `QueryBuilder` | Generates search provider queries tailored to entity type and domain hints. |
-| `DefaultResearchDiscoveryService` | Coordinates provider invocation, logging, and error categorization. |
-| `SourceProcessor` | Deduplicates candidate URLs, strips tracking parameters (`utm_*`), and classifies sources. |
-| `WebContentFetcher` | Executes HTTP requests against discovered source URLs with timeouts and size limits. |
-| `ContentExtractor` | Cleans raw HTML/text into readable markdown/plain text up to configured maximum size. |
-| `EntityResolver` | Verifies whether fetched source content genuinely references the target entity. |
-| `EvidenceExtractor` | Extracts verified facts with provenance citations and confidence tiers. |
-| `SourceEvidenceService` | Coordinates content retrieval, extraction, resolution, and evidence aggregation. |
-| `ResearchSnapshotPersister` | Resiliently persists entity snapshots to `dataset-service` without failing research flow. |
-| `ResearchPipeline` | Orchestrates the sequential pipeline stages via a lightweight `ResearchContext`. |
-| `ResearchResponseFactory` | Maps domain models to DTOs, builds execution metadata, and computes status. |
-| `DefaultResearchService` | Thin use-case facade delegating to the research pipeline. |
+This guide explains how we decompose the research pipeline into focused, single-responsibility components using pragmatic SOLID principles.
 
 ---
 
-## 2. Open/Closed Principle (OCP)
+## 1. What Is It?
 
-The pipeline is open for extension but closed for modification:
-- Adding a new search engine (e.g., Google Custom Search, Bing, Brave Search) requires only implementing the `SearchProvider` interface and registering a bean—no changes to `DefaultResearchService` or pipeline controllers.
-- Adding a new AI model (e.g., Anthropic Claude, OpenAI, local Ollama) requires only adding an implementation of `ExtractionService` in `ai-intelligent-service`.
-
----
-
-## 3. Liskov Substitution Principle (LSP)
-
-Implementations of `SearchProvider` (`MockSearchProvider`, `TavilySearchProvider`) honor the same behavioral contract:
-- If results are found, return `List<DiscoveredSource>` ordered by initial provider relevance.
-- If no results exist, return an empty list `List.of()`, never `null`.
-- On provider network or timeout failure, throw `ExternalServiceException` with root cause attached.
+* **Single Responsibility Principle (SRP)**: Each class should have only one reason to change.
+* **Pipeline Pattern with Context**: Breaking a multi-step workflow into discrete, sequential stages that operate on a shared context object (`ResearchContext`).
+* **Dependency Inversion**: High-level orchestration depends on abstractions (interfaces), not concrete implementations.
 
 ---
 
-## 4. Interface Segregation Principle (ISP)
+## 2. Why Do We Use It Here?
 
-Clients depend only on what they consume:
-- `ResearchService` exposes synchronous execution (`executeResearch`).
-- `ResearchJobService` exposes asynchronous submission and polling (`submitJob`, `getJob`).
-- Controllers and test classes do not need to know about job storage internals or thread pool state.
+Researching an entity involves at least 7 distinct steps:
+1. Validating input data.
+2. Canonicalizing URLs and stripping marketing tags.
+3. Querying search engines for candidate pages.
+4. Scraping HTML and converting it into readable text.
+5. Invoking LLMs to extract facts.
+6. Corroborating claims across sources to detect contradictions.
+7. Persisting snapshots to MySQL.
+
+If all 7 steps lived in a single class:
+* Modifying search engine parameters would risk breaking database persistence.
+* Adding unit tests for URL parsing would require mocking AI models and search providers.
+* Debugging would require tracing through hundreds of lines of interleaved logic.
 
 ---
 
-## 5. Dependency Inversion Principle (DIP)
+## 3. How Does It Work in THIS Project?
 
-High-level modules do not depend on low-level modules. Both depend on abstractions:
-- `DefaultResearchService` depends on `SearchProvider`, not on `TavilySearchProvider`.
-- `InMemoryResearchJobService` depends on `ResearchService`, not `DefaultResearchService`.
+[`DefaultResearchPipeline`](file:///P:/Agentic%20AI/Enrichment%20Platform/data-enrichment-ai-intelligence/apps/backend/research-service/src/main/java/com/subdual/research_service/orchestration/DefaultResearchPipeline.java#L32-L114) coordinates the workflow. It does not execute the work directly; it delegates to specialized components:
+
+```mermaid
+flowchart TD
+    Req["ResearchRequest"] --> Pipe["DefaultResearchPipeline.execute()"]
+    
+    subgraph Stages ["Focused Pipeline Components"]
+        Pipe --> V["1. ResearchRequestValidator<br/>(Validates target presence & format)"]
+        V --> N["2. EntityNormalizer<br/>(Strips tracking & computes SHA-256 ID)"]
+        N --> D["3. ResearchDiscoveryService<br/>(Queries Tavily / Mock search provider)"]
+        D --> P["4. SourceProcessor<br/>(Fetches HTML & extracts text)"]
+        P --> E["5. SourceEvidenceService<br/>(Calls AI & corroborates facts)"]
+        E --> S["6. ResearchSnapshotPersister<br/>(Transmits to dataset-service)"]
+        S --> R["7. ResearchResponseFactory<br/>(Builds final response with diagnostics)"]
+    end
+```
+
+---
+
+## 4. Relevant Architecture & Code
+
+### A. Pipeline Orchestration in [`DefaultResearchPipeline.java`](file:///P:/Agentic%20AI/Enrichment%20Platform/data-enrichment-ai-intelligence/apps/backend/research-service/src/main/java/com/subdual/research_service/orchestration/DefaultResearchPipeline.java#L45-L59)
+
+```java
+@Override
+public ResearchResponse execute(ResearchContext context) {
+    validate(context);
+    normalize(context);
+
+    MDC.put("entityId", context.target().entityId());
+    try {
+        discover(context);
+        processSources(context);
+        extractEvidence(context);
+        persistSnapshot(context);
+        return assembleResponse(context);
+    } finally {
+        MDC.remove("entityId");
+    }
+}
+```
+
+* **Why this code**:
+  - The pipeline method is under 15 lines. Anyone reading the code understands the entire business flow in 10 seconds.
+  - Each stage takes the [`ResearchContext`](file:///P:/Agentic%20AI/Enrichment%20Platform/data-enrichment-ai-intelligence/apps/backend/research-service/src/main/java/com/subdual/research_service/orchestration/ResearchContext.java), reads what it needs, and attaches its output for the next stage.
+
+### B. Single Responsibility Decomposition
+
+| Component | Single Responsibility | Why It Changes |
+| :--- | :--- | :--- |
+| `ResearchRequestValidator` | Validates target constraints. | When input rules change (e.g., minimum name length). |
+| `DefaultEntityNormalizer` | Normalizes URLs & hashes SHA-256 IDs. | When new tracking query parameters emerge. |
+| `SearchProvider` | Queries external search engines. | When swapping or adding search providers (Tavily, Bing). |
+| `WebContentFetcher` | Executes HTTP requests against websites. | When adjusting timeouts, proxies, or max response sizes. |
+| `EvidenceExtractor` | Merges facts & resolves conflicts. | When tuning confidence scoring thresholds. |
+| `ResearchSnapshotPersister` | Dispatches snapshots to `dataset-service`. | When persistence payloads or retry logic changes. |
+
+---
+
+## 5. Production & Interview Lessons
+
+1. **Context Objects Prevent Parameter Bloat**:
+   Passing 10 parameters across 7 methods (`method(url, name, entityId, sources, docs, ...)`) is brittle. Wrapping stage inputs and outputs in a mutable or progressive `Context` object keeps method signatures clean and maintainable.
+2. **Open/Closed in Action**:
+   When you need to add a new search provider (e.g., Google Custom Search), you implement the `SearchProvider` interface and register the bean. You do **not** edit `DefaultResearchPipeline` or any existing service classes.
+3. **Testability Without Integration Friction**:
+   Because `EntityNormalizer` has no database or network dependencies, its unit tests run in less than 5 milliseconds without mocks.

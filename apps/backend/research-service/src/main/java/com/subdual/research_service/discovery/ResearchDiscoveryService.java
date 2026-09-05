@@ -1,7 +1,7 @@
 package com.subdual.research_service.discovery;
 
-import com.subdual.research_service.domain.DiscoveredSource;
-import com.subdual.research_service.domain.ResearchTarget;
+import com.subdual.research_service.research.model.DiscoveredSource;
+import com.subdual.research_service.research.model.ResearchTarget;
 import java.util.List;
 
 /**

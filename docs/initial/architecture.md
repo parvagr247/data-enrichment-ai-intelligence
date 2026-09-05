@@ -1,90 +1,113 @@
-# Architecture
+# System Architecture
 
-> **Status:** Active  
-> **Version:** 1.0  
-> **Last Updated:** 2026-09-05
-
-## Purpose
-
-This document details the production-oriented architecture of the Data Enrichment AI Intelligence Platform, the role of the microservice ecosystem, network boundaries, resilience patterns, and the scalability roadmap.
+The **Data Enrichment & AI Intelligence** platform is built as a lightweight microservice system designed for modularity, resilience, and testability.
 
 ---
 
-## 1. Overall System Architecture
+## 1. High-Level Microservice Architecture
 
-The platform is designed as a modular, resilient microservice system with zero unnecessary distributed overhead.
+```mermaid
+flowchart LR
+    Client["Client / Frontend<br/>(:3000 Next.js)"]
+    Research["research-service<br/>(:9741)"]
+    AI["ai-intelligent-service<br/>(:9742)"]
+    Dataset["dataset-service<br/>(:9743)"]
+    MySQL[("MySQL<br/>(:3306)")]
 
-```text
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                             Next.js Frontend (:3000)                        │
-│             Interactive Research Hub • Live Async Job Poller • Catalog      │
-└──────────────┬───────────────────────────────────────────────┬──────────────┘
-               │                                               │
-               │ HTTP REST                                     │ HTTP REST
-               ▼                                               ▼
-┌───────────────────────────────────────────────┐ ┌───────────────────────────┐
-│           research-service (:9741)            │ │   dataset-service (:9743) │
-│  - Bounded ThreadPoolExecutor (Async Jobs)    │ │ - JPA Relational Storage  │
-│  - Deterministic Entity Normalizer (SHA-256)  │ │ - Pagination & Sorting    │
-│  - Polite Scraper & Tavily Search Discovery   │ │ - Cascade Entity Graph    │
-│  - Multi-Source Corroboration Engine          │ └─────────────┬─────────────┘
-│  - Diagnostic Warning Collector               │               │
-└──────────────┬─────────────────┬──────────────┘               │
-               │                 │                              │
-               │ HTTP REST       │ HTTP REST                    │ JDBC
-               ▼                 ▼                              ▼
-┌───────────────────────────┐   ┌─────────────────────────────────────────────┐
-│  ai-intelligent-service   │   │                 MySQL (:3306)               │
-│          (:9742)          │   │  - enriched_entities (indexed by type/date) │
-│  - Google Gemini Model    │   │  - enriched_sources (indexed by entity_id)  │
-│  - Heuristic Fallback     │   │  - enriched_attributes (indexed by attr/id) │
-└───────────────────────────┘   └─────────────────────────────────────────────┘
+    Client -->|1. Submit Research| Research
+    Client -.->|2. Query Saved Records| Dataset
+    Research -->|3. Extract Facts| AI
+    Research -->|4. Persist Snapshot| Dataset
+    Dataset -->|5. Store Relational Data| MySQL
 ```
 
 ---
 
-## 2. Service Responsibilities & Boundaries
+## 2. Microservice Responsibilities
 
-### 2.1 Research Service (`research-service` :9741)
-- **Deterministic Cleaning & Normalization**: Strips ad/tracking params (`utm_*`, `fbclid`, etc.), trims trailing slashes, sorts functional query parameters, and generates deterministic SHA-256 canonical entity IDs.
-- **Polite Retrieval & Bounded I/O**: Configurable timeouts (`connectTimeoutMs=3000`, `readTimeoutMs=5000`), maximum payload limits (`maxResponseSizeMb=5`), and source count caps (`maxSources=5`).
-- **Autonomous Discovery**: Integrates with Tavily search API or deterministic mock search to discover corroborating URLs based on entity name and type.
-- **Multi-Source Corroboration**: Evaluates multiple sources; upgrades confidence tiers (`LOW` &rarr; `MEDIUM`, `MEDIUM` &rarr; `HIGH`), records corroborating citations, and preserves conflicting assertions without arbitrary clobbering.
-- **Partial Failure Resiliency**: Emits structured warnings (`warnings: [...]`) for unreachable or unparseable URLs rather than failing the entire research run.
-- **Async Job Engine**: In-memory bounded `ThreadPoolExecutor` (core: 4, max: 16, queue: 500, `CallerRunsPolicy`) with graceful shutdown (`DisposableBean`).
+Each service owns a single bounded context:
 
-### 2.2 AI Intelligent Service (`ai-intelligent-service` :9742)
-- **Grounded Structured Extraction**: Maps text snippets to structured entity attributes strictly from retrieved evidence.
-- **Graceful Degradation**: If `GEMINI_API_KEY` is missing or the external API call fails/times out, seamlessly falls back to deterministic heuristic extraction.
+### `research-service` (Port 9741)
+* **Owns the research workflow**.
+* Coordinates the multi-step enrichment pipeline:
+  1. Validates inbound targets (URL or entity name).
+  2. Normalizes URLs (strips tracking tags like `utm_*`, computes deterministic SHA-256 ID).
+  3. Discovers candidate web sources via search engines (Tavily or offline mock).
+  4. Scrapes and cleans web pages into plain text with strict size and timeout limits.
+  5. Calls `ai-intelligent-service` to extract verifiable facts.
+  6. Corroborates facts across multiple sources (boosts confidence on agreement, flags conflicts).
+  7. Sends the final snapshot to `dataset-service`.
+* Provides both synchronous (`POST /api/v1/research`) and asynchronous (`POST /api/v1/research/jobs`) execution.
 
-### 2.3 Dataset Service (`dataset-service` :9743)
-- **Relational Snapshot Persistence**: Stores canonical entities, sources, and attribute evidence into MySQL with foreign key cascading.
-- **Fast Lookups & Catalog Pagination**: Database indexes on `entity_type`, `updated_at`, `entity_id`, and `attribute_name`. Supports paginated browsing (`GET /api/v1/entities?page=0&size=20`).
+### `ai-intelligent-service` (Port 9742)
+* **Owns AI extraction**.
+* Interacts with Google Gemini (via Spring AI) to extract structured key-value facts from raw text.
+* Enforces strict zero-hallucination verification: ensures every quoted excerpt actually exists in the raw source text.
+* Provides deterministic rule-based fallback if the AI API is unavailable, unconfigured, or rate-limited.
 
-### 2.4 Frontend (`apps/frontend` :3000)
-- **Full Research Interface**: Next.js (App Router), Tailwind CSS, Lucide icons.
-- **Dual Mode**: Asynchronous job submission with 1s polling, status badge, progress bar, duration timer, and synchronous quick-run.
-- **Explainable Results**: Highlighting confidence levels (`HIGH`, `MEDIUM`, `LOW`), verbatim evidence quotes, clickable source URLs, and multi-source corroboration badges.
-- **Entity Catalog**: Direct view into persisted records with pagination and inspector modal.
+### `dataset-service` (Port 9743)
+* **Owns persistence and database access**.
+* Manages the relational schema using versioned Flyway migrations.
+* Executes atomic idempotent upserts: clears and re-inserts sources and attributes for an entity within a single transaction using JPA orphan removal.
+* Exposes read APIs for catalog exploration, detail lookup, and paginated browsing.
+
+### `MySQL` (Port 3306)
+* Stores relational tables: `entities`, `entity_sources`, and `entity_attributes`.
+* Uses indexes on `entity_id`, `entity_type`, and `updated_at` for high-performance lookups and sorting.
+
+### `frontend` (Port 3000)
+* Next.js 15 client providing an interactive research dashboard.
+* Supports live async job polling (progress bar, timer, status badges) and direct catalog browsing.
 
 ---
 
-## 3. Resilience & Production Guardrails
+## 3. Communication Flows
 
-1. **Memory & Thread Safety**: Concurrency is bounded to prevent unbounded task submission from exhausting JVM heap memory.
-2. **Network Timeouts**: Every HTTP call to external web targets or AI endpoints is bounded by strict connect and read timeouts.
-3. **Observability**: SLF4J MDC (Mapped Diagnostic Context) attaches `entityId` and `jobId` across log messages for clear correlation.
-4. **Graceful Degradation**: Partial failures (e.g. one dead link among five sources) do not abort the entire research pipeline; instead, the run succeeds with a `PARTIAL` status and populated `warnings`.
+### A. Asynchronous Research Workflow (Background Execution)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as Client (:3000)
+    participant RS as research-service (:9741)
+    participant AI as ai-intelligent-service (:9742)
+    participant DS as dataset-service (:9743)
+    participant DB as MySQL (:3306)
+
+    User->>RS: POST /api/v1/research/jobs (target URL / name)
+    RS-->>User: 202 Accepted { jobId: "uuid", status: "SUBMITTED" }
+    
+    rect rgb(240, 248, 255)
+    Note over RS: Background Thread Pool Worker
+    RS->>RS: Normalize URL & compute SHA-256 entityId
+    RS->>RS: Discover sources (Tavily / Mock) & fetch HTML
+    RS->>AI: POST /api/v1/ai/extract (clean text + target fields)
+    AI-->>RS: 200 OK { facts with exactQuote & confidence }
+    RS->>RS: Corroborate facts across sources & detect conflicts
+    RS->>DS: POST /api/v1/entities (persists final entity graph)
+    DS->>DB: Atomic insert / update (orphanRemoval = true)
+    DB-->>DS: Commit
+    DS-->>RS: 201 Created
+    end
+
+    loop Every 1 Second Polling
+        User->>RS: GET /api/v1/research/jobs/{jobId}
+        RS-->>User: 200 OK { status: "IN_PROGRESS" | "COMPLETED", result: {...} }
+    end
+```
 
 ---
 
-## 4. Scalability & Evolution Roadmap
+## 4. Key Architectural Decisions
 
-When dataset volumes scale beyond single-node requirements:
+1. **Decoupled AI Layer**:
+   LLMs have high latency and variable failure modes (rate limits, context window limits). Putting AI in `ai-intelligent-service` ensures failures or slow responses never lock database transactions or break the core API contracts of `dataset-service`.
 
-| Scaling Need | Architectural Evolution |
-| :--- | :--- |
-| **High-Volume Job Queue** | Replace in-memory `ThreadPoolExecutor` with **RabbitMQ** or **Apache Kafka** (`enrichment.jobs.submitted`, `enrichment.jobs.completed`). |
-| **Distributed Caching** | Introduce **Redis** for HTTP response caching and domain rate-limiting. |
-| **Read/Write DB Separation** | Add MySQL read replicas for entity catalog queries while routing writes to the primary database. |
-| **Distributed Workers** | Containerize research workers with horizontal pod autoscaling (HPA) in Kubernetes if container orchestration is later required. |
+2. **Deterministic Entity IDs for Idempotency**:
+   Entities are keyed by a 64-character SHA-256 hash of their canonical URL or URN. Re-running research for the same URL automatically routes to the existing record without creating duplicate entries.
+
+3. **Grounded Fact Verification**:
+   Attributes must have an associated source URL, an exact verbatim quote, and a confidence score (`HIGH`, `MEDIUM`, `LOW`). Ungrounded assertions are filtered out.
+
+4. **Bounded Thread Concurrency**:
+   Asynchronous jobs run on a bounded `ThreadPoolExecutor` (core: 4, max: 16, queue: 500, `CallerRunsPolicy`). If the queue fills up, the submitting thread executes the task, applying natural backpressure to prevent OutOfMemory crashes.

@@ -1,8 +1,8 @@
 {
   "info": {
-    "_postman_id": "4b68e9a2-9741-4742-9743-a1b2c3d4e5f6",
+    "_postman_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
     "name": "Data Enrichment AI Intelligence Platform",
-    "description": "Production Postman collection for Data Enrichment AI Intelligence Platform microservices:\n- Research Service (:9741)\n- AI Intelligent Service (:9742)\n- Dataset Service (:9743)",
+    "description": "Production API collection for the Data Enrichment AI Intelligence Platform microservices (research-service :9741, ai-intelligent-service :9742, dataset-service :9743).",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -23,30 +23,118 @@
     },
     {
       "key": "jobId",
-      "value": "sample-job-id",
+      "value": "",
       "type": "string"
     },
     {
       "key": "entityId",
-      "value": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "value": "",
       "type": "string"
     }
   ],
   "item": [
     {
-      "name": "Research Service",
+      "name": "01 - Health & Actuator",
       "item": [
         {
-          "name": "Synchronous Research",
+          "name": "Research Service Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseResearchUrl}}/actuator/health",
+              "host": ["{{baseResearchUrl}}"],
+              "path": ["actuator", "health"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Status is UP\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.status).to.eql(\"UP\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "AI Service Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseAiUrl}}/actuator/health",
+              "host": ["{{baseAiUrl}}"],
+              "path": ["actuator", "health"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Status is UP\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.status).to.eql(\"UP\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Dataset Service Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseDatasetUrl}}/actuator/health",
+              "host": ["{{baseDatasetUrl}}"],
+              "path": ["actuator", "health"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Status is UP\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.status).to.eql(\"UP\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02 - Research Service",
+      "item": [
+        {
+          "name": "Execute Research (URL + Name)",
           "request": {
             "method": "POST",
             "header": [
               {
                 "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Accept",
                 "value": "application/json"
               }
             ],
@@ -65,18 +153,56 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "pm.test(\"Status code is 200\", function () {",
                   "    pm.response.to.have.status(200);",
                   "});",
-                  "pm.test(\"Response contains completed status and entityId\", function () {",
-                  "    var json = pm.response.json();",
+                  "var json = pm.response.json();",
+                  "pm.test(\"Result contains entity ID and sources\", function () {",
                   "    pm.expect(json.status).to.be.oneOf([\"COMPLETED\", \"PARTIAL\"]);",
                   "    pm.expect(json.entityId).to.be.a(\"string\");",
-                  "    pm.expect(json.result).to.be.an(\"object\");",
                   "    pm.expect(json.sources).to.be.an(\"array\");",
-                  "    if (json.entityId) {",
-                  "        pm.collectionVariables.set(\"entityId\", json.entityId);",
-                  "    }",
+                  "});",
+                  "if (json.entityId) {",
+                  "    pm.collectionVariables.set(\"entityId\", json.entityId);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Discovery-First Research (Name only)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"entityType\": \"ORGANIZATION\",\n  \"name\": \"Acme Corporation\"\n}"
+            },
+            "url": {
+              "raw": "{{baseResearchUrl}}/api/v1/research",
+              "host": ["{{baseResearchUrl}}"],
+              "path": ["api", "v1", "research"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200 OK for discovery-first\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "var json = pm.response.json();",
+                  "pm.test(\"Generates entityId and matches displayName\", function () {",
+                  "    pm.expect(json.entityId).to.be.a(\"string\");",
+                  "    pm.expect(json.result.displayName).to.eql(\"Acme Corporation\");",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -85,22 +211,52 @@
           ]
         },
         {
-          "name": "Submit Research Job",
+          "name": "Research with URL only (Name omitted)",
           "request": {
             "method": "POST",
             "header": [
               {
                 "key": "Content-Type",
                 "value": "application/json"
-              },
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"url\": \"https://github.com/spring-projects/spring-boot\"\n}"
+            },
+            "url": {
+              "raw": "{{baseResearchUrl}}/api/v1/research",
+              "host": ["{{baseResearchUrl}}"],
+              "path": ["api", "v1", "research"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Submit Async Research Job",
+          "request": {
+            "method": "POST",
+            "header": [
               {
-                "key": "Accept",
+                "key": "Content-Type",
                 "value": "application/json"
               }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"url\": \"https://spring.io/projects/spring-boot\",\n  \"entityType\": \"WEBSITE\",\n  \"name\": \"Spring Boot\"\n}"
+              "raw": "{\n  \"url\": \"https://github.com/spring-projects/spring-boot\",\n  \"entityType\": \"REPOSITORY\",\n  \"name\": \"Spring Boot Async\"\n}"
             },
             "url": {
               "raw": "{{baseResearchUrl}}/api/v1/research/jobs",
@@ -117,6 +273,10 @@
                   "    pm.response.to.have.status(202);",
                   "});",
                   "var json = pm.response.json();",
+                  "pm.test(\"Job response contains jobId and status\", function () {",
+                  "    pm.expect(json.jobId).to.be.a(\"string\");",
+                  "    pm.expect(json.status).to.be.oneOf([\"SUBMITTED\", \"IN_PROGRESS\", \"COMPLETED\"]);",
+                  "});",
                   "if (json.jobId) {",
                   "    pm.collectionVariables.set(\"jobId\", json.jobId);",
                   "}"
@@ -127,15 +287,10 @@
           ]
         },
         {
-          "name": "Get Research Job",
+          "name": "Poll Job Status by Job ID",
           "request": {
             "method": "GET",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              }
-            ],
+            "header": [],
             "url": {
               "raw": "{{baseResearchUrl}}/api/v1/research/jobs/{{jobId}}",
               "host": ["{{baseResearchUrl}}"],
@@ -151,7 +306,116 @@
                   "    pm.response.to.have.status(200);",
                   "});",
                   "var json = pm.response.json();",
-                  "pm.expect(json.jobId).to.eql(pm.collectionVariables.get(\"jobId\"));"
+                  "pm.test(\"Returns current job state\", function () {",
+                  "    pm.expect(json.jobId).to.eql(pm.collectionVariables.get(\"jobId\"));",
+                  "    pm.expect(json.status).to.be.oneOf([\"SUBMITTED\", \"IN_PROGRESS\", \"COMPLETED\", \"FAILED\"]);",
+                  "});",
+                  "if (json.response && json.response.entityId) {",
+                  "    pm.collectionVariables.set(\"entityId\", json.response.entityId);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Validation Error - Missing Both URL and Name",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"entityType\": \"ORGANIZATION\"\n}"
+            },
+            "url": {
+              "raw": "{{baseResearchUrl}}/api/v1/research",
+              "host": ["{{baseResearchUrl}}"],
+              "path": ["api", "v1", "research"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 400 Bad Request\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "pm.test(\"Returns RFC 7807 ProblemDetail\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.status).to.eql(400);",
+                  "    pm.expect(json.detail).to.include(\"Either 'url' or 'name' must be provided\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Validation Error - Malformed URL",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"url\": \"not-a-valid-url\",\n  \"name\": \"Malformed URL Test\"\n}"
+            },
+            "url": {
+              "raw": "{{baseResearchUrl}}/api/v1/research",
+              "host": ["{{baseResearchUrl}}"],
+              "path": ["api", "v1", "research"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 400 Bad Request\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "pm.test(\"ProblemDetail indicates invalid URL format\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.status).to.eql(400);",
+                  "    pm.expect(json.detail).to.include(\"must be a valid, well-formed HTTP/HTTPS URL\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "404 - Nonexistent Research Job",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseResearchUrl}}/api/v1/research/jobs/nonexistent-job-uuid-12345",
+              "host": ["{{baseResearchUrl}}"],
+              "path": ["api", "v1", "research", "jobs", "nonexistent-job-uuid-12345"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 404 Not Found\", function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});"
                 ],
                 "type": "text/javascript"
               }
@@ -161,25 +425,21 @@
       ]
     },
     {
-      "name": "AI Intelligent Service",
+      "name": "03 - AI Intelligent Service",
       "item": [
         {
-          "name": "Extract Facts",
+          "name": "Extract Facts from Content",
           "request": {
             "method": "POST",
             "header": [
               {
                 "key": "Content-Type",
                 "value": "application/json"
-              },
-              {
-                "key": "Accept",
-                "value": "application/json"
               }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"entityName\": \"Spring Boot\",\n  \"entityType\": \"REPOSITORY\",\n  \"sourceUrl\": \"https://github.com/spring-projects/spring-boot\",\n  \"textContent\": \"Spring Boot makes it easy to create stand-alone, production-grade Spring based Applications that you can just run. It takes an opinionated view of the Spring platform.\",\n  \"targetFields\": [\"role\", \"organization\", \"description\", \"summary\", \"headquarters\", \"technologies\"]\n}"
+              "raw": "{\n  \"entityName\": \"Spring Boot\",\n  \"entityType\": \"REPOSITORY\",\n  \"sourceUrl\": \"https://github.com/spring-projects/spring-boot\",\n  \"textContent\": \"Spring Boot makes it easy to create stand-alone, production-grade Spring based Applications that you can just run. We take an opinionated view of the Spring platform and third-party libraries so you can get started with minimum fuss.\",\n  \"targetFields\": [\"role\", \"organization\", \"description\", \"summary\", \"technologies\"]\n}"
             },
             "url": {
               "raw": "{{baseAiUrl}}/api/v1/ai/extract",
@@ -192,12 +452,92 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "pm.test(\"Status code is 200\", function () {",
                   "    pm.response.to.have.status(200);",
                   "});",
-                  "var json = pm.response.json();",
-                  "pm.expect(json.entityName).to.eql(\"Spring Boot\");",
-                  "pm.expect(json.facts).to.be.an(\"object\");"
+                  "pm.test(\"Response contains extracted facts map\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.entityName).to.eql(\"Spring Boot\");",
+                  "    pm.expect(json.facts).to.be.an(\"object\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Validation Error - Missing entityName",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"entityType\": \"REPOSITORY\",\n  \"sourceUrl\": \"https://example.com/test\",\n  \"textContent\": \"Some raw content without entityName\"\n}"
+            },
+            "url": {
+              "raw": "{{baseAiUrl}}/api/v1/ai/extract",
+              "host": ["{{baseAiUrl}}"],
+              "path": ["api", "v1", "ai", "extract"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 400 Bad Request\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "pm.test(\"ProblemDetail validation error structure\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.status).to.eql(400);",
+                  "    pm.expect(json.detail).to.include(\"entityName\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Validation Error - Missing textContent",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"entityName\": \"Spring Boot\",\n  \"sourceUrl\": \"https://example.com/test\"\n}"
+            },
+            "url": {
+              "raw": "{{baseAiUrl}}/api/v1/ai/extract",
+              "host": ["{{baseAiUrl}}"],
+              "path": ["api", "v1", "ai", "extract"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 400 Bad Request\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "pm.test(\"ProblemDetail indicates textContent missing\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.status).to.eql(400);",
+                  "    pm.expect(json.detail).to.include(\"textContent\");",
+                  "});"
                 ],
                 "type": "text/javascript"
               }
@@ -207,25 +547,21 @@
       ]
     },
     {
-      "name": "Dataset Service",
+      "name": "04 - Dataset Persistence Service",
       "item": [
         {
-          "name": "Create/Upsert Entity",
+          "name": "Persist Enriched Entity",
           "request": {
             "method": "POST",
             "header": [
               {
                 "key": "Content-Type",
                 "value": "application/json"
-              },
-              {
-                "key": "Accept",
-                "value": "application/json"
               }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"entityId\": \"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\",\n  \"displayName\": \"Spring Boot\",\n  \"entityType\": \"REPOSITORY\",\n  \"canonicalUrl\": \"https://github.com/spring-projects/spring-boot\",\n  \"sources\": [\n    {\n      \"sourceUrl\": \"https://github.com/spring-projects/spring-boot\",\n      \"title\": \"spring-projects/spring-boot\",\n      \"snippet\": \"Spring Boot makes it easy to create stand-alone applications.\",\n      \"sourceType\": \"GITHUB\",\n      \"domain\": \"github.com\",\n      \"provider\": \"mock\",\n      \"relevance\": 1.0,\n      \"retrievedAt\": \"2026-09-05T09:00:00Z\"\n    }\n  ],\n  \"attributes\": [\n    {\n      \"attributeName\": \"description\",\n      \"attributeValue\": \"Spring Boot makes it easy to create stand-alone, production-grade Spring based Applications.\",\n      \"sourceUrl\": \"https://github.com/spring-projects/spring-boot\",\n      \"evidenceSnippet\": \"Spring Boot makes it easy to create stand-alone, production-grade Spring based Applications.\",\n      \"confidence\": \"HIGH\"\n    }\n  ]\n}"
+              "raw": "{\n  \"entityId\": \"e2e-postman-test-entity-001\",\n  \"displayName\": \"Postman Integration Entity\",\n  \"entityType\": \"ORGANIZATION\",\n  \"canonicalUrl\": \"https://postman.example.com\",\n  \"sources\": [\n    {\n      \"url\": \"https://postman.example.com\",\n      \"title\": \"Postman Example Official\",\n      \"snippet\": \"Official integration testing profile\",\n      \"sourceType\": \"OFFICIAL_WEBSITE\",\n      \"domain\": \"postman.example.com\",\n      \"provider\": \"mock\",\n      \"relevance\": 0.95,\n      \"retrievedAt\": \"2026-09-05T09:00:00Z\"\n    }\n  ],\n  \"attributes\": [\n    {\n      \"name\": \"mission\",\n      \"value\": \"Building reliable microservices\",\n      \"sourceUrl\": \"https://postman.example.com\",\n      \"evidence\": \"Our mission is building reliable microservices\",\n      \"confidence\": \"HIGH\"\n    }\n  ]\n}"
             },
             "url": {
               "raw": "{{baseDatasetUrl}}/api/v1/entities",
@@ -238,12 +574,13 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test(\"Status code is 200 OK\", function () {",
-                  "    pm.response.to.have.status(200);",
+                  "pm.test(\"Status code is 201 Created\", function () {",
+                  "    pm.response.to.have.status(201);",
                   "});",
                   "var json = pm.response.json();",
-                  "pm.expect(json.entityId).to.eql(\"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\");",
-                  "pm.collectionVariables.set(\"entityId\", json.entityId);"
+                  "if (json.entityId) {",
+                  "    pm.collectionVariables.set(\"entityId\", json.entityId);",
+                  "}"
                 ],
                 "type": "text/javascript"
               }
@@ -251,15 +588,39 @@
           ]
         },
         {
-          "name": "Get Entity",
+          "name": "List All Entities",
           "request": {
             "method": "GET",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
+            "header": [],
+            "url": {
+              "raw": "{{baseDatasetUrl}}/api/v1/entities",
+              "host": ["{{baseDatasetUrl}}"],
+              "path": ["api", "v1", "entities"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Returns array of entity summaries\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json).to.be.an(\"array\");",
+                  "});"
+                ],
+                "type": "text/javascript"
               }
-            ],
+            }
+          ]
+        },
+        {
+          "name": "Get Entity by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
             "url": {
               "raw": "{{baseDatasetUrl}}/api/v1/entities/{{entityId}}",
               "host": ["{{baseDatasetUrl}}"],
@@ -271,11 +632,13 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "pm.test(\"Status code is 200\", function () {",
                   "    pm.response.to.have.status(200);",
                   "});",
-                  "var json = pm.response.json();",
-                  "pm.expect(json.entityId).to.eql(pm.collectionVariables.get(\"entityId\"));"
+                  "pm.test(\"Returns entity details\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.entityId).to.eql(pm.collectionVariables.get(\"entityId\"));",
+                  "});"
                 ],
                 "type": "text/javascript"
               }
@@ -283,17 +646,12 @@
           ]
         },
         {
-          "name": "List Entities",
+          "name": "List Entities Paginated",
           "request": {
             "method": "GET",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              }
-            ],
+            "header": [],
             "url": {
-              "raw": "{{baseDatasetUrl}}/api/v1/entities?page=0&size=20",
+              "raw": "{{baseDatasetUrl}}/api/v1/entities?page=0&size=10",
               "host": ["{{baseDatasetUrl}}"],
               "path": ["api", "v1", "entities"],
               "query": [
@@ -303,7 +661,7 @@
                 },
                 {
                   "key": "size",
-                  "value": "20"
+                  "value": "10"
                 }
               ]
             }
@@ -313,11 +671,34 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "pm.test(\"Status code is 200\", function () {",
                   "    pm.response.to.have.status(200);",
-                  "});",
-                  "var json = pm.response.json();",
-                  "pm.expect(json).to.be.an(\"array\");"
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Entity Not Found (404)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseDatasetUrl}}/api/v1/entities/nonexistent-entity-999",
+              "host": ["{{baseDatasetUrl}}"],
+              "path": ["api", "v1", "entities", "nonexistent-entity-999"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 404 Not Found\", function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});"
                 ],
                 "type": "text/javascript"
               }

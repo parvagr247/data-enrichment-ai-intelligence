@@ -1,4 +1,4 @@
-﻿# Project Structure & Directory Reference
+# Project Structure & Directory Reference
 
 > **Status:** Active  
 > **Version:** 0.1  
@@ -65,9 +65,29 @@ The platform operates within a reserved port range of **9741–9750**:
 
 | Port | Service | Responsibility & Boundaries |
 | :--- | :--- | :--- |
-| **9741** | `research-service` | Orchestrates research requests (`POST /api/v1/research`), seed URL canonicalization, external web source discovery, polite HTTP retrieval, and evidence tuple compilation. **Boundary:** Strictly stateless; does not connect directly to MySQL. |
+| **9741** | `research-service` | Orchestrates research requests (`POST /api/v1/research`), seed URL canonicalization, external web source discovery, polite HTTP retrieval, and evidence tuple compilation. **Boundary:** Strictly stateless; persists to `dataset-service` via non-blocking REST adapter. |
 | **9742** | `ai-intelligent-service` | Manages Spring AI Google GenAI integrations (`ChatClient`), prompt execution, tool/function calling, structured schema extraction, and entity scoring. **Boundary:** Strictly internal AI reasoning engine. |
 | **9743** | `dataset-service` | Primary persistence boundary. Handles relational entity storage (MySQL via Spring Data JPA), tabular file ingestion (CSV/TSV/JSON), query APIs, and export generation. |
+
+### Research Service Internal Architecture
+
+The `research-service` follows a modular, single-responsibility architecture where `DefaultResearchService` acts strictly as a thin use-case facade:
+
+```text
+com.subdual.research_service/
+├── validation/     # ResearchRequestValidator: ensures target presence and valid HTTP/HTTPS URLs
+├── normalization/  # EntityNormalizer & DefaultEntityNormalizer: canonical URL & SHA-256 ID generation
+├── discovery/      # QueryBuilder & ResearchDiscoveryService: search provider abstraction & query generation
+├── processing/     # SourceProcessor, SourceClassifier, RelevanceEvaluator: ranking & deduplication
+├── extraction/     # ContentExtractor, EntityResolver, EvidenceExtractor, SourceEvidenceService: grounded facts
+├── persistence/    # ResearchSnapshotPersister & RestDatasetPersistenceClient: resilient, non-blocking storage
+├── orchestration/  # ResearchContext, ResearchExecutionTimer, ResearchPipeline: stage coordination
+├── response/       # ResearchResponseFactory: DTO mapping, metadata, warnings, and COMPLETED/PARTIAL status
+├── diagnostics/    # ResearchDiagnostics: tracks skipped sources, upstream warnings, degraded states
+├── service/        # DefaultResearchService (thin facade) & InMemoryResearchJobService (async pool)
+├── controller/     # ResearchController: REST endpoints, HTTP content negotiation, ProblemDetail mapping
+└── client/         # External HTTP clients and Null Object fallback implementations
+```
 
 ### Technology Baseline
 

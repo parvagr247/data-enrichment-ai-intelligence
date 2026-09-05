@@ -1,17 +1,14 @@
 package com.subdual.research_service.extraction;
 
-import com.subdual.research_service.source.ContentExtractor;
-import com.subdual.research_service.source.ExtractedDocument;
-import com.subdual.research_service.source.FetchedContent;
-import com.subdual.research_service.source.WebContentFetcher;
-import com.subdual.research_service.configuration.ResearchPipelineProperties;
-import com.subdual.research_service.diagnostics.ResearchDiagnostics;
-import com.subdual.research_service.domain.ResearchSource;
-import com.subdual.research_service.domain.ResearchTarget;
-import com.subdual.research_service.dto.response.EvidenceTuple;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.subdual.research_service.integration.web.FetchedContent;
+import com.subdual.research_service.integration.web.WebContentFetcher;
+import com.subdual.research_service.config.ResearchPipelineProperties;
+import com.subdual.research_service.research.pipeline.ResearchDiagnostics;
+import com.subdual.research_service.research.model.ResearchSource;
+import com.subdual.research_service.research.model.ResearchTarget;
+import com.subdual.research_service.api.dto.EvidenceTuple;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -24,30 +21,15 @@ import java.util.Map;
  * document extraction, entity resolution, and grounded evidence extraction.
  */
 @Component
+@RequiredArgsConstructor
+@Slf4j
 public class DefaultSourceEvidenceService implements SourceEvidenceService {
-
-    private static final Logger log = LoggerFactory.getLogger(DefaultSourceEvidenceService.class);
 
     private final WebContentFetcher webContentFetcher;
     private final ContentExtractor contentExtractor;
     private final EntityResolver entityResolver;
     private final EvidenceExtractor evidenceExtractor;
     private final ResearchPipelineProperties pipelineProperties;
-
-    @Autowired
-    public DefaultSourceEvidenceService(
-            WebContentFetcher webContentFetcher,
-            ContentExtractor contentExtractor,
-            EntityResolver entityResolver,
-            EvidenceExtractor evidenceExtractor,
-            ResearchPipelineProperties pipelineProperties
-    ) {
-        this.webContentFetcher = webContentFetcher;
-        this.contentExtractor = contentExtractor;
-        this.entityResolver = entityResolver;
-        this.evidenceExtractor = evidenceExtractor;
-        this.pipelineProperties = pipelineProperties;
-    }
 
     @Override
     public Map<String, EvidenceTuple> extractEvidence(

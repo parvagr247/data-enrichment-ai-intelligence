@@ -20,10 +20,7 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/**
- * Structured factual extraction service utilizing Spring AI (Google GenAI)
- * with deterministic fallback for offline, testing, and mock environments.
- */
+
 @Service
 public class SpringAiExtractionService implements ExtractionService {
 

@@ -79,11 +79,14 @@ data-enrichment-ai-intelligence/
 │   │   ├── problem.md              # Problem definition, scope, and reality constraints
 │   │   ├── architecture.md         # Architecture blueprint, Spring stack, structure, ADRs
 │   │   └── enrichment.md           # Research engine, tool calling, evidence schema, limitations
-│   ├── learning/                   # Technical concept guides & web standards
-│   │   ├── concepts-01-10.md       # Web & retrieval foundations
-│   │   ├── concepts-11-20.md       # AI research & evidence extraction
-│   │   ├── concepts-21-30.md       # Spring implementation & reliability
-│   │   └── http-media-type-negotiation.md # Content negotiation guards
+│   ├── learning/                   # Core architectural concepts & production patterns (01–07)
+│   │   ├── 01-http-api-design-and-media-types.md
+│   │   ├── 02-spring-dependency-injection-and-boundaries.md
+│   │   ├── 03-service-abstraction-and-solid.md
+│   │   ├── 04-strategy-and-adapter-patterns-in-provider-integrations.md
+│   │   ├── 05-async-job-lifecycle-and-thread-pooling.md
+│   │   ├── 06-evidence-grounded-ai-extraction.md
+│   │   └── 07-transactional-persistence-and-idempotency.md
 │   └── setup/                      # Technical setup, architecture, & pipeline workflows
 │       ├── project-structure.md    # Canonical directory & service responsibilities
 │       ├── research-workflow.md    # Pipeline roadmap & Phase 1 discovery specification
@@ -153,7 +156,7 @@ docker compose -f infrastructure/docker/docker-compose-dev.yml up -d
 
 ## 8. Documentation Index
 
-The canonical platform documentation is centrally organized under `docs/`:
+The canonical platform documentation is centrally organized under `docs/` (see the **[Documentation Hub](docs/README.md)**):
 
 ### Technical Setup & Architecture
 * 🏛️ **[Project Structure & Service Responsibilities](docs/setup/project-structure.md)**: Canonical directory ownership, backend service boundaries, port mapping, and environment strategies.

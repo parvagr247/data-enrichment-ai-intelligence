@@ -1,11 +1,10 @@
 package com.subdual.research_service.discovery;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.subdual.research_service.configuration.ResearchDiscoveryProperties;
-import com.subdual.research_service.domain.DiscoveredSource;
-import com.subdual.research_service.exception.ExternalServiceException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.subdual.research_service.common.exception.ExternalServiceException;
+import com.subdual.research_service.config.ResearchDiscoveryProperties;
+import com.subdual.research_service.research.model.DiscoveredSource;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.ResourceAccessException;
@@ -21,9 +20,8 @@ import java.util.Map;
  * Strategy implementation connecting to Tavily Search API.
  * Maps external Tavily payloads directly into internal DiscoveredSource domain objects.
  */
+@Slf4j
 public class TavilySearchProvider implements SearchProvider {
-
-    private static final Logger log = LoggerFactory.getLogger(TavilySearchProvider.class);
 
     private final ResearchDiscoveryProperties properties;
     private final RestClient restClient;

@@ -1,9 +1,8 @@
 package com.subdual.research_service.discovery;
 
-import com.subdual.research_service.domain.DiscoveredSource;
-import com.subdual.research_service.exception.ExternalServiceException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.subdual.research_service.common.exception.ExternalServiceException;
+import com.subdual.research_service.research.model.DiscoveredSource;
+import lombok.extern.slf4j.Slf4j;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -14,9 +13,8 @@ import java.util.concurrent.TimeoutException;
 /**
  * Deterministic offline/mock implementation of SearchProvider for local development and testing.
  */
+@Slf4j
 public class MockSearchProvider implements SearchProvider {
-
-    private static final Logger log = LoggerFactory.getLogger(MockSearchProvider.class);
 
     @Override
     public List<DiscoveredSource> search(String query, int maxResults) {

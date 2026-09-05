@@ -1,75 +1,114 @@
-# Concept 02: Spring Dependency Injection and Service Boundaries
+# Concept 02: Layered Architecture & Dependency Injection
 
-Clean dependency injection (DI) prevents tight coupling, simplifies unit testing, and establishes clear architectural boundaries between controllers, domain services, infrastructure clients, and persistence layers.
+Software architectures degrade when boundaries blur. When a controller queries a database directly or an AI service imports an HTTP request object, the system becomes brittle and difficult to test.
 
----
-
-## 1. Constructor Injection vs. Field Injection
-
-Our platform strictly enforces **constructor-based dependency injection**:
-
-```java
-// ✅ Recommended: Explicit, testable, immutable
-@Service
-public class DefaultResearchService implements ResearchService {
-
-    private final ResearchDiscoveryService discoveryService;
-    private final EntityNormalizer entityNormalizer;
-    private final SourceProcessor sourceProcessor;
-
-    @Autowired
-    public DefaultResearchService(
-            ResearchDiscoveryService discoveryService,
-            EntityNormalizer entityNormalizer,
-            SourceProcessor sourceProcessor
-    ) {
-        this.discoveryService = discoveryService;
-        this.entityNormalizer = entityNormalizer;
-        this.sourceProcessor = sourceProcessor;
-    }
-}
-```
-
-### Why Field Injection (`@Autowired private X x;`) is Prohibited:
-1. **Hidden Dependencies**: Classes hide their prerequisites; callers cannot instantiate them cleanly in unit tests without Spring reflection.
-2. **Mutability**: Field injection prevents dependencies from being declared `final`.
-3. **Circular Dependencies**: Field injection masks circular dependencies until runtime rather than failing fast at bean initialization.
+This guide explains how layered boundaries and constructor-based dependency injection are enforced across our Spring Boot microservices.
 
 ---
 
-## 2. Thin Controllers and Thick Services
+## 1. What Is It?
 
-Controllers are strictly restricted to:
-1. Receiving HTTP requests and validating payload constraints (`@Valid`).
-2. Translating DTOs to domain target parameters.
-3. Delegating to domain service interfaces (`ResearchService`, `ExtractionService`, `EntityPersistenceService`).
-4. Mapping domain results to HTTP response codes (`200`, `202`, `404`).
-
-Controllers **never** execute business validation, HTTP client calls, or database operations directly.
+* **Layered Architecture**: Structuring a service into distinct, isolated tiers where each layer has a single concern:
+  - **Controller Layer**: Handles HTTP, serialization, and status codes.
+  - **Domain / Service Layer**: Contains business rules, orchestration, and validation.
+  - **Infrastructure / Client Layer**: Communicates with external networks, databases, and APIs.
+* **Constructor Injection**: Supplying all required dependencies through a class constructor rather than injecting them reflectively into private fields (`@Autowired private Foo foo;`).
 
 ---
 
-## 3. Separation of Domain and Infrastructure
+## 2. Why Do We Use It Here?
+
+`research-service` coordinates complex operations: scraping web pages, calling Google Gemini, and persisting to MySQL.
+
+If these boundaries were mixed:
+1. Writing a unit test for research logic would require spinning up a fake web server and a MySQL database.
+2. Changing the database library or HTTP client would break domain business rules.
+3. Hidden circular dependencies would emerge, causing Spring to crash unexpectedly during startup.
+
+---
+
+## 3. How Does It Work in THIS Project?
 
 ```mermaid
 flowchart LR
     subgraph Presentation ["Presentation Layer"]
-        C[Controller]
+        C["ResearchController<br/>(Thin HTTP Facade)"]
     end
     subgraph Domain ["Core Domain Layer"]
-        S[Service Interface] --> DS[Default Service Implementation]
+        S["ResearchService<br/>(Interface)"]
+        DS["DefaultResearchService<br/>(Orchestration)"]
     end
     subgraph Infrastructure ["Infrastructure Adapters"]
-        SP[SearchProvider Strategy]
-        AC[AiExtractionClient]
-        DC[DatasetPersistenceClient]
+        SP["SearchProvider<br/>(Tavily / Mock)"]
+        AC["AiExtractionClient<br/>(REST to Port 9742)"]
+        DC["DatasetPersistenceClient<br/>(REST to Port 9743)"]
     end
-    
-    C --> S
-    DS --> SP
-    DS --> AC
-    DS --> DC
+
+    C -->|Invokes| S
+    S -.->|Implemented by| DS
+    DS -->|Delegates to| SP
+    DS -->|Delegates to| AC
+    DS -->|Delegates to| DC
 ```
 
-- Domain services depend on **interfaces** (e.g., `SearchProvider`), not concrete implementations (e.g. `TavilySearchProvider`).
-- Infrastructure details (HTTP timeouts, WebClient retries, JSON parsing) remain encapsulated within infrastructure adapters.
+1. **Thin Controllers**: [`ResearchController`](file:///P:/Agentic%20AI/Enrichment%20Platform/data-enrichment-ai-intelligence/apps/backend/research-service/src/main/java/com/subdual/research_service/controller/ResearchController.java) contains zero business logic. It validates the inbound DTO, passes it to `ResearchService`, and returns a status code.
+2. **Interface Contracts**: The controller only knows about the `ResearchService` interface, never the implementation details.
+3. **Immutable Constructor Injection**: All service fields are marked `final` and passed through the constructor.
+
+---
+
+## 4. Relevant Architecture & Code
+
+### A. Constructor Injection in [`DefaultResearchService.java`](file:///P:/Agentic%20AI/Enrichment%20Platform/data-enrichment-ai-intelligence/apps/backend/research-service/src/main/java/com/subdual/research_service/service/DefaultResearchService.java#L16-L31)
+
+```java
+@Service
+@RequiredArgsConstructor
+public class DefaultResearchService implements ResearchService {
+
+    private final ResearchContextFactory contextFactory;
+    private final ResearchPipeline researchPipeline;
+
+    @Override
+    public ResearchResponse executeResearch(ResearchRequest request) {
+        ResearchContext context = contextFactory.create(request);
+        return researchPipeline.execute(context);
+    }
+}
+```
+
+* **Why this code**: 
+  - The dependencies (`contextFactory`, `researchPipeline`) are `final`. They cannot be altered after instantiation.
+  - In a unit test, you can instantiate this class with two lines: `new DefaultResearchService(mockFactory, mockPipeline)`—no Spring context or reflection required.
+
+### B. Thin Controller Delegation in [`EntityController.java`](file:///P:/Agentic%20AI/Enrichment%20Platform/data-enrichment-ai-intelligence/apps/backend/dataset-service/src/main/java/com/subdual/dataset_service/controller/EntityController.java#L22-L40)
+
+```java
+@RestController
+@RequestMapping("/api/v1/entities")
+@RequiredArgsConstructor
+public class EntityController {
+
+    private final EntityPersistenceService persistenceService;
+
+    @GetMapping("/{entityId}")
+    public ResponseEntity<EntityDetailResponse> getEntity(@PathVariable String entityId) {
+        return persistenceService.findById(entityId)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+}
+```
+
+* **Why this code**: The controller doesn't know about MySQL, JPA, or SQL tables. It only queries the persistence interface and maps the resulting `Optional` to `200 OK` or `404 Not Found`.
+
+---
+
+## 5. Production & Interview Lessons
+
+1. **Why Field Injection (`@Autowired`) Is an Anti-Pattern**:
+   - **Hidden Dependencies**: A class with 5 `@Autowired` private fields hides what it needs to function. You only discover what is missing when you get a `NullPointerException` at runtime.
+   - **Mutability**: You cannot declare `@Autowired private final Foo foo;`. Constructor injection guarantees object immutability.
+   - **Unit Testing Friction**: Testing a class with field injection requires either booting Spring, using Mockito reflection runners, or adding package-private setters.
+2. **The "Thin Controller, Rich Service" Rule**:
+   In backend system design interviews, never write database queries, HTTP calls, or business validation inside controllers. Controllers should only handle protocol transformation (HTTP $\leftrightarrow$ Java DTOs).

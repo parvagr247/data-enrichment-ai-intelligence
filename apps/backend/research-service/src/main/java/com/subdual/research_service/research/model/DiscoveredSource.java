@@ -1,0 +1,16 @@
+package com.subdual.research_service.research.model;
+
+import java.time.Instant;
+
+public record DiscoveredSource(
+        String url,
+        String title,
+        String sourceType,
+        Instant retrievedAt,
+        Double relevance,
+        String snippet
+) {
+    public DiscoveredSource(String url, String title, String sourceType, Instant retrievedAt, Double relevance) {
+        this(url, title, sourceType, retrievedAt, relevance, null);
+    }
+}

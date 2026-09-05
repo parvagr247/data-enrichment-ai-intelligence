@@ -1,55 +1,84 @@
-# Concept 01: HTTP API Design, Media Types, and Content Negotiation
+# Concept 01: HTTP REST API Design & Explicit Media Type Contracts
 
-In modern microservice architectures, HTTP APIs serve as the primary contract between clients and backend services. This guide explains how media types, content negotiation, status code semantics, and RFC 7807 ProblemDetail structures are designed and enforced across our platform.
+In a microservice system, HTTP APIs are the contractual boundary between services. When contracts are vague, systems fail unpredictably.
+
+This guide explains how content negotiation, status code semantics, and standardized error handling are enforced in this project.
 
 ---
 
-## 1. Content Negotiation: `consumes` and `produces`
+## 1. What Is It?
 
-In Spring Boot REST controllers, the `consumes` and `produces` attributes serve as **HTTP header filters** and **content-negotiation guards**.
+HTTP REST API design specifies:
+* **Media Types**: How the client and server agree on the payload format (`application/json`).
+* **HTTP Status Codes**: Meaningful numbers communicating whether a request succeeded (`200`), was queued for later (`202`), or failed (`400`, `404`, `502`).
+* **Error Representation**: Standardized machine-readable error responses (RFC 7807 `ProblemDetail`) instead of raw stack traces.
+
+---
+
+## 2. Why Do We Use It Here?
+
+Our platform has four communicating components:
+`frontend` (:3000) $\rightarrow$ `research-service` (:9741) $\rightarrow$ `ai-intelligent-service` (:9742) and `dataset-service` (:9743).
+
+Without strict HTTP contracts:
+1. A client could send XML or plain text, causing silent null deserialization or internal crashes.
+2. Long-running web scraping and AI extraction (5–15 seconds) would block HTTP connections and trigger browser timeouts if treated as synchronous `200 OK` requests.
+3. Errors would leak Java stack traces to clients, revealing internal class names and database schemas.
+
+---
+
+## 3. How Does It Work in THIS Project?
 
 ```mermaid
 flowchart TD
-    Client(["HTTP Client"]) -->|Request| InboundCheck{"Header: Content-Type"}
+    Client["Client Request"] --> InboundCheck{"Header: Content-Type"}
     
     subgraph Spring_Controller_Guard ["Spring MVC DispatcherGuard"]
-        InboundCheck -->|"Matches consumes<br>(application/json)"| ExecuteLogic["Execute Controller Action"]
-        InboundCheck -->|"Mismatch<br>(e.g., text/plain, xml)"| Reject415["415 Unsupported Media Type"]
+        InboundCheck -->|"application/json"| Exec["Execute Controller Method"]
+        InboundCheck -->|"Mismatch (e.g. text/xml)"| Reject415["415 Unsupported Media Type"]
         
-        ExecuteLogic --> OutboundCheck{"Header: Accept"}
-        OutboundCheck -->|"Compatible with produces<br>(application/json, */*)"| Return200["200 OK + JSON Body"]
-        OutboundCheck -->|"Incompatible<br>(e.g., application/xml)"| Reject406["406 Not Acceptable"]
+        Exec --> OutboundCheck{"Header: Accept"}
+        OutboundCheck -->|"Compatible with produces"| ReturnJSON["Return Status Code + JSON"]
+        OutboundCheck -->|"Incompatible"| Reject406["406 Not Acceptable"]
     end
-    
-    Reject415 -->|Fail Fast| Client
-    Reject406 -->|Fail Fast| Client
-    Return200 -->|Serialized Output| Client
 ```
 
-### When to Use (and When to Omit) `consumes`
-- **GET endpoints without request body**: Endpoints like `GET /api/v1/entities` or `GET /api/v1/research/jobs/{jobId}` do not receive a request body. Specifying `consumes = MediaType.APPLICATION_JSON_VALUE` on GET endpoints can inadvertently cause Spring MVC to reject requests that do not specify a redundant `Content-Type` header with a `404 Not Found` or `415 Unsupported Media Type`.
-- **POST/PUT endpoints**: Endpoints that accept JSON payloads explicitly specify `consumes = MediaType.APPLICATION_JSON_VALUE` or allow Spring's default `@RequestBody` mapping to bind incoming JSON payloads.
+1. **Content Negotiation Guards**: Controllers declare `consumes` and `produces` using `MediaType.APPLICATION_JSON_VALUE`. Spring MVC automatically rejects mismatched requests before touching any service logic.
+2. **Synchronous vs. Asynchronous Status Codes**:
+   - Quick operations (e.g. looking up an entity) return `200 OK`.
+   - Long-running research tasks return `202 Accepted` immediately with a `jobId` so the frontend can poll progress without timing out.
+3. **RFC 7807 Error Bodies**: Unhandled exceptions are converted by [`GlobalExceptionHandler`](file:///P:/Agentic%20AI/Enrichment%20Platform/data-enrichment-ai-intelligence/apps/backend/research-service/src/main/java/com/subdual/research_service/exception/GlobalExceptionHandler.java) into standard `ProblemDetail` JSON objects.
 
 ---
 
-## 2. HTTP Status Code Semantics
+## 4. Relevant Architecture & Code
 
-Our platform adheres to strict REST semantics:
+### A. Strict Media Type Enforcement in [`EntityController.java`](file:///P:/Agentic%20AI/Enrichment%20Platform/data-enrichment-ai-intelligence/apps/backend/dataset-service/src/main/java/com/subdual/dataset_service/controller/EntityController.java#L29-L33)
 
-| HTTP Status | Meaning in Our Services |
-| :--- | :--- |
-| `200 OK` | Synchronous request succeeded with payload returned (`executeResearch`, `listEntities`, `pollJob`). |
-| `202 Accepted` | Asynchronous task accepted for background execution (`submitJob`). Returns `jobId` and `status: SUBMITTED`. |
-| `400 Bad Request` | Client request validation failed (e.g., both `url` and `name` missing, malformed URL). Returns RFC 7807 `ProblemDetail`. |
-| `404 Not Found` | Target resource does not exist (e.g. unknown `jobId` or non-existent `entityId`). |
-| `502 Bad Gateway` | Upstream third-party integration failure (e.g., Tavily search provider returned HTTP 502/503). |
-| `504 Gateway Timeout`| Upstream third-party integration timed out beyond SLA (e.g. search exceeded 4000ms). |
+```java
+@PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+public ResponseEntity<EntityDetailResponse> persistEntity(@Valid @RequestBody PersistEntityRequest request) {
+    EntityDetailResponse response = persistenceService.persistOrUpdate(request);
+    return ResponseEntity.status(HttpStatus.CREATED).body(response);
+}
+```
+* **Why this code**: `consumes` prevents clients from sending malformed or unsupported payloads. `produces` guarantees the client receives JSON.
 
----
+### B. Long-Running Task Contract in [`ResearchController.java`](file:///P:/Agentic%20AI/Enrichment%20Platform/data-enrichment-ai-intelligence/apps/backend/research-service/src/main/java/com/subdual/research_service/controller/ResearchController.java#L40-L45)
 
-## 3. Standardized Error Handling via RFC 7807 (`ProblemDetail`)
+```java
+@PostMapping(value = "/jobs", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+@ResponseStatus(HttpStatus.ACCEPTED)
+public ResponseEntity<ResearchJobResponse> submitJob(@Valid @RequestBody ResearchRequest request) {
+    ResearchJobResponse response = researchJobService.submitJob(request);
+    return ResponseEntity.status(HttpStatus.ACCEPTED).body(response);
+}
+```
+* **Why this code**: Scraping multiple websites and invoking LLMs takes several seconds. Returning `202 Accepted` immediately frees the HTTP thread and gives the client a tracking `jobId`.
 
-Spring Boot native RFC 7807 `ProblemDetail` is used across all services via `@ControllerAdvice`:
+### C. RFC 7807 Error Response
+
+When validation fails (e.g., neither URL nor name is provided), the API returns:
 
 ```json
 {
@@ -61,4 +90,13 @@ Spring Boot native RFC 7807 `ProblemDetail` is used across all services via `@Co
 }
 ```
 
-This prevents leaking internal stack traces and provides machine-readable error context.
+---
+
+## 5. Production & Interview Lessons
+
+1. **Never use GET with `consumes`**:
+   `GET` requests do not have request bodies. Adding `consumes = "application/json"` to a `GET` endpoint causes Spring to reject normal browser or curl requests that omit the `Content-Type` header with a `415 Unsupported Media Type` or `404 Not Found`.
+2. **`200 OK` vs `202 Accepted` in System Design**:
+   In interview questions involving background workers (e.g., video processing, document indexing, web scraping), never propose a synchronous `200 OK` endpoint. Always return `202 Accepted` with a status polling URL or webhook.
+3. **RFC 7807 as the Microservice Standard**:
+   Modern APIs avoid bespoke error payloads (`{"err": "message"}`). Standardizing on RFC 7807 allows API gateways, client libraries, and monitoring tools to automatically parse errors across all services.

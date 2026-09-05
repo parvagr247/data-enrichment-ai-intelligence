@@ -1,6 +1,6 @@
 package com.subdual.research_service.discovery;
 
-import com.subdual.research_service.domain.ResearchTarget;
+import com.subdual.research_service.research.model.ResearchTarget;
 import org.springframework.stereotype.Component;
 
 import java.net.URI;

@@ -1,8 +1,7 @@
 package com.subdual.research_service.extraction;
 
-import com.subdual.research_service.domain.ConfidenceTier;
-import com.subdual.research_service.domain.ResearchTarget;
-import com.subdual.research_service.source.ExtractedDocument;
+import com.subdual.research_service.research.model.ConfidenceTier;
+import com.subdual.research_service.research.model.ResearchTarget;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;

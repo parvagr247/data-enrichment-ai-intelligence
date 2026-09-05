@@ -42,8 +42,7 @@ public class EntityController {
     @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<List<EntitySummaryResponse>> listEntities(
             @RequestParam(required = false) Integer page,
-            @RequestParam(required = false) Integer size
-    ) {
+            @RequestParam(required = false) Integer size ) {
         if (page != null || size != null) {
             int p = page != null ? page : 0;
             int s = size != null ? size : 20;
