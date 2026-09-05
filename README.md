@@ -65,6 +65,9 @@ data-enrichment-engine/
 │   │   ├── research-service/           # Research orchestration & retrieval (Port 9741)
 │   │   ├── ai-intelligent-service/     # Spring AI model interaction & extraction (Port 9742)
 │   │   ├── dataset-service/            # Dataset ingestion & MySQL persistence boundary (Port 9743)
+│   │   ├── docs/                       # Backend architecture, workflows, and concept deep-dives
+│   │   │   ├── RESEARCH_WORKFLOW.md    # Pipeline roadmap & Phase 1 discovery specification
+│   │   │   └── concepts/               # Technical concept guides (e.g., HTTP content negotiation)
 │   │   └── one.md                      # Single compact backend reference
 │   │
 │   └── frontend/                       # Next.js + TypeScript frontend application (Port 3000)
@@ -94,15 +97,19 @@ data-enrichment-engine/
 
 ## 6. Current Status
 
-* **Status**: Current / Phase 0 (Foundation & Minimal Documentation Established)
-* **Under Development**: Initial single-entity research flow inside `apps/backend/` using Spring AI function calling.
-* **Architecture Note**: Single Spring Boot application first. Microservices and message brokers are intentionally deferred until the core single-entity enrichment workflow is proven.
+* **Status**: Current / Phase 0 Completed (Scaffold & In-Memory Research API Operational)
+* **Next Implementation Milestone**: Phase 1 — Web Source Discovery (discovering candidate sources and returning populated `sources[]` with metadata).
+* **Technical Roadmap**: Detailed in [Research Workflow & Target Pipeline](apps/backend/docs/RESEARCH_WORKFLOW.md).
 
 ---
 
 ## 7. Documentation Index
 
-The project documentation is organized into foundational definitions (`docs/initial/`) and pre-implementation technical specifications (`docs/setup/`):
+The project documentation is organized into foundational definitions (`docs/initial/`), pre-implementation technical specifications (`docs/setup/`), and backend implementation roadmaps (`apps/backend/docs/`):
+
+### Backend Implementation Roadmaps & Workflows
+* 🚀 **[Research Workflow & Target Pipeline](apps/backend/docs/RESEARCH_WORKFLOW.md)**: Production-oriented technical roadmap for turning the Research API into an active discovery, retrieval, and enrichment pipeline.
+* 📚 **[Backend Documentation Index](apps/backend/docs/README.md)**: Comprehensive index of backend service specifications, media type negotiation, and concept deep-dives.
 
 ### Initial Foundations
 * 📄 **[Problem Statement & Scope](docs/initial/problem.md)**: Problem analysis, generic entity goals, scope boundaries, and reality constraints.

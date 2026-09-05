@@ -41,8 +41,10 @@ All commands below are intended to be executed from the **repository root**:
 Start all services (MySQL, research-service, ai-intelligent-service, dataset-service, frontend) and continuously watch for file changes:
 
 ```powershell
-docker compose --env-file infrastructure/docker/.env -f infrastructure/docker/docker-compose-dev-all.yml up --watch
+docker compose -f infrastructure/docker/docker-compose-dev-all.yml up --watch
 ```
+
+*(Optional: add `--env-file infrastructure/docker/.env` if defining custom environment variable overrides)*
 
 #### How Automatic Change Detection Works:
 * **Java Source Changes (`apps/backend/*/src/**`)**:
@@ -156,5 +158,5 @@ docker compose --env-file infrastructure/docker/.env -f infrastructure/docker/do
 
 ## Maven & Layer Caching Architecture
 
-1. **Docker Layer Cache**: Each backend Dockerfile executes `./mvnw dependency:resolve dependency:resolve-plugins -B` *before* copying `src/`. As long as `pom.xml` does not change, this layer is `CACHED` by Docker, skipping all remote repository downloads during image builds.
+1. **Docker Layer Cache**: Each backend Dockerfile executes `./mvnw dependency:resolve -B` *before* copying `src/`. As long as `pom.xml` does not change, this layer is `CACHED` by Docker, skipping all remote repository downloads during image builds.
 2. **Runtime Volume Cache (`maven_cache`)**: A shared named volume `maven_cache` is mounted at `/root/.m2` across all Spring Boot services. Any runtime plugins or dependencies downloaded during execution persist across container restarts, eliminating repeat downloads.

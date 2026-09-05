@@ -90,6 +90,7 @@ The backend operates within a reserved port range of **9741–9750**:
   * Spring Boot DevTools (development scope)
   * Project Lombok
 * **Boundaries**: Does not connect directly to MySQL or contain persistence logic.
+* **Roadmap**: Refer to [Research Workflow & Target Pipeline](docs/RESEARCH_WORKFLOW.md) for the phased implementation roadmap from initial scaffold to web discovery and enrichment.
 
 ---
 
@@ -179,4 +180,11 @@ No credentials or secrets are committed. Database parameters are configured via 
 A centralized configuration template is provided at `apps/.env.example`. Active local values are stored in `apps/.env` (ignored by Git):
 * `apps/.env.example`: Committed template showing all frontend, backend, database, and AI environment variables.
 * `apps/.env`: Active environment configuration file for local development.
+
+---
+
+## 9. Backend Documentation & Roadmaps
+
+* 🚀 **[Research Workflow & Target Pipeline](docs/RESEARCH_WORKFLOW.md)**: Production-oriented technical roadmap for transitioning the Research Service from the initial API baseline into an operational web discovery, retrieval, and enrichment pipeline.
+* 📚 **[Backend Documentation Index](docs/README.md)**: Index of technical specifications and architectural deep-dives.
 

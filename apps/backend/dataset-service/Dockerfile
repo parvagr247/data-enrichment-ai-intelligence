@@ -10,7 +10,8 @@ RUN sed -i 's/\r$//' mvnw && chmod +x mvnw
 
 # 2. Pre-fetch and cache Maven dependencies in a dedicated layer
 # This layer is cached by Docker and ONLY re-executes if pom.xml or .mvn changes
-RUN ./mvnw dependency:resolve dependency:resolve-plugins -B
+RUN ./mvnw dependency:resolve -B
+
 
 # 3. Copy application source tree
 COPY src ./src
