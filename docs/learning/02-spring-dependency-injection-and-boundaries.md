@@ -112,3 +112,7 @@ public class EntityController {
    - **Unit Testing Friction**: Testing a class with field injection requires either booting Spring, using Mockito reflection runners, or adding package-private setters.
 2. **The "Thin Controller, Rich Service" Rule**:
    In backend system design interviews, never write database queries, HTTP calls, or business validation inside controllers. Controllers should only handle protocol transformation (HTTP $\leftrightarrow$ Java DTOs).
+
+---
+
+**Previous:** [Concept 01: HTTP REST API Design & Explicit Media Type Contracts](01-http-api-design-and-media-types.md) | **Next:** [Concept 03: Service Abstraction & Pragmatic SOLID Principles](03-service-abstraction-and-solid.md)

@@ -19,11 +19,6 @@ import java.util.stream.Collectors;
 @Component
 public class DefaultEntityNormalizer implements EntityNormalizer {
 
-    private static final Set<String> TRACKING_PARAMS = Set.of(
-            "utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content",
-            "ref_src", "fbclid", "gclid", "mc_eid", "_ga", "_gl"
-    );
-
     @Override
     public ResearchTarget normalize(ResearchRequest request) {
         if (request == null) throw new IllegalArgumentException("ResearchRequest must not be null");
@@ -95,54 +90,21 @@ public class DefaultEntityNormalizer implements EntityNormalizer {
 
     public String canonicalizeUrl(String rawUrl) {
         if (rawUrl == null || rawUrl.isBlank()) return "";
-        
         try {
             URI uri = URI.create(rawUrl.trim());
             String scheme = uri.getScheme() != null ? uri.getScheme().toLowerCase(Locale.ROOT) : "https";
             String host = uri.getHost() != null ? uri.getHost().toLowerCase(Locale.ROOT) : "";
-            String portPart = formatPortPart(scheme, uri.getPort());
-            String path = normalizePath(uri.getPath());
-            String query = cleanQueryParameters(uri.getQuery());
+            if (com.subdual.research_service.util.UrlNormalizer.isLinkedInInternational(host)) {
+                host = "linkedin.com";
+            }
+            String portPart = (uri.getPort() == -1 || ("http".equals(scheme) && uri.getPort() == 80) || ("https".equals(scheme) && uri.getPort() == 443)) ? "" : ":" + uri.getPort();
+            String path = com.subdual.research_service.util.UrlNormalizer.normalizePath(uri.getRawPath());
+            String query = com.subdual.research_service.util.UrlNormalizer.cleanQueryParameters(uri.getRawQuery());
 
             return scheme + "://" + host + portPart + path + query;
-            
         } catch (Exception e) {
             return rawUrl.trim();
         }
-    }
-
-    private String normalizePath(String path) {
-        if (path == null || path.isEmpty()) {
-            return "/";
-        }
-        if (path.length() > 1 && path.endsWith("/")) {
-            return path.substring(0, path.length() - 1);
-        }
-        return path;
-    }
-
-    private String formatPortPart(String scheme, int port) {
-        boolean isDefaultPort = port == -1
-                || ("http".equals(scheme) && port == 80)
-                || ("https".equals(scheme) && port == 443);
-        return isDefaultPort ? "" : ":" + port;
-    }
-
-    private String cleanQueryParameters(String rawQuery) {
-        if (rawQuery == null || rawQuery.isBlank()) {
-            return "";
-        }
-
-        String cleanParams = Arrays.stream(rawQuery.split("&"))
-                .filter(param -> !param.isBlank())
-                .filter(param -> {
-                    String key = param.split("=")[0].toLowerCase(Locale.ROOT);
-                    return !TRACKING_PARAMS.contains(key);
-                })
-                .sorted()
-                .collect(Collectors.joining("&"));
-
-        return cleanParams.isBlank() ? "" : "?" + cleanParams;
     }
 
     public String normalizeDisplayName(String rawName, String fallbackCanonicalUrl) {

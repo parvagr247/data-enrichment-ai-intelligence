@@ -24,11 +24,6 @@ import java.util.stream.Collectors;
 @Slf4j
 public class SourceProcessor {
 
-    private static final Set<String> TRACKING_PARAMS = Set.of(
-            "utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content",
-            "ref", "ref_src", "fbclid", "gclid", "source", "feature", "mc_eid"
-    );
-
     private static final Set<String> CONFLICTING_PROFESSIONS = Set.of(
             "dentist", "dentistry", "dental", "dds", "dmd",
             "actress", "actor", "filmography", "hollywood", "imdb",
@@ -191,78 +186,34 @@ public class SourceProcessor {
     }
 
     private boolean isSameUrl(String u1, String u2) {
-        if (u1 == null || u2 == null) return false;
-        String s1 = u1.trim().replaceFirst("^https?://(www\\.)?", "").replaceFirst("/+$", "");
-        String s2 = u2.trim().replaceFirst("^https?://(www\\.)?", "").replaceFirst("/+$", "");
-        return s1.equalsIgnoreCase(s2);
+        return com.subdual.research_service.util.UrlNormalizer.isSameUrl(u1, u2);
     }
 
     public String normalizeDiscoveredUrl(String rawUrl) {
         if (rawUrl == null || rawUrl.isBlank()) {
             return null;
         }
-
         try {
             URI uri = URI.create(rawUrl.trim());
-            String scheme = extractValidScheme(uri);
-            String host = extractValidHost(uri);
-            if (scheme == null || host == null) {
+            String scheme = uri.getScheme() != null ? uri.getScheme().toLowerCase(Locale.ROOT) : null;
+            if (!"http".equals(scheme) && !"https".equals(scheme)) {
                 return null;
             }
-
-            String portPart = formatPort(scheme, uri.getPort());
-            String path = normalizePath(uri.getPath());
-            String cleanQuery = cleanTrackingQuery(uri.getQuery());
-
+            if (uri.getHost() == null || uri.getHost().isBlank()) {
+                return null;
+            }
+            String host = uri.getHost().toLowerCase(Locale.ROOT);
+            String portPart = (uri.getPort() == -1 || ("http".equals(scheme) && uri.getPort() == 80) || ("https".equals(scheme) && uri.getPort() == 443)) ? "" : ":" + uri.getPort();
+            String path = (uri.getPath() == null || uri.getPath().isEmpty()) ? "/" : uri.getPath();
+            String cleanQuery = com.subdual.research_service.util.UrlNormalizer.cleanQueryParameters(uri.getQuery(), true);
             return scheme + "://" + host + portPart + path + cleanQuery;
         } catch (Exception ex) {
             return null;
         }
     }
 
-    private String extractValidScheme(URI uri) {
-        String scheme = uri.getScheme() != null ? uri.getScheme().toLowerCase(Locale.ROOT) : null;
-        return ("http".equals(scheme) || "https".equals(scheme)) ? scheme : null;
-    }
-
-    private String extractValidHost(URI uri) {
-        String host = uri.getHost() != null ? uri.getHost().toLowerCase(Locale.ROOT) : null;
-        return (host != null && !host.isBlank()) ? host : null;
-    }
-
     private String deduplicationKey(String url) {
-        if (url == null) return "";
-        String lower = url.toLowerCase(Locale.ROOT);
-        if (lower.length() > 1 && lower.endsWith("/")) {
-            return lower.substring(0, lower.length() - 1);
-        }
-        return lower;
-    }
-
-    private String normalizePath(String path) {
-        return (path == null || path.isEmpty()) ? "/" : path;
-    }
-
-    private String formatPort(String scheme, int port) {
-        boolean isDefaultPort = port == -1
-                || ("http".equals(scheme) && port == 80)
-                || ("https".equals(scheme) && port == 443);
-        return isDefaultPort ? "" : ":" + port;
-    }
-
-    private String cleanTrackingQuery(String rawQuery) {
-        if (rawQuery == null || rawQuery.isBlank()) {
-            return "";
-        }
-
-        String filtered = Arrays.stream(rawQuery.split("&"))
-                .filter(param -> {
-                    String paramName = param.split("=")[0].toLowerCase(Locale.ROOT);
-                    return !TRACKING_PARAMS.contains(paramName);
-                })
-                .collect(Collectors.joining("&"));
-
-        return filtered.isBlank() ? "" : "?" + filtered;
+        return com.subdual.research_service.util.UrlNormalizer.toComparisonKey(url);
     }
 
     public String classifySourceType(String url, String candidateType, ResearchTarget target) {

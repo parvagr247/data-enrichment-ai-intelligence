@@ -34,7 +34,7 @@ public class ResearchResponseFactory {
                 result.attributes().size(),
                 diagnostics
         );
-        ResearchStatus status = determineResearchStatus(diagnostics, attributes);
+        ResearchStatus status = determineResearchStatus(target, rankedSources, diagnostics, attributes);
         List<String> warnings = extractWarnings(diagnostics);
 
         return new ResearchResponse(
@@ -64,13 +64,24 @@ public class ResearchResponseFactory {
         );
     }
 
-    private ResearchStatus determineResearchStatus(ResearchDiagnostics diagnostics, Map<String, EvidenceTuple> attributes) {
-        boolean hasDegradedSources = diagnostics != null && diagnostics.hasDegradedSources();
+    private ResearchStatus determineResearchStatus(
+            ResearchTarget target,
+            List<ResearchSource> rankedSources,
+            ResearchDiagnostics diagnostics,
+            Map<String, EvidenceTuple> attributes
+    ) {
+        boolean hasSources = rankedSources != null && !rankedSources.isEmpty();
         boolean hasExtractedAttributes = attributes != null && !attributes.isEmpty();
 
-        return (hasDegradedSources && !hasExtractedAttributes)
-                ? ResearchStatus.PARTIAL
-                : ResearchStatus.COMPLETED;
+        if (diagnostics != null && diagnostics.hasDegradedSources() && !hasExtractedAttributes) {
+            return ResearchStatus.PARTIAL;
+        }
+
+        if (!hasSources && !hasExtractedAttributes) {
+            return ResearchStatus.FAILED;
+        }
+
+        return hasExtractedAttributes ? ResearchStatus.COMPLETED : ResearchStatus.PARTIAL;
     }
 
     private List<String> extractWarnings(ResearchDiagnostics diagnostics) {

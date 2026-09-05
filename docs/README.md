@@ -62,7 +62,25 @@ Deep dives into the engineering decisions and production patterns implemented in
    *Strict prompt schema enforcement, verbatim quote substring verification in raw text, and offline heuristic fallback.*
 
 7. 🗄️ **[07. Transactional Persistence, Flyway & Idempotent Upsert](learning/07-transactional-persistence-and-idempotency.md)**  
-   *Versioned SQL migrations, Hibernate `validate`, atomic orphan removal (`clear()` & append), tracking removal, and SHA-256 idempotency.*
+   *Versioned SQL migrations, Hibernate `validate`, atomic orphan removal (`clear()` & append), tracking removal, and SHA-256 idempotency (consolidates Concept 08).*
+
+8. 🏗️ **[09. Multi-Service Architecture, Isolation & Cross-Service Orchestration](learning/09-multi-service-architecture-and-orchestration.md)**  
+   *Service boundaries (`dataset-service`, `research-service`, `ai-intelligent-service`), private DTO contracts via `RestClient`, zero shared-domain coupling, and resilient downstream fallback.*
+
+9. 🤖 **[10. Spring AI Model Abstraction, Prompt Engineering & Deterministic Fallbacks](learning/10-spring-ai-model-abstraction-and-prompt-engineering.md)**  
+   *Spring AI `ChatModel` decoupling, prompt schemas with JSON markdown fence cleaning, anti-hallucination guardrails, and dual-mode deterministic offline fallback.*
+
+10. 📊 **[11. Dataset Ingestion, Schema Detection & Multi-Tier Entity Normalization](learning/11-dataset-ingestion-schema-detection-and-normalization.md)**  
+    *Browser-side SheetJS ingestion, regex heuristic identity anchor detection, and the 6 distinct data representations along the pipeline.*
+
+11. 🎯 **[12. User-Directed Requirements vs. Default Enrichment & Adaptive Scoping](learning/12-user-directed-requirements-and-adaptive-enrichment.md)**  
+    *Treating user requirements as dynamic runtime data, natural language intent interpretation, authoritative entity-type default scopes, and adaptive early stopping.*
+
+12. 🔬 **[13. Modular Evidence Extraction, Domain Extractor Decomposition & Entity Resolution](learning/13-modular-evidence-extraction-and-entity-resolution.md)**  
+    *Eliminating extractor God classes, subpackage decomposition (`document`, `extractor`, `support`, `ai`), Jsoup noise stripping, and `EntityResolver` false-positive filtering.*
+
+13. 📡 **[14. Observability, MDC Correlation Tracing & ProblemDetail Diagnostics](learning/14-observability-mdc-tracing-and-diagnostics.md)**  
+    *Thread-safe SLF4J MDC correlation tokens (`entityId`, `jobId`), milestone pipeline logging, in-flight warnings accumulator (`ResearchDiagnostics`), and RFC 7807 `ProblemDetail` error responses.*
 
 ---
 

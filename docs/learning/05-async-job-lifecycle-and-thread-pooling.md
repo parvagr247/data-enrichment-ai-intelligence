@@ -94,3 +94,7 @@ private void processJob(String jobId, ResearchRequest request) {
    `new LinkedBlockingQueue<>()` defaults to `Integer.MAX_VALUE` (2.1 billion items). Under load, the queue grows infinitely until the JVM crashes with an OOM before the pool ever spawns threads beyond `corePoolSize`.
 3. **MDC Cleanup Is Mandatory**:
    Worker threads in a thread pool are reused. If you forget to call `MDC.remove("jobId")` in a `finally` block, the next task executed on that thread will inherit the previous job's ID in its logs.
+
+---
+
+**Previous:** [Concept 04: Strategy & Adapter Patterns for External Integrations](04-strategy-and-adapter-patterns-in-provider-integrations.md) | **Next:** [Concept 06: Evidence-Grounded AI Extraction & Zero-Hallucination Guardrails](06-evidence-grounded-ai-extraction.md)

@@ -95,12 +95,7 @@ public class DeterministicRelevanceEvaluator implements RelevanceEvaluator {
     }
 
     private boolean isSameUrl(String u1, String u2) {
-        if (u1 == null || u2 == null) {
-            return false;
-        }
-        String s1 = u1.trim().replaceFirst("^https?://(www\\.)?", "").replaceFirst("/+$", "");
-        String s2 = u2.trim().replaceFirst("^https?://(www\\.)?", "").replaceFirst("/+$", "");
-        return s1.equalsIgnoreCase(s2);
+        return com.subdual.research_service.util.UrlNormalizer.isSameUrl(u1, u2);
     }
 
     private String extractSlug(String path) {

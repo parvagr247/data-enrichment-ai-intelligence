@@ -15,9 +15,6 @@ export function exportDataset(
     const row: Record<string, string> = { ...record.originalData };
 
     row['Enrichment_Status'] = record.status;
-    if (record.response?.entityId) {
-      row['Enrichment_Entity_Id'] = record.response.entityId;
-    }
     if (record.response?.result?.canonicalUrl) {
       row['Canonical_Url'] = record.response.result.canonicalUrl;
     }

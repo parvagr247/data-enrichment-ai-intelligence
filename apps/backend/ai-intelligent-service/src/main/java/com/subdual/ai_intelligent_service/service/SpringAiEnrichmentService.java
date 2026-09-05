@@ -11,6 +11,7 @@ import com.subdual.ai_intelligent_service.dto.InputCleansingRequest;
 import com.subdual.ai_intelligent_service.dto.InputCleansingResponse;
 import com.subdual.ai_intelligent_service.dto.RequirementInterpretationRequest;
 import com.subdual.ai_intelligent_service.dto.RequirementInterpretationResponse;
+import com.subdual.ai_intelligent_service.normalization.AiOutputNormalizer;
 import com.subdual.ai_intelligent_service.prompt.PromptTemplates;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.model.ChatModel;
@@ -172,11 +173,34 @@ public class SpringAiEnrichmentService implements EnrichmentAIService {
             fields.add("industry");
         }
 
+        if (fields.isEmpty() && requirement != null && !requirement.isBlank()) {
+            String[] tokens = requirement.split("[,;\\n]|\\band\\b");
+            for (String token : tokens) {
+                String cleanToken = token.trim().replaceAll("[^a-zA-Z0-9_ ]", "");
+                if (!cleanToken.isBlank() && cleanToken.length() <= 35) {
+                    fields.add(toCamelCase(cleanToken));
+                }
+            }
+        }
+
         if (fields.isEmpty()) {
             return buildDefaultScope(entityType);
         }
 
         return new RequirementInterpretationResponse(fields.stream().distinct().toList(), "Rule-interpreted user requirement", false);
+    }
+
+    private String toCamelCase(String text) {
+        String[] words = text.trim().split("\\s+");
+        if (words.length == 0) return "";
+        StringBuilder sb = new StringBuilder(words[0].toLowerCase(Locale.ROOT));
+        for (int i = 1; i < words.length; i++) {
+            if (!words[i].isBlank()) {
+                sb.append(Character.toUpperCase(words[i].charAt(0)))
+                  .append(words[i].substring(1).toLowerCase(Locale.ROOT));
+            }
+        }
+        return sb.toString();
     }
 
     private String buildSynthesisPromptText(EnrichmentSynthesisRequest request) {
@@ -247,7 +271,10 @@ public class SpringAiEnrichmentService implements EnrichmentAIService {
                     if (node.has("sources") && node.get("sources").isArray()) {
                         node.get("sources").forEach(s -> sources.add(s.asText()));
                     }
-                    attributes.put(field, new EnrichedAttributeResult(field, val, origVal, conf, status, sources, evidence, notes));
+                    EnrichedAttributeResult norm = AiOutputNormalizer.normalizeAttribute(
+                            new EnrichedAttributeResult(field, val, origVal, conf, status, sources, evidence, notes)
+                    );
+                    attributes.put(field, norm);
                 });
             }
 
@@ -287,25 +314,27 @@ public class SpringAiEnrichmentService implements EnrichmentAIService {
 
             if (match != null && match.value() != null && !match.value().isBlank() && !"UNKNOWN".equalsIgnoreCase(match.value().trim())) {
                 String status = match.conflictDetected() ? "CONFLICT" : "VERIFIED";
+                String conf = match.conflictDetected() ? "MEDIUM" : (match.confidence() != null ? match.confidence() : "MEDIUM");
                 if (match.conflictDetected()) {
                     conflicts.add("Conflicting evidence detected for field: " + targetField);
                 }
 
-                attributes.put(targetField, new EnrichedAttributeResult(
+                EnrichedAttributeResult norm = AiOutputNormalizer.normalizeAttribute(new EnrichedAttributeResult(
                         targetField,
                         match.value(),
                         originalVal,
-                        match.confidence() != null ? match.confidence() : "MEDIUM",
+                        conf,
                         status,
                         match.corroboratingSources() != null && !match.corroboratingSources().isEmpty()
                                 ? match.corroboratingSources()
                                 : (match.sourceUrl() != null ? List.of(match.sourceUrl()) : List.of()),
                         match.evidenceSnippet() != null ? match.evidenceSnippet() : "",
-                        "Grounded in verified research evidence"
+                        match.conflictDetected() ? "Conflicting evidence preserved across sources" : "Grounded in verified research evidence"
                 ));
+                attributes.put(targetField, norm);
             } else {
                 unresolved.add(targetField);
-                attributes.put(targetField, new EnrichedAttributeResult(
+                EnrichedAttributeResult norm = AiOutputNormalizer.normalizeAttribute(new EnrichedAttributeResult(
                         targetField,
                         "UNKNOWN",
                         originalVal,
@@ -315,6 +344,7 @@ public class SpringAiEnrichmentService implements EnrichmentAIService {
                         "",
                         "No verified evidence found in research sources"
                 ));
+                attributes.put(targetField, norm);
             }
         }
 

@@ -138,3 +138,7 @@ public EntityDetailResponse persistOrUpdate(PersistEntityRequest request) {
    When designing distributed ingestion pipelines, deriving a deterministic primary key (like SHA-256 of canonical URL) guarantees idempotency without needing distributed locks (Redis Redlock or DB locks).
 3. **The Power of `orphanRemoval = true`**:
    Without `orphanRemoval = true`, calling `clear()` and saving would leave old sources and attributes in the database with null foreign keys. With orphan removal, stale research data is automatically purged.
+
+---
+
+**Previous:** [Concept 06: Evidence-Grounded AI Extraction & Zero-Hallucination Guardrails](06-evidence-grounded-ai-extraction.md) | **Next:** [Concept 08: Note on Consolidation](08-canonicalization-and-configuration-binding.md) / [Concept 09: Multi-Service Architecture, Isolation & Cross-Service Orchestration](09-multi-service-architecture-and-orchestration.md)

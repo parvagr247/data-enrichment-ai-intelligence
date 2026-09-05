@@ -74,7 +74,7 @@ if (request.textContent().toLowerCase(Locale.ROOT).contains(quote.toLowerCase(Lo
 
 * **Why this code**: Even if the prompt says "do not hallucinate", LLMs occasionally make up quotes. This programmatic substring check guarantees that no fact enters the system unless its evidence quote literally exists in the raw HTML text.
 
-### C. Multi-Source Corroboration in [`EvidenceExtractor.java`](file:///P:/Agentic%20AI/Enrichment%20Platform/data-enrichment-ai-intelligence/apps/backend/research-service/src/main/java/com/subdual/research_service/extraction/EvidenceExtractor.java#L139-L160)
+### C. Multi-Source Corroboration in [`EvidenceMerger.java`](file:///P:/Agentic%20AI/Enrichment%20Platform/data-enrichment-ai-intelligence/apps/backend/research-service/src/main/java/com/subdual/research_service/extraction/support/EvidenceMerger.java#L37-L65)
 
 ```java
 if (isAgreement(existing.value(), value)) {
@@ -90,7 +90,7 @@ if (isAgreement(existing.value(), value)) {
 }
 ```
 
-* **Why this code**: If Source A says "Role: Lead Engineer" and Source B says "Role: Lead Engineer", confidence is promoted to `HIGH`. If Source A says "Role: Engineer" and Source B says "Role: Product Manager", both alternatives are recorded and `conflictDetected` is set to `true`.
+* **Why this code**: If Source A says "Role: Lead Engineer" and Source B says "Role: Lead Engineer", confidence is promoted to `HIGH`. If Source A says "Role: Engineer" and Source B says "Role: Product Manager", both alternatives are recorded and `conflictDetected` is set to `true`. This logic is encapsulated inside `EvidenceMerger` under `com.subdual.research_service.extraction.support`.
 
 ---
 
@@ -102,3 +102,7 @@ if (isAgreement(existing.value(), value)) {
    Giving a user a score of `0.95` without an explanation builds distrust. Giving them the exact verbatim sentence from the source URL makes the data instantly auditable and explainable.
 3. **Graceful Fallback When Tokens Run Out**:
    If Gemini is rate-limited or fails, `ai-intelligent-service` catches the error and executes a deterministic regex parser (`extractDeterministically`). The user still gets baseline entity metadata rather than a `500 Internal Server Error`.
+
+---
+
+**Previous:** [Concept 05: Async Job Lifecycle, Bounded Thread Pools & Backpressure](05-async-job-lifecycle-and-thread-pooling.md) | **Next:** [Concept 07: Transactional Persistence, Flyway & Idempotent Upserts](07-transactional-persistence-and-idempotency.md)

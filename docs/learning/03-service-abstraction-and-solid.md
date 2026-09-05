@@ -101,3 +101,7 @@ public ResearchResponse execute(ResearchContext context) {
    When you need to add a new search provider (e.g., Google Custom Search), you implement the `SearchProvider` interface and register the bean. You do **not** edit `DefaultResearchPipeline` or any existing service classes.
 3. **Testability Without Integration Friction**:
    Because `EntityNormalizer` has no database or network dependencies, its unit tests run in less than 5 milliseconds without mocks.
+
+---
+
+**Previous:** [Concept 02: Layered Architecture & Dependency Injection](02-spring-dependency-injection-and-boundaries.md) | **Next:** [Concept 04: Strategy & Adapter Patterns for External Integrations](04-strategy-and-adapter-patterns-in-provider-integrations.md)

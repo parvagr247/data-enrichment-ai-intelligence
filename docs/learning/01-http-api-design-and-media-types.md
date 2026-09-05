@@ -100,3 +100,7 @@ When validation fails (e.g., neither URL nor name is provided), the API returns:
    In interview questions involving background workers (e.g., video processing, document indexing, web scraping), never propose a synchronous `200 OK` endpoint. Always return `202 Accepted` with a status polling URL or webhook.
 3. **RFC 7807 as the Microservice Standard**:
    Modern APIs avoid bespoke error payloads (`{"err": "message"}`). Standardizing on RFC 7807 allows API gateways, client libraries, and monitoring tools to automatically parse errors across all services.
+
+---
+
+**Next:** [Concept 02: Layered Architecture & Dependency Injection](02-spring-dependency-injection-and-boundaries.md)

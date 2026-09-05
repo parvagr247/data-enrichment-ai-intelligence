@@ -31,8 +31,21 @@ public class ResearchServiceClient {
             String organization,
             String role,
             List<String> targetFields,
-            String userRequirement
-    ) {}
+            String userRequirement,
+            Map<String, Object> metadata
+    ) {
+        public ResearchCallRequest(
+                String url,
+                String entityType,
+                String name,
+                String organization,
+                String role,
+                List<String> targetFields,
+                String userRequirement
+        ) {
+            this(url, entityType, name, organization, role, targetFields, userRequirement, Map.of());
+        }
+    }
 
     public record ResearchCallResult(
             String displayName,

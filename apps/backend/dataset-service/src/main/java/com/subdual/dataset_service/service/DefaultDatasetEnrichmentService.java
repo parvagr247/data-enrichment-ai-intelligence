@@ -215,6 +215,10 @@ public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService
         ResearchServiceClient.ResearchCallResponse researchResp = null;
         String researchError = null;
         try {
+            Map<String, Object> metadata = new LinkedHashMap<>();
+            if (rawRow != null) {
+                metadata.putAll(rawRow);
+            }
             researchResp = researchServiceClient.executeResearch(new ResearchServiceClient.ResearchCallRequest(
                     url,
                     entityType,
@@ -222,7 +226,8 @@ public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService
                     org,
                     role,
                     targetFields,
-                    requirement
+                    requirement,
+                    metadata
             ));
         } catch (Exception ex) {
             log.warn("Research call failed for row {}: {}", rowIndex, ex.getMessage());
@@ -362,9 +367,14 @@ public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService
             log.warn("Failed persisting entity {} in database: {}", entityId, ex.getMessage());
         }
 
-        String status = unresolvedFields.size() == targetFields.size() && !targetFields.isEmpty()
-                ? "PARTIAL"
-                : (unresolvedFields.isEmpty() ? "COMPLETED" : "PARTIAL");
+        String status;
+        if ("FAILED".equalsIgnoreCase(researchResp.status())) {
+            status = "FAILED";
+        } else if ("PARTIAL".equalsIgnoreCase(researchResp.status()) || !unresolvedFields.isEmpty()) {
+            status = "PARTIAL";
+        } else {
+            status = "COMPLETED";
+        }
 
         return new RowEnrichmentResult(
                 rowId,

@@ -131,7 +131,7 @@ public class DefaultSourceEvidenceService implements SourceEvidenceService {
             EntityResolver.ResolutionResult resolution,
             List<ExtractedDocument> extractedDocuments
     ) {
-        if (resolution != null && resolution.matched()) {
+        if (resolution != null && (resolution.matched() || resolution.status() == EntityResolver.MatchStatus.AMBIGUOUS)) {
             extractedDocuments.add(doc);
         } else {
             String reason = resolution != null ? resolution.reason() : "resolution failed";

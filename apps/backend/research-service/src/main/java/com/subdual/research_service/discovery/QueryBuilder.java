@@ -21,7 +21,7 @@ public class QueryBuilder {
         addPrimaryQuery(queries, target);
         addAlternativeQueries(queries, target);
 
-        return queries.stream().distinct().limit(3).toList();
+        return queries.stream().distinct().limit(5).toList();
     }
 
     public String buildAdaptiveQuery(ResearchTarget target, List<String> missingFields) {
@@ -91,11 +91,17 @@ public class QueryBuilder {
         }
 
         String name = target.displayName().trim();
-        if (target.seedOrganization() != null && !target.seedOrganization().isBlank()) {
-            queries.add("\"" + name + "\" \"" + target.seedOrganization().trim() + "\"");
+        String org = findContextValue(target, "organization", "company", "employer", "current_organization");
+        if (org != null && !org.isBlank()) {
+            queries.add("\"" + name + "\" \"" + org.trim() + "\"");
         }
-        if (target.seedRole() != null && !target.seedRole().isBlank()) {
-            queries.add("\"" + name + "\" \"" + target.seedRole().trim() + "\"");
+        String role = findContextValue(target, "role", "title", "position", "currentrole", "headline");
+        if (role != null && !role.isBlank()) {
+            queries.add("\"" + name + "\" \"" + role.trim() + "\"");
+        }
+        String location = findContextValue(target, "location", "city", "country", "headquarters", "based_in");
+        if (location != null && !location.isBlank()) {
+            queries.add("\"" + name + "\" \"" + location.trim() + "\"");
         }
         if (target.targetFields() != null && !target.targetFields().isEmpty()) {
             String fieldsToken = target.targetFields().stream()
@@ -104,6 +110,23 @@ public class QueryBuilder {
                     .collect(java.util.stream.Collectors.joining(" "));
             queries.add("\"" + name + "\" " + fieldsToken);
         }
+    }
+
+    private String findContextValue(ResearchTarget target, String... keys) {
+        if (target == null) return null;
+        if (target.metadata() != null && !target.metadata().isEmpty()) {
+            for (String key : keys) {
+                for (var entry : target.metadata().entrySet()) {
+                    if (entry.getKey().equalsIgnoreCase(key) && entry.getValue() != null) {
+                        String val = entry.getValue().toString().trim();
+                        if (!val.isBlank()) return val;
+                    }
+                }
+            }
+        }
+        if (keys.length > 0 && "organization".equalsIgnoreCase(keys[0])) return target.seedOrganization();
+        if (keys.length > 0 && "role".equalsIgnoreCase(keys[0])) return target.seedRole();
+        return null;
     }
 
     private String constructAdaptiveQuery(ResearchTarget target, String fieldTerm) {

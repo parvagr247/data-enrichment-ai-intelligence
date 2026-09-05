@@ -107,3 +107,7 @@ research:
    By depending on `SearchProvider` rather than Tavily's SDK, our core domain logic remains 100% agnostic to the underlying search provider.
 3. **Graceful Degraded States**:
    The same pattern is used for persistence and AI extraction (`NoOpAiExtractionClient`, `NoOpDatasetPersistenceClient`), allowing individual services to run even when dependent microservices are stopped.
+
+---
+
+**Previous:** [Concept 03: Service Abstraction & Pragmatic SOLID Principles](03-service-abstraction-and-solid.md) | **Next:** [Concept 05: Async Job Lifecycle, Bounded Thread Pools & Backpressure](05-async-job-lifecycle-and-thread-pooling.md)
