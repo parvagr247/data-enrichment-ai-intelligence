@@ -2,6 +2,11 @@ package com.subdual.research_service.domain;
 
 public enum ResearchStatus {
     SUBMITTED,
+    RECEIVED,
+    SEARCHING,
+    COLLECTING_SOURCES,
+    EXTRACTING_EVIDENCE,
+    ENRICHING,
     IN_PROGRESS,
     COMPLETED,
     PARTIAL,

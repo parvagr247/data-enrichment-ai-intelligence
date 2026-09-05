@@ -7,5 +7,10 @@ public record DiscoveredSource(
         String title,
         String sourceType,
         Instant retrievedAt,
-        Double relevance
-) {}
+        Double relevance,
+        String snippet
+) {
+    public DiscoveredSource(String url, String title, String sourceType, Instant retrievedAt, Double relevance) {
+        this(url, title, sourceType, retrievedAt, relevance, null);
+    }
+}

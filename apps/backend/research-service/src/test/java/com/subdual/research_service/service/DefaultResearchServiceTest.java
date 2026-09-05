@@ -2,9 +2,11 @@ package com.subdual.research_service.service;
 
 import com.subdual.research_service.client.ResearchSourceClient;
 import com.subdual.research_service.configuration.ResearchDiscoveryProperties;
+import com.subdual.research_service.domain.ConfidenceTier;
 import com.subdual.research_service.domain.DiscoveredSource;
 import com.subdual.research_service.domain.EntityType;
 import com.subdual.research_service.domain.ResearchStatus;
+import com.subdual.research_service.dto.EvidenceTuple;
 import com.subdual.research_service.dto.ResearchRequest;
 import com.subdual.research_service.dto.ResearchResponse;
 import com.subdual.research_service.dto.SourceItem;
@@ -201,5 +203,33 @@ class DefaultResearchServiceTest {
         assertThatThrownBy(() -> researchService.research(emptyUrlRequest))
                 .isInstanceOf(BusinessRuleException.class)
                 .hasMessageContaining("Field 'url' must be a valid, well-formed HTTP/HTTPS URL");
+    }
+
+    @Test
+    @DisplayName("Should populate verified attributes with provenance and confidence tier")
+    void shouldPopulateVerifiedAttributesWithProvenance() {
+        Instant now = Instant.now();
+        List<DiscoveredSource> mockSources = List.of(
+                new DiscoveredSource("https://github.com/spring-projects/spring-boot",
+                        "spring-projects/spring-boot", "GITHUB", now, 1.00,
+                        "Spring Boot makes it easy to create stand-alone applications.")
+        );
+
+        when(researchSourceClient.discoverSources(anyString(), anyInt())).thenReturn(mockSources);
+
+        ResearchRequest request = new ResearchRequest(
+                "https://github.com/spring-projects/spring-boot",
+                EntityType.REPOSITORY,
+                "Spring Boot"
+        );
+
+        ResearchResponse response = researchService.executeResearch(request);
+
+        assertThat(response.result().attributes()).isNotEmpty();
+        assertThat(response.result().attributes()).containsKey("repository");
+        EvidenceTuple repoTuple = response.result().attributes().get("repository");
+        assertThat(repoTuple.value()).isEqualTo("spring-projects/spring-boot");
+        assertThat(repoTuple.sourceUrl()).isEqualTo("https://github.com/spring-projects/spring-boot");
+        assertThat(repoTuple.confidence()).isEqualTo(ConfidenceTier.HIGH);
     }
 }

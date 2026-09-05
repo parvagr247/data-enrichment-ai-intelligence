@@ -765,8 +765,179 @@ HTTP Client (Postman / cURL)
 | Variable | Default | Purpose |
 | :--- | :--- | :--- |
 | `SEARCH_PROVIDER_NAME` | `mock` | Active provider: `mock` for deterministic development, `tavily` for external search API |
-| `SEARCH_PROVIDER_API_KEY` | *(empty)* | API key for external search provider (e.g. Tavily) |
+| `SEARCH_PROVIDER_API_KEY` | *(empty)* | API key for external search provider (required when `SEARCH_PROVIDER_NAME=tavily`) |
 | `SEARCH_PROVIDER_BASE_URL` | `https://api.tavily.com` | Base URL of the discovery service |
 | `SEARCH_DISCOVERY_MAX_RESULTS` | `5` | Maximum number of candidate sources per entity |
-| `SEARCH_DISCOVERY_TIMEOUT_MS` | `4000` | HTTP client connect/read timeout in milliseconds |
+| `SEARCH_DISCOVERY_TIMEOUT_MS` | `4000` | HTTP client connect/read timeout in milliseconds for discovery |
+| `WEB_FETCH_CONNECT_TIMEOUT_MS` | `3000` | Connect timeout for web content retrieval |
+| `WEB_FETCH_READ_TIMEOUT_MS` | `5000` | Read timeout for web content retrieval |
+| `WEB_FETCH_MAX_RESPONSE_SIZE_MB` | `5` | Maximum allowed payload size before stream truncation |
+| `RESEARCH_MAX_SOURCES` | `5` | Maximum candidate sources fetched and evaluated |
+| `RESEARCH_MAX_CONTENT_LENGTH` | `50000` | Maximum character length retained for document body content |
+
+---
+
+## 16. Comprehensive Research Pipeline Architecture
+
+### End-to-End Execution Flow
+
+The research pipeline executes synchronously across decoupled components:
+
+```mermaid
+flowchart TD
+    Client(["HTTP Client / UI"]) -->|POST /api/v1/research| RC["ResearchController"]
+    RC -->|executeResearch| DRS["DefaultResearchService"]
+    
+    subgraph Stage1 ["Stage 1: Validation & Target Construction"]
+        DRS -->|validate| VAL["Request Validation"]
+        VAL -->|canonicalize & hash| TGT["ResearchTarget (SHA-256 entityId)"]
+    end
+
+    subgraph Stage2 ["Stage 2: Query Construction & Search Discovery"]
+        TGT -->|buildDiscoveryQuery| QB["QueryBuilder"]
+        QB -->|query| SP["SearchProvider Interface"]
+        SP -.->|SEARCH_PROVIDER_NAME=tavily| TSP["TavilySearchProvider (Real API)"]
+        SP -.->|SEARCH_PROVIDER_NAME=mock| MSP["MockSearchProvider (Deterministic)"]
+    end
+
+    subgraph Stage3 ["Stage 3: Normalization, Deduplication & Quality Ranking"]
+        TSP & MSP -->|raw DiscoveredSources| SPrc["SourceProcessor"]
+        SPrc -->|strip tracking params & rank| Ranked["Ranked ResearchSources"]
+    end
+
+    subgraph Stage4 ["Stage 4: Web Content Retrieval & HTML Extraction"]
+        Ranked -->|source URLs| WCF["WebContentFetcher (SSRF & Timeout Protected)"]
+        WCF -->|FetchedContent| CE["ContentExtractor (Jsoup Boilerplate Stripping)"]
+        CE -->|clean text & metadata| ED["ExtractedDocuments"]
+    end
+
+    subgraph Stage5 ["Stage 5: Entity Resolution, Provenance & Confidence"]
+        ED -->|document & target| ER["EntityResolver (Host & Title Matching)"]
+        ER -->|resolution results| EE["EvidenceExtractor"]
+        EE -->|evidence tuples & corroboration| ATTR["Map<String, EvidenceTuple> Attributes"]
+    end
+
+    subgraph Stage6 ["Stage 6: Response Assembly"]
+        ATTR & Ranked --> RESP["ResearchResponse (COMPLETED / PARTIAL)"]
+        RESP -->|200 OK| Client
+    end
+```
+
+### Component Responsibilities
+
+1. **`ResearchController` (`controller`)**:
+   - Strictly enforces JSON content negotiation (`MediaType.APPLICATION_JSON_VALUE`).
+   - Delegates validated requests to `ResearchService`.
+2. **`DefaultResearchService` (`service`)**:
+   - Central orchestrator coordinating query construction, search discovery, source processing, content retrieval, content extraction, entity resolution, and evidence compilation.
+   - Measures true end-to-end execution latency (`executionTimeMs`).
+3. **`QueryBuilder` (`service`)**:
+   - Constructs targeted discovery queries based on `displayName`, `entityType`, and canonical URL domain/path.
+4. **`SearchProvider` (`client`)**:
+   - Abstraction isolating discovery implementations.
+   - `TavilySearchProvider`: Authenticates via `SEARCH_PROVIDER_API_KEY`, calls Tavily REST endpoint (`/search`), extracts relevance scores and snippets, and maps HTTP error status codes (401, 403, 429, 5xx, timeouts) to `ExternalServiceException`.
+   - `MockSearchProvider`: Generates deterministic, clearly marked `[MOCK]` sources for offline development and testing. Never fabricates fake official domains.
+5. **`SourceProcessor` (`service`)**:
+   - Normalizes URLs (protocol lowercased, default ports removed, path trailing slashes standardized).
+   - Strips analytics/tracking parameters (`utm_*`, `ref*`, `fbclid`, `gclid`, etc.).
+   - Classifies authority types (`OFFICIAL_WEBSITE`, `DOCUMENTATION`, `GOVERNMENT`, `SOCIAL_PROFILE`, `GITHUB`, `NEWS`, `BLOG`, `SEARCH_RESULT`, `OTHER`). Only designates a site as official if its host matches the target seed.
+   - Computes weighted authority + relevance ranking quality scores while strictly preserving the provider's relevance score in `SourceItem.relevance`.
+6. **`WebContentFetcher` (`client`)**:
+   - Uses `java.net.http.HttpClient` with redirect following, connect timeout, read timeout, and max byte truncation.
+   - Enforces SSRF protections: blocks loopback addresses, RFC 1918 private IP subnets (`10/8`, `172.16/12`, `192.168/16`, `169.254/16`), and internal Docker service hostnames (`mysql`, `ai-intelligent-service`, `dataset-service`).
+   - Supports offline `mockMode` fast-path returning deterministic, structured mock HTML without opening external network sockets.
+   - Graceful degradation: individual URL fetch failures do not abort the overall research job.
+7. **`ContentExtractor` (`service`)**:
+   - Lightweight HTML parsing via Jsoup.
+   - Removes DOM noise (`<script>`, `<style>`, `<noscript>`, `<svg>`, `<nav>`, `<footer>`, `<form>`, `<iframe>`).
+   - Extracts page titles, OpenGraph titles/descriptions, meta descriptions, and clean plain text truncated to `RESEARCH_MAX_CONTENT_LENGTH`.
+8. **`EntityResolver` (`service`)**:
+   - Evaluates whether discovered pages correspond to the target entity.
+   - Assigns explainable `ConfidenceTier` (`HIGH` for matching canonical hosts or exact title occurrences; `MEDIUM` for domain/path alignment or body mentions; `LOW` for unverified hits).
+9. **`EvidenceExtractor` (`service`)**:
+   - Binds every discovered attribute (`title`, `description`, `site_name`, `repository`) into an `EvidenceTuple(value, sourceUrl, evidenceSnippet, confidence)`.
+   - Enforces zero-hallucination compliance: facts without empirical proof in retrieved content or from unmatched spam sources are omitted.
+   - Provides snippet fallback: if full page retrieval is unavailable, extracts verified evidence from search engine snippets.
+
+### Switching Between Mock and Tavily Modes
+
+#### Mock Mode (Default / Offline)
+In `.env` or container environment:
+```bash
+SEARCH_PROVIDER_NAME=mock
+```
+- No external internet access or API key required.
+- All sources and documents are deterministically generated and labeled `[MOCK]`.
+- Fast sub-10ms in-memory execution for unit tests and local UI iteration.
+
+#### Tavily Production Mode
+In `.env`:
+```bash
+SEARCH_PROVIDER_NAME=tavily
+SEARCH_PROVIDER_API_KEY=tvly-your-actual-api-key
+SEARCH_PROVIDER_BASE_URL=https://api.tavily.com
+SEARCH_DISCOVERY_MAX_RESULTS=5
+SEARCH_DISCOVERY_TIMEOUT_MS=4000
+```
+- Calls the real Tavily search API.
+- URLs and snippets originate exclusively from live web search.
+- If the API key is missing or invalid, the service throws an explicit `ExternalServiceException` and returns RFC 7807 `502 Bad Gateway` (never silently falls back to mock data).
+
+### Provenance & Evidence Sample Response
+
+```json
+{
+  "status": "COMPLETED",
+  "entityId": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "result": {
+    "displayName": "Spring Boot",
+    "entityType": "REPOSITORY",
+    "canonicalUrl": "https://github.com/spring-projects/spring-boot",
+    "attributes": {
+      "title": {
+        "value": "spring-projects/spring-boot: Spring Boot helps you create Spring-powered applications",
+        "sourceUrl": "https://github.com/spring-projects/spring-boot",
+        "evidenceSnippet": "Page title: \"spring-projects/spring-boot: Spring Boot helps you create Spring-powered applications\"",
+        "confidence": "HIGH"
+      },
+      "description": {
+        "value": "Spring Boot makes it easy to create stand-alone, production-grade Spring based Applications that you can just run.",
+        "sourceUrl": "https://github.com/spring-projects/spring-boot",
+        "evidenceSnippet": "Meta description: \"Spring Boot makes it easy to create stand-alone, production-grade Spring based Applications that you can just run.\"",
+        "confidence": "HIGH"
+      },
+      "repository": {
+        "value": "spring-projects/spring-boot",
+        "sourceUrl": "https://github.com/spring-projects/spring-boot",
+        "evidenceSnippet": "Parsed repository coordinates from canonical target URL",
+        "confidence": "HIGH"
+      }
+    }
+  },
+  "sources": [
+    {
+      "url": "https://github.com/spring-projects/spring-boot",
+      "title": "spring-projects/spring-boot: Spring Boot helps you create Spring-powered applications",
+      "sourceType": "GITHUB",
+      "retrievedAt": "2026-09-05T07:45:00Z",
+      "relevance": 0.98
+    },
+    {
+      "url": "https://spring.io/projects/spring-boot",
+      "title": "Spring Boot - Overview and Quickstart",
+      "sourceType": "OFFICIAL_WEBSITE",
+      "retrievedAt": "2026-09-05T07:45:01Z",
+      "relevance": 0.95
+    }
+  ],
+  "executionTimeMs": 312
+}
+```
+
+### Current Limitations & Future Extension Points
+
+1. **Deterministic Extraction Baseline**: Current attribute extraction relies on structured metadata, OpenGraph tags, and heuristic text parsing. Phase 3 will introduce AI-assisted unstructured extraction by delegating text blocks to `ai-intelligent-service` (`POST /api/v1/ai/extract`).
+2. **Synchronous Execution**: Multi-source web retrieval currently executes synchronously during the HTTP request. Phase 6 will introduce asynchronous job submission (`202 Accepted` + `jobId`) for multi-page deep crawling.
+3. **Stateless Persistence**: Results are returned directly to the caller. Phase 5 will integrate with `dataset-service` to persist entities, discovered sources, and provenance logs into MySQL.
+
 
