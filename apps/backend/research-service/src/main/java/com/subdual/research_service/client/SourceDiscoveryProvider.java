@@ -1,4 +1,4 @@
 package com.subdual.research_service.client;
 
-public interface SourceDiscoveryProvider extends ResearchSourceClient {
+public interface SourceDiscoveryProvider extends SearchDiscoveryProvider, ResearchSourceClient {
 }

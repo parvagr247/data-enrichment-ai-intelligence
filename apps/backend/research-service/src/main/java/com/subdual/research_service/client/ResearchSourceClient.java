@@ -4,8 +4,14 @@ import com.subdual.research_service.domain.DiscoveredSource;
 import java.util.List;
 
 public interface ResearchSourceClient extends SearchProvider {
+
     @Override
     default List<DiscoveredSource> search(String query, int maxResults) {
+        return discoverSources(query, maxResults);
+    }
+
+    @Override
+    default List<DiscoveredSource> discover(String query, int maxResults) {
         return discoverSources(query, maxResults);
     }
 

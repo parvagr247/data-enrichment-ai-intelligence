@@ -28,6 +28,7 @@ import java.util.concurrent.TimeoutException;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -255,5 +256,32 @@ class ResearchControllerTest {
                 .andExpect(jsonPath("$.title").value("Gateway Timeout"))
                 .andExpect(jsonPath("$.detail").value("Search discovery timed out after 4000ms"))
                 .andExpect(jsonPath("$.instance").value("/api/v1/research"));
+    }
+
+    @Test
+    @DisplayName("Test 8: Asynchronous job submission returns 202 Accepted with jobId and status")
+    void shouldSubmitJobAndReturnAccepted() throws Exception {
+        String requestJson = """
+                {
+                  "url": "https://example.com/company",
+                  "entityType": "ORGANIZATION",
+                  "name": "Acme Inc"
+                }
+                """;
+
+        mockMvc.perform(post("/api/v1/research/jobs")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestJson))
+                .andExpect(status().isAccepted())
+                .andExpect(jsonPath("$.jobId").isNotEmpty())
+                .andExpect(jsonPath("$.status").isNotEmpty())
+                .andExpect(jsonPath("$.createdAt").isNotEmpty());
+    }
+
+    @Test
+    @DisplayName("Test 9: Polling nonexistent job returns 404 Not Found")
+    void shouldReturn404ForNonexistentJob() throws Exception {
+        mockMvc.perform(get("/api/v1/research/jobs/nonexistent-id-xyz"))
+                .andExpect(status().isNotFound());
     }
 }

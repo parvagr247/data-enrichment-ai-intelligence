@@ -1,11 +1,11 @@
 package com.subdual.research_service.service;
 
 import com.subdual.research_service.domain.DiscoveredSource;
-import com.subdual.research_service.domain.EntityType;
 import com.subdual.research_service.domain.ResearchSource;
 import com.subdual.research_service.domain.ResearchTarget;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.net.URI;
@@ -19,6 +19,10 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+/**
+ * Normalizes discovered search results, applies source classification,
+ * evaluates composite relevance/quality scores, deduplicates, and ranks sources.
+ */
 @Component
 public class SourceProcessor {
 
@@ -29,7 +33,24 @@ public class SourceProcessor {
             "ref", "ref_src", "fbclid", "gclid", "source", "feature", "mc_eid"
     );
 
+    private final SourceClassifier sourceClassifier;
+    private final RelevanceEvaluator relevanceEvaluator;
+
+    public SourceProcessor() {
+        this(new DeterministicSourceClassifier(), new DeterministicRelevanceEvaluator());
+    }
+
+    @Autowired
+    public SourceProcessor(SourceClassifier sourceClassifier, RelevanceEvaluator relevanceEvaluator) {
+        this.sourceClassifier = sourceClassifier;
+        this.relevanceEvaluator = relevanceEvaluator;
+    }
+
     public List<ResearchSource> processSources(List<DiscoveredSource> rawSources, ResearchTarget target, int maxSources) {
+        return processSources(rawSources, target, maxSources, null);
+    }
+
+    public List<ResearchSource> processSources(List<DiscoveredSource> rawSources, ResearchTarget target, int maxSources, String provider) {
         if (rawSources == null || rawSources.isEmpty()) {
             return List.of();
         }
@@ -42,6 +63,7 @@ public class SourceProcessor {
                 continue;
             }
 
+            // 1. URL Normalization
             String normalizedUrl = normalizeDiscoveredUrl(ds.url());
             if (normalizedUrl == null || seenUrls.contains(normalizedUrl)) {
                 continue;
@@ -52,14 +74,30 @@ public class SourceProcessor {
                     ? ds.title().trim()
                     : normalizedUrl;
 
+            // 2. Source Classification
             String sourceType = classifySourceType(normalizedUrl, ds.sourceType(), target);
+
+            // 3. Relevance & Quality Evaluation
             Instant retrievedAt = ds.retrievedAt() != null ? ds.retrievedAt() : Instant.now();
             double providerRelevance = ds.relevance() != null ? ds.relevance() : 0.80;
             double qualityScore = calculateRankedScore(providerRelevance, sourceType, target);
 
-            processed.add(new ResearchSource(normalizedUrl, title, sourceType, retrievedAt, providerRelevance, qualityScore, ds.snippet()));
+            String domain = ResearchSource.extractDomain(normalizedUrl);
+
+            processed.add(new ResearchSource(
+                    normalizedUrl,
+                    title,
+                    sourceType,
+                    retrievedAt,
+                    providerRelevance,
+                    qualityScore,
+                    ds.snippet(),
+                    domain,
+                    provider
+            ));
         }
 
+        // 4. Rank by composite quality score descending
         processed.sort(Comparator.comparingDouble(ResearchSource::qualityScore).reversed());
 
         int limit = Math.min(processed.size(), Math.max(1, maxSources));
@@ -108,64 +146,10 @@ public class SourceProcessor {
     }
 
     public String classifySourceType(String url, String candidateType, ResearchTarget target) {
-        String lowerUrl = url.toLowerCase(Locale.ROOT);
-
-        // Check if host matches canonical target host
-        if (target != null && target.canonicalUrl() != null) {
-            try {
-                URI targetUri = URI.create(target.canonicalUrl());
-                URI sourceUri = URI.create(url);
-                if (targetUri.getHost() != null && sourceUri.getHost() != null
-                        && targetUri.getHost().equalsIgnoreCase(sourceUri.getHost())) {
-                    return "OFFICIAL_WEBSITE";
-                }
-            } catch (Exception ignored) {}
-        }
-
-        if (lowerUrl.contains("github.com") || lowerUrl.contains("gitlab.com")) {
-            return "GITHUB";
-        }
-        if (lowerUrl.contains("docs.") || lowerUrl.contains("/docs") || lowerUrl.contains("/reference")
-                || lowerUrl.contains("readthedocs.io") || lowerUrl.contains("/documentation")) {
-            return "DOCUMENTATION";
-        }
-        if (lowerUrl.contains(".gov") || lowerUrl.contains(".mil")) {
-            return "GOVERNMENT";
-        }
-        if (lowerUrl.contains("linkedin.com") || lowerUrl.contains("twitter.com") || lowerUrl.contains("x.com")) {
-            return "SOCIAL_PROFILE";
-        }
-        if (lowerUrl.contains("reuters.com") || lowerUrl.contains("bloomberg.com") || lowerUrl.contains("techcrunch.com")
-                || lowerUrl.contains("nytimes.com") || lowerUrl.contains("wsj.com") || lowerUrl.contains("bbc.com")
-                || lowerUrl.contains("theverge.com") || lowerUrl.contains("forbes.com")) {
-            return "NEWS";
-        }
-        if (lowerUrl.contains("blog.") || lowerUrl.contains("/blog")) {
-            return "BLOG";
-        }
-
-        // Only retain candidateType if it was classified by client and is not falsely claiming to be official
-        if (candidateType != null && !candidateType.isBlank() && !"OFFICIAL_WEBSITE".equals(candidateType)) {
-            return candidateType;
-        }
-
-        return "SEARCH_RESULT";
+        return sourceClassifier.classify(url, candidateType, target);
     }
 
-    double calculateRankedScore(double providerRelevance, String sourceType, ResearchTarget target) {
-        double authorityWeight = switch (sourceType) {
-            case "OFFICIAL_WEBSITE" -> 1.00;
-            case "DOCUMENTATION" -> 0.90;
-            case "GOVERNMENT" -> 0.85;
-            case "GITHUB" -> (target != null && target.entityType() == EntityType.REPOSITORY) ? 0.95 : 0.80;
-            case "SOCIAL_PROFILE" -> 0.75;
-            case "NEWS" -> 0.70;
-            case "BLOG" -> 0.65;
-            case "SEARCH_RESULT" -> 0.60;
-            default -> 0.50;
-        };
-
-        double combined = (providerRelevance * 0.5) + (authorityWeight * 0.5);
-        return Math.round(combined * 100.0) / 100.0;
+    public double calculateRankedScore(double providerRelevance, String sourceType, ResearchTarget target) {
+        return relevanceEvaluator.evaluateRelevance(providerRelevance, sourceType, null, null, target);
     }
 }

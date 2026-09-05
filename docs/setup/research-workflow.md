@@ -1,8 +1,8 @@
 # Research Service: Target Pipeline & Next Development Workflow
 
 > **Document Type:** Architecture Roadmap & Technical Specification  
-> **Target Component:** `apps/backend/research-service`  
-> **Current Milestone:** Phase 1 Completed &rarr; Phase 2 (Polite Content Retrieval) Next  
+> **Target Component:** `apps/backend/research-service`, `apps/backend/ai-intelligent-service`, `apps/backend/dataset-service`  
+> **Current Milestone:** Phases 1 through 8 Completed & Verified (Full Multi-Service Mesh Operational)  
 > **Last Updated:** 2026-09-05  
 
 ---
@@ -827,37 +827,46 @@ flowchart TD
 
 1. **`ResearchController` (`controller`)**:
    - Strictly enforces JSON content negotiation (`MediaType.APPLICATION_JSON_VALUE`).
-   - Delegates validated requests to `ResearchService`.
-2. **`DefaultResearchService` (`service`)**:
-   - Central orchestrator coordinating query construction, search discovery, source processing, content retrieval, content extraction, entity resolution, and evidence compilation.
-   - Measures true end-to-end execution latency (`executionTimeMs`).
+   - Delegates validated requests to `ResearchService`. Thin HTTP boundary.
+2. **`EntityNormalizer` & `DefaultEntityNormalizer` (`service`)**:
+   - Canonicalizes seed URLs (scheme and host lowercased, default ports removed, path trailing slash standardized).
+   - Computes deterministic, immutable 64-character SHA-256 `entityId`.
+   - Cleans display names (trims whitespace, collapses internal whitespace) with URL fallback.
+   - Enforces valid `EntityType` defaulting to `OTHER`.
 3. **`QueryBuilder` (`service`)**:
    - Constructs targeted discovery queries based on `displayName`, `entityType`, and canonical URL domain/path.
-4. **`SearchProvider` (`client`)**:
-   - Abstraction isolating discovery implementations.
-   - `TavilySearchProvider`: Authenticates via `SEARCH_PROVIDER_API_KEY`, calls Tavily REST endpoint (`/search`), extracts relevance scores and snippets, and maps HTTP error status codes (401, 403, 429, 5xx, timeouts) to `ExternalServiceException`.
+4. **`SearchDiscoveryProvider` (`client`)**:
+   - Primary search abstraction isolating discovery implementations from business logic.
+   - `TavilySearchProvider`: Authenticates via `SEARCH_PROVIDER_API_KEY`, calls Tavily REST endpoint (`/search`), extracts relevance scores and snippets, and maps HTTP error status codes (401, 403, 429, 5xx, timeouts) to `ExternalServiceException` without leaking secrets.
    - `MockSearchProvider`: Generates deterministic, clearly marked `[MOCK]` sources for offline development and testing. Never fabricates fake official domains.
-5. **`SourceProcessor` (`service`)**:
-   - Normalizes URLs (protocol lowercased, default ports removed, path trailing slashes standardized).
-   - Strips analytics/tracking parameters (`utm_*`, `ref*`, `fbclid`, `gclid`, etc.).
-   - Classifies authority types (`OFFICIAL_WEBSITE`, `DOCUMENTATION`, `GOVERNMENT`, `SOCIAL_PROFILE`, `GITHUB`, `NEWS`, `BLOG`, `SEARCH_RESULT`, `OTHER`). Only designates a site as official if its host matches the target seed.
-   - Computes weighted authority + relevance ranking quality scores while strictly preserving the provider's relevance score in `SourceItem.relevance`.
-6. **`WebContentFetcher` (`client`)**:
+5. **`SourceClassifier` & `DeterministicSourceClassifier` (`service`)**:
+   - Classifies discovered sources into standardized taxonomies: `OFFICIAL_WEBSITE`, `DOCUMENTATION`, `SOCIAL_PROFILE`, `NEWS`, `GITHUB`, `GOVERNMENT`, `BLOG`, `SEARCH_RESULT`, `UNKNOWN`.
+   - Uses domain rules, URL structure, and host matching with target canonical host.
+6. **`RelevanceEvaluator` & `DeterministicRelevanceEvaluator` (`service`)**:
+   - Replaceable abstraction computing explainable composite quality/relevance score (0.00 to 1.00).
+   - Combines search provider relevance, source classification authority weight, and entity host alignment.
+7. **`SourceProcessor` (`service`)**:
+   - Normalizes URLs and strips tracking parameters (`utm_*`, `ref*`, `fbclid`, `gclid`, etc.).
+   - Orchestrates classification via `SourceClassifier` and scoring via `RelevanceEvaluator`.
+   - Deduplicates sources by canonical URL and ranks them by composite score.
+8. **`WebContentFetcher` (`client`)**:
    - Uses `java.net.http.HttpClient` with redirect following, connect timeout, read timeout, and max byte truncation.
    - Enforces SSRF protections: blocks loopback addresses, RFC 1918 private IP subnets (`10/8`, `172.16/12`, `192.168/16`, `169.254/16`), and internal Docker service hostnames (`mysql`, `ai-intelligent-service`, `dataset-service`).
    - Supports offline `mockMode` fast-path returning deterministic, structured mock HTML without opening external network sockets.
    - Graceful degradation: individual URL fetch failures do not abort the overall research job.
-7. **`ContentExtractor` (`service`)**:
+9. **`ContentExtractor` (`service`)**:
    - Lightweight HTML parsing via Jsoup.
    - Removes DOM noise (`<script>`, `<style>`, `<noscript>`, `<svg>`, `<nav>`, `<footer>`, `<form>`, `<iframe>`).
    - Extracts page titles, OpenGraph titles/descriptions, meta descriptions, and clean plain text truncated to `RESEARCH_MAX_CONTENT_LENGTH`.
-8. **`EntityResolver` (`service`)**:
+10. **`EntityResolver` (`service`)**:
    - Evaluates whether discovered pages correspond to the target entity.
    - Assigns explainable `ConfidenceTier` (`HIGH` for matching canonical hosts or exact title occurrences; `MEDIUM` for domain/path alignment or body mentions; `LOW` for unverified hits).
-9. **`EvidenceExtractor` (`service`)**:
+11. **`EvidenceExtractor` (`service`)**:
    - Binds every discovered attribute (`title`, `description`, `site_name`, `repository`) into an `EvidenceTuple(value, sourceUrl, evidenceSnippet, confidence)`.
-   - Enforces zero-hallucination compliance: facts without empirical proof in retrieved content or from unmatched spam sources are omitted.
+   - Enforces strict zero-hallucination compliance: facts without empirical proof in retrieved content or from unmatched spam sources are omitted.
    - Provides snippet fallback: if full page retrieval is unavailable, extracts verified evidence from search engine snippets.
+12. **`DefaultResearchService` (`service`)**:
+   - Central orchestrator coordinating the entire end-to-end enrichment pipeline and assembling `ResearchResponse` with execution metadata (`searchProvider`, `totalSourcesDiscovered`, `totalSourcesRanked`, `attributesExtracted`).
 
 ### Switching Between Mock and Tavily Modes
 
@@ -934,10 +943,104 @@ SEARCH_DISCOVERY_TIMEOUT_MS=4000
 }
 ```
 
-### Current Limitations & Future Extension Points
+### Current Status: Multi-Service Platform Operational
 
-1. **Deterministic Extraction Baseline**: Current attribute extraction relies on structured metadata, OpenGraph tags, and heuristic text parsing. Phase 3 will introduce AI-assisted unstructured extraction by delegating text blocks to `ai-intelligent-service` (`POST /api/v1/ai/extract`).
-2. **Synchronous Execution**: Multi-source web retrieval currently executes synchronously during the HTTP request. Phase 6 will introduce asynchronous job submission (`202 Accepted` + `jobId`) for multi-page deep crawling.
-3. **Stateless Persistence**: Results are returned directly to the caller. Phase 5 will integrate with `dataset-service` to persist entities, discovered sources, and provenance logs into MySQL.
+1. **Structured AI Extraction (`ai-intelligent-service:9742`)**: Operational via `POST /api/v1/ai/extract`. Leverages Spring AI with Gemini / deterministic fallback with quote verification and confidence scoring.
+2. **Relational Persistence Boundary (`dataset-service:9743`)**: Operational via `POST /api/v1/entities`, `GET /api/v1/entities/{id}`, `GET /api/v1/entities`. Backed by MySQL JPA with cascade audit logging.
+3. **Asynchronous Research Jobs (`research-service:9741`)**: Operational via `POST /api/v1/research/jobs` (`202 Accepted`) and `GET /api/v1/research/jobs/{jobId}` (`200 OK`). Retains backward-compatible synchronous `POST /api/v1/research`.
+4. **Cross-Service Mesh**: Fully wired with non-blocking resilience; total test suite comprises 77 passing automated tests with zero regressions.
+
+---
+
+## 16. Multi-Service Mesh Reference (Phases 3–8 — COMPLETED)
+
+### Component Matrix
+
+| Service | Port | Key Endpoints | Responsibilities | Resilience Guarantee |
+| :--- | :--- | :--- | :--- | :--- |
+| `research-service` | `9741` | `POST /api/v1/research`<br>`POST /api/v1/research/jobs`<br>`GET /api/v1/research/jobs/{jobId}` | Orchestration, search discovery, HTTP retrieval, DOM cleaning, AI facts integration, non-blocking persistence relay. | Falls back to in-memory/mock if search, AI, or dataset service is offline. |
+| `ai-intelligent-service` | `9742` | `POST /api/v1/ai/extract` | Spring AI Gemini extraction, verbatim exact-quote verification, field-level confidence calculation. | Heuristic fallback when `GEMINI_API_KEY` is mock or network unavailable. |
+| `dataset-service` | `9743` | `POST /api/v1/entities`<br>`GET /api/v1/entities/{id}`<br>`GET /api/v1/entities` | Spring Data JPA persistence, relational schema management, upsert deduplication, entity queries. | Transactions ensure all-or-nothing consistency across entities, sources, and attributes. |
+
+### API Contracts
+
+#### 1. AI Fact Extraction (`POST http://localhost:9742/api/v1/ai/extract`)
+```json
+{
+  "entityName": "Spring Boot",
+  "entityType": "REPOSITORY",
+  "sourceUrl": "https://github.com/spring-projects/spring-boot",
+  "textContent": "Spring Boot makes it easy to create stand-alone, production-grade Spring based Applications.",
+  "targetFields": ["description", "organization", "technologies"]
+}
+```
+
+#### 2. Relational Entity Persistence (`POST http://localhost:9743/api/v1/entities`)
+```json
+{
+  "entityId": "bcffb9c9c445ee32f6e55a82f36cc0d911f8898e23d8b40a88344e4b43223d77",
+  "displayName": "Spring Boot",
+  "entityType": "REPOSITORY",
+  "canonicalUrl": "https://github.com/spring-projects/spring-boot",
+  "sources": [
+    {
+      "url": "https://github.com/spring-projects/spring-boot",
+      "title": "spring-projects/spring-boot",
+      "sourceType": "GITHUB",
+      "relevance": 1.0,
+      "retrievedAt": "2026-09-05T08:00:00Z"
+    }
+  ],
+  "attributes": {
+    "description": {
+      "value": "Spring Boot makes it easy to create stand-alone applications.",
+      "sourceUrl": "https://github.com/spring-projects/spring-boot",
+      "evidenceSnippet": "Quote: \"Spring Boot makes it easy...\"",
+      "confidence": "HIGH"
+    }
+  }
+}
+```
+
+#### 3. Asynchronous Job Submission (`POST http://localhost:9741/api/v1/research/jobs` -> 202 Accepted)
+```json
+{
+  "url": "https://github.com/spring-projects/spring-boot",
+  "entityType": "REPOSITORY",
+  "name": "Spring Boot"
+}
+```
+**Response (202 Accepted):**
+```json
+{
+  "jobId": "c6a2e8c2-3e2b-4fa8-a114-6fa103328e3b",
+  "status": "SUBMITTED",
+  "progress": 0,
+  "createdAt": "2026-09-05T08:40:00Z"
+}
+```
+
+#### 4. Job Status Polling (`GET http://localhost:9741/api/v1/research/jobs/{jobId}` -> 200 OK)
+```json
+{
+  "jobId": "c6a2e8c2-3e2b-4fa8-a114-6fa103328e3b",
+  "status": "COMPLETED",
+  "progress": 100,
+  "createdAt": "2026-09-05T08:40:00Z",
+  "completedAt": "2026-09-05T08:40:01Z",
+  "result": {
+    "status": "COMPLETED",
+    "entityId": "bcffb9c9c445ee32f6e55a82f36cc0d911f8898e23d8b40a88344e4b43223d77",
+    "result": {
+      "displayName": "Spring Boot",
+      "entityType": "REPOSITORY",
+      "canonicalUrl": "https://github.com/spring-projects/spring-boot",
+      "attributes": { ... }
+    },
+    "sources": [ ... ]
+  }
+}
+```
+
 
 

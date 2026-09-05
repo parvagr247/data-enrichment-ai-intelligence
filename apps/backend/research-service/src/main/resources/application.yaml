@@ -25,3 +25,7 @@ research:
   pipeline:
     max-sources: ${RESEARCH_MAX_SOURCES:5}
     max-content-length: ${RESEARCH_MAX_CONTENT_LENGTH:50000}
+  services:
+    ai-intelligent-service-url: ${AI_INTELLIGENT_SERVICE_URL:http://localhost:9742}
+    dataset-service-url: ${DATASET_SERVICE_URL:http://localhost:9743}
+

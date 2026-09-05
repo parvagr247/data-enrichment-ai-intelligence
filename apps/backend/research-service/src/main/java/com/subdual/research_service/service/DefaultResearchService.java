@@ -1,15 +1,15 @@
 package com.subdual.research_service.service;
 
+import com.subdual.research_service.client.DatasetPersistenceClient;
 import com.subdual.research_service.client.DefaultWebContentFetcher;
 import com.subdual.research_service.client.FetchedContent;
 import com.subdual.research_service.client.ResearchSourceClient;
-import com.subdual.research_service.client.SearchProvider;
+import com.subdual.research_service.client.SearchDiscoveryProvider;
 import com.subdual.research_service.client.WebContentFetcher;
 import com.subdual.research_service.configuration.ResearchDiscoveryProperties;
 import com.subdual.research_service.configuration.ResearchPipelineProperties;
 import com.subdual.research_service.configuration.WebFetchProperties;
 import com.subdual.research_service.domain.DiscoveredSource;
-import com.subdual.research_service.domain.EntityType;
 import com.subdual.research_service.domain.ResearchSource;
 import com.subdual.research_service.domain.ResearchStatus;
 import com.subdual.research_service.domain.ResearchTarget;
@@ -25,24 +25,26 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.net.URI;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HexFormat;
+import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 
+/**
+ * Production-oriented orchestration engine for research and entity enrichment.
+ * Coordinates request validation, entity normalization, search discovery,
+ * source normalization, classification, relevance evaluation, evidence extraction,
+ * and response aggregation.
+ */
 @Service
 public class DefaultResearchService implements ResearchService {
 
     private static final Logger log = LoggerFactory.getLogger(DefaultResearchService.class);
 
-    private final SearchProvider searchProvider;
+    private final SearchDiscoveryProvider searchDiscoveryProvider;
     private final ResearchDiscoveryProperties discoveryProperties;
+    private final EntityNormalizer entityNormalizer;
     private final QueryBuilder queryBuilder;
     private final SourceProcessor sourceProcessor;
     private final WebContentFetcher webContentFetcher;
@@ -50,11 +52,39 @@ public class DefaultResearchService implements ResearchService {
     private final EntityResolver entityResolver;
     private final EvidenceExtractor evidenceExtractor;
     private final ResearchPipelineProperties pipelineProperties;
+    private final DatasetPersistenceClient datasetPersistenceClient;
 
     @Autowired
     public DefaultResearchService(
-            SearchProvider searchProvider,
+            SearchDiscoveryProvider searchDiscoveryProvider,
             ResearchDiscoveryProperties discoveryProperties,
+            EntityNormalizer entityNormalizer,
+            QueryBuilder queryBuilder,
+            SourceProcessor sourceProcessor,
+            WebContentFetcher webContentFetcher,
+            ContentExtractor contentExtractor,
+            EntityResolver entityResolver,
+            EvidenceExtractor evidenceExtractor,
+            ResearchPipelineProperties pipelineProperties,
+            @Autowired(required = false) DatasetPersistenceClient datasetPersistenceClient
+    ) {
+        this.searchDiscoveryProvider = searchDiscoveryProvider;
+        this.discoveryProperties = discoveryProperties;
+        this.entityNormalizer = entityNormalizer;
+        this.queryBuilder = queryBuilder;
+        this.sourceProcessor = sourceProcessor;
+        this.webContentFetcher = webContentFetcher;
+        this.contentExtractor = contentExtractor;
+        this.entityResolver = entityResolver;
+        this.evidenceExtractor = evidenceExtractor;
+        this.pipelineProperties = pipelineProperties;
+        this.datasetPersistenceClient = datasetPersistenceClient;
+    }
+
+    public DefaultResearchService(
+            SearchDiscoveryProvider searchDiscoveryProvider,
+            ResearchDiscoveryProperties discoveryProperties,
+            EntityNormalizer entityNormalizer,
             QueryBuilder queryBuilder,
             SourceProcessor sourceProcessor,
             WebContentFetcher webContentFetcher,
@@ -63,21 +93,18 @@ public class DefaultResearchService implements ResearchService {
             EvidenceExtractor evidenceExtractor,
             ResearchPipelineProperties pipelineProperties
     ) {
-        this.searchProvider = searchProvider;
-        this.discoveryProperties = discoveryProperties;
-        this.queryBuilder = queryBuilder;
-        this.sourceProcessor = sourceProcessor;
-        this.webContentFetcher = webContentFetcher;
-        this.contentExtractor = contentExtractor;
-        this.entityResolver = entityResolver;
-        this.evidenceExtractor = evidenceExtractor;
-        this.pipelineProperties = pipelineProperties;
+        this(searchDiscoveryProvider, discoveryProperties, entityNormalizer, queryBuilder, sourceProcessor,
+                webContentFetcher, contentExtractor, entityResolver, evidenceExtractor, pipelineProperties, null);
     }
 
-    public DefaultResearchService(SearchProvider searchProvider, ResearchDiscoveryProperties discoveryProperties) {
+    /**
+     * Backward-compatible convenience constructor for unit tests and lightweight instantiation.
+     */
+    public DefaultResearchService(SearchDiscoveryProvider searchDiscoveryProvider, ResearchDiscoveryProperties discoveryProperties) {
         this(
-                searchProvider,
+                searchDiscoveryProvider,
                 discoveryProperties,
+                new DefaultEntityNormalizer(),
                 new QueryBuilder(),
                 new SourceProcessor(),
                 new DefaultWebContentFetcher(
@@ -93,105 +120,54 @@ public class DefaultResearchService implements ResearchService {
 
     @Override
     public ResearchResponse executeResearch(ResearchRequest request) {
-        return research(request);
-    }
-
-    @Override
-    public ResearchResponse research(ResearchRequest request) {
         long startTime = System.currentTimeMillis();
 
-        // 1. Stage: RECEIVED & Validation
-        log.info("[Pipeline: RECEIVED] Research request received for URL: '{}', entityType: '{}', name: '{}'",
-                request != null ? request.url() : null,
-                request != null ? request.entityType() : null,
-                request != null ? request.name() : null);
-
+        // 1. Request Validation
         validateRequest(request);
-        ResearchTarget target = buildTarget(request);
 
-        // 2. Stage: SEARCHING (Query construction & Discovery)
+        // 2. Entity Normalization
+        ResearchTarget target = entityNormalizer.normalize(request);
+        log.info("[Pipeline: NORMALIZED] EntityId='{}', CanonicalUrl='{}', DisplayName='{}', Type='{}'",
+                target.entityId(), target.canonicalUrl(), target.displayName(), target.entityType());
+
+        // 3. Search Discovery
         String query = queryBuilder.buildDiscoveryQuery(target);
-        log.info("[Pipeline: SEARCHING] Discovery started for entityId: '{}', query: '{}'", target.entityId(), query);
+        log.info("[Pipeline: DISCOVERY] Searching provider '{}' with query: '{}'",
+                discoveryProperties.provider(), query);
+        List<DiscoveredSource> rawDiscoveredSources = discoverSources(query);
 
-        List<DiscoveredSource> rawDiscoveredSources;
-        try {
-            if (searchProvider instanceof ResearchSourceClient client) {
-                rawDiscoveredSources = client.discoverSources(query, discoveryProperties.maxResults());
-            } else {
-                rawDiscoveredSources = searchProvider.search(query, discoveryProperties.maxResults());
-            }
-        } catch (BusinessRuleException ex) {
-            throw ex;
-        } catch (ExternalServiceException ex) {
-            log.error("[Pipeline: FAILED] Search provider failure for query '{}': {}", query, ex.getMessage());
-            throw ex;
-        } catch (Exception ex) {
-            log.error("[Pipeline: FAILED] Unexpected failure during search discovery for query '{}'", query, ex);
-            throw new ExternalServiceException("Failed to retrieve research sources", ex);
-        }
-
-        // 3. Stage: COLLECTING_SOURCES (Normalization, Deduplication, Quality Ranking)
-        log.info("[Pipeline: COLLECTING_SOURCES] Processing and ranking discovered sources for entityId: '{}'", target.entityId());
+        // 4. Source Collection, Normalization, Classification, and Relevance Scoring
+        log.info("[Pipeline: SOURCE_PROCESSING] Processing {} discovered candidate sources for entityId: '{}'",
+                rawDiscoveredSources.size(), target.entityId());
         List<ResearchSource> rankedSources = sourceProcessor.processSources(
                 rawDiscoveredSources,
                 target,
-                pipelineProperties.maxSources()
+                pipelineProperties.maxSources(),
+                discoveryProperties.provider()
         );
 
-        // 4. Stage: EXTRACTING_EVIDENCE & Web Content Retrieval
-        log.info("[Pipeline: EXTRACTING_EVIDENCE] Retrieving content from {} sources for entityId: '{}'",
+        // 5. Evidence Extraction (Grounded attribute extraction from ranked sources)
+        log.info("[Pipeline: EVIDENCE_EXTRACTION] Extracting evidence from {} ranked sources for entityId: '{}'",
                 rankedSources.size(), target.entityId());
+        Map<String, EvidenceTuple> attributes = extractEvidence(target, rankedSources);
 
-        List<ExtractedDocument> extractedDocuments = new ArrayList<>();
-        Map<String, EntityResolver.ResolutionResult> resolutions = new HashMap<>();
+        // 6. Response Aggregation
+        long executionTimeMs = System.currentTimeMillis() - startTime;
+        ResearchResponse response = aggregateResponse(target, rankedSources, attributes, rawDiscoveredSources.size(), executionTimeMs);
 
-        for (ResearchSource source : rankedSources) {
-            FetchedContent fetched = webContentFetcher.fetch(source.url());
-            if (fetched.success()) {
-                ExtractedDocument doc = contentExtractor.extract(fetched, pipelineProperties.maxContentLength());
-                extractedDocuments.add(doc);
-
-                EntityResolver.ResolutionResult resolution = entityResolver.resolve(target, doc);
-                resolutions.put(source.url(), resolution);
-            } else {
-                log.debug("Skipping failed content fetch for source URL '{}': {}", source.url(), fetched.errorMessage());
+        // 7. Relational Persistence Boundary (non-blocking)
+        if (datasetPersistenceClient != null) {
+            try {
+                datasetPersistenceClient.persistEntity(target, rankedSources, attributes);
+            } catch (Exception ex) {
+                log.warn("[Pipeline: PERSISTENCE_FAILED] Non-blocking dataset persistence failed: {}", ex.getMessage());
             }
         }
 
-        // 5. Stage: ENRICHING (Attribute extraction, confidence calculation, provenance mapping)
-        log.info("[Pipeline: ENRICHING] Extracting attributes and binding provenance for entityId: '{}'", target.entityId());
-        Map<String, EvidenceTuple> attributes = evidenceExtractor.extractEvidence(
-                target,
-                rankedSources,
-                extractedDocuments,
-                resolutions
-        );
+        log.info("[Pipeline: COMPLETED] Research finished for entityId: '{}' in {}ms (sources: {}, attributes: {})",
+                target.entityId(), executionTimeMs, response.sources().size(), response.result().attributes().size());
 
-        // 6. Stage: COMPLETED (Build final response)
-        long executionTimeMs = System.currentTimeMillis() - startTime;
-        ResearchStatus finalStatus = ResearchStatus.COMPLETED;
-
-        log.info("[Pipeline: COMPLETED] Research completed for entityId: '{}' in {}ms with {} sources, {} attributes",
-                target.entityId(), executionTimeMs, rankedSources.size(), attributes.size());
-
-        List<SourceItem> sourceItems = rankedSources.stream()
-                .map(this::mapSource)
-                .toList();
-
-        ResearchResult result = new ResearchResult(
-                target.displayName(),
-                target.entityType(),
-                target.canonicalUrl(),
-                attributes
-        );
-
-        return new ResearchResponse(
-                finalStatus,
-                target.entityId(),
-                result,
-                sourceItems,
-                executionTimeMs
-        );
+        return response;
     }
 
     private void validateRequest(ResearchRequest request) {
@@ -203,55 +179,92 @@ public class DefaultResearchService implements ResearchService {
         }
     }
 
-    private ResearchTarget buildTarget(ResearchRequest request) {
-        String canonicalUrl = canonicalizeUrl(request.url());
-        String entityId = computeEntityId(canonicalUrl);
-        EntityType type = request.entityType() != null ? request.entityType() : EntityType.OTHER;
-        String displayName = (request.name() != null && !request.name().isBlank())
-                ? request.name().trim()
-                : canonicalUrl;
-
-        return new ResearchTarget(request.url(), canonicalUrl, entityId, type, displayName);
+    private List<DiscoveredSource> discoverSources(String query) {
+        try {
+            if (searchDiscoveryProvider instanceof ResearchSourceClient client) {
+                return client.discoverSources(query, discoveryProperties.maxResults());
+            }
+            return searchDiscoveryProvider.discover(query, discoveryProperties.maxResults());
+        } catch (BusinessRuleException ex) {
+            throw ex;
+        } catch (ExternalServiceException ex) {
+            log.error("[Pipeline: FAILED] Search provider failure for query '{}': {}", query, ex.getMessage());
+            throw ex;
+        } catch (Exception ex) {
+            log.error("[Pipeline: FAILED] Unexpected error during search discovery for query '{}': {}", query, ex.getMessage(), ex);
+            throw new ExternalServiceException("Failed to retrieve research sources from provider", ex);
+        }
     }
 
-    private SourceItem mapSource(ResearchSource source) {
-        return new SourceItem(
-                source.url(),
-                source.title(),
-                source.sourceType(),
-                source.retrievedAt(),
-                source.relevance()
+    private Map<String, EvidenceTuple> extractEvidence(ResearchTarget target, List<ResearchSource> rankedSources) {
+        List<ExtractedDocument> extractedDocuments = new ArrayList<>();
+        Map<String, EntityResolver.ResolutionResult> resolutions = new HashMap<>();
+
+        for (ResearchSource source : rankedSources) {
+            FetchedContent fetched = webContentFetcher.fetch(source.url());
+            if (fetched != null && fetched.success()) {
+                ExtractedDocument doc = contentExtractor.extract(fetched, pipelineProperties.maxContentLength());
+                extractedDocuments.add(doc);
+
+                EntityResolver.ResolutionResult resolution = entityResolver.resolve(target, doc);
+                resolutions.put(source.url(), resolution);
+            } else {
+                log.debug("Skipping unretrievable source URL '{}'", source.url());
+            }
+        }
+
+        return evidenceExtractor.extractEvidence(
+                target,
+                rankedSources,
+                extractedDocuments,
+                resolutions
         );
     }
 
-    private String canonicalizeUrl(String rawUrl) {
-        try {
-            URI uri = URI.create(rawUrl.trim());
-            String scheme = uri.getScheme() != null ? uri.getScheme().toLowerCase(Locale.ROOT) : "https";
-            String host = uri.getHost() != null ? uri.getHost().toLowerCase(Locale.ROOT) : "";
-            int port = uri.getPort();
-            String path = uri.getPath();
-            if (path == null || path.isEmpty()) {
-                path = "/";
-            }
-            String query = uri.getQuery() != null ? "?" + uri.getQuery() : "";
+    private ResearchResponse aggregateResponse(
+            ResearchTarget target,
+            List<ResearchSource> rankedSources,
+            Map<String, EvidenceTuple> attributes,
+            int totalDiscovered,
+            long executionTimeMs
+    ) {
+        List<SourceItem> sourceItems = rankedSources.stream()
+                .map(this::toSourceItem)
+                .toList();
 
-            String portPart = (port == -1 || (scheme.equals("http") && port == 80) || (scheme.equals("https") && port == 443))
-                    ? "" : ":" + port;
+        ResearchResult result = new ResearchResult(
+                target.displayName(),
+                target.entityType(),
+                target.canonicalUrl(),
+                attributes
+        );
 
-            return scheme + "://" + host + portPart + path + query;
-        } catch (Exception e) {
-            return rawUrl.trim();
-        }
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("provider", discoveryProperties.provider());
+        metadata.put("totalSourcesDiscovered", totalDiscovered);
+        metadata.put("totalSourcesRanked", rankedSources.size());
+        metadata.put("attributesExtracted", attributes.size());
+
+        return new ResearchResponse(
+                ResearchStatus.COMPLETED,
+                target.entityId(),
+                result,
+                sourceItems,
+                executionTimeMs,
+                metadata
+        );
     }
 
-    private String computeEntityId(String canonicalUrl) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(canonicalUrl.getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(hash);
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256 algorithm not available", e);
-        }
+    private SourceItem toSourceItem(ResearchSource source) {
+        return new SourceItem(
+                source.url(),
+                source.title(),
+                source.snippet(),
+                source.sourceType(),
+                source.domain(),
+                source.provider(),
+                source.retrievedAt(),
+                source.relevance()
+        );
     }
 }

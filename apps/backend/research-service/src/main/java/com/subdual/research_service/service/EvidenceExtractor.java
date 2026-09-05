@@ -5,6 +5,9 @@ import com.subdual.research_service.domain.EntityType;
 import com.subdual.research_service.domain.ResearchSource;
 import com.subdual.research_service.domain.ResearchTarget;
 import com.subdual.research_service.dto.EvidenceTuple;
+import com.subdual.research_service.client.AiExtractionClient;
+import com.subdual.research_service.client.dto.AiExtractedFact;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.net.URI;
@@ -14,6 +17,17 @@ import java.util.Map;
 
 @Component
 public class EvidenceExtractor {
+
+    private final AiExtractionClient aiExtractionClient;
+
+    public EvidenceExtractor() {
+        this(null);
+    }
+
+    @Autowired
+    public EvidenceExtractor(@Autowired(required = false) AiExtractionClient aiExtractionClient) {
+        this.aiExtractionClient = aiExtractionClient;
+    }
 
     public Map<String, EvidenceTuple> extractEvidence(
             ResearchTarget target,
@@ -53,7 +67,57 @@ public class EvidenceExtractor {
             }
         }
 
+        // 5. Enhance with Structured AI Extraction from Matched Documents
+        if (aiExtractionClient != null) {
+            enrichWithAiExtraction(target, documents, resolutions, attributes);
+        }
+
         return attributes;
+    }
+
+    private void enrichWithAiExtraction(
+            ResearchTarget target,
+            List<ExtractedDocument> documents,
+            Map<String, EntityResolver.ResolutionResult> resolutions,
+            Map<String, EvidenceTuple> attributes
+    ) {
+        for (ExtractedDocument doc : documents) {
+            EntityResolver.ResolutionResult res = resolutions.getOrDefault(doc.url(),
+                    new EntityResolver.ResolutionResult(ConfidenceTier.LOW, false, "Unknown"));
+
+            if (res.matched() && doc.cleanText() != null && !doc.cleanText().isBlank()) {
+                Map<String, AiExtractedFact> facts = aiExtractionClient.extractFacts(
+                        target.displayName(),
+                        target.entityType() != null ? target.entityType().name() : "OTHER",
+                        doc.url(),
+                        doc.cleanText(),
+                        List.of("role", "organization", "description", "summary", "headquarters", "technologies")
+                );
+
+                if (facts != null) {
+                    facts.forEach((factKey, fact) -> {
+                        if (fact != null && fact.value() != null && !fact.value().isBlank()) {
+                            ConfidenceTier tier = fact.confidenceScore() >= 0.8
+                                    ? ConfidenceTier.HIGH
+                                    : (fact.confidenceScore() >= 0.5 ? ConfidenceTier.MEDIUM : ConfidenceTier.LOW);
+
+                            String snippet = (fact.exactQuote() != null && !fact.exactQuote().isBlank())
+                                    ? "AI Quote: \"" + fact.exactQuote() + "\""
+                                    : "AI Structured Extraction";
+
+                            if (!attributes.containsKey(factKey)) {
+                                attributes.put(factKey, new EvidenceTuple(fact.value(), doc.url(), snippet, tier));
+                            } else if ("description".equalsIgnoreCase(factKey)) {
+                                EvidenceTuple existingDesc = attributes.get("description");
+                                if (existingDesc.confidence() == ConfidenceTier.LOW && tier != ConfidenceTier.LOW) {
+                                    attributes.put("description", new EvidenceTuple(fact.value(), doc.url(), snippet, tier));
+                                }
+                            }
+                        }
+                    });
+                }
+            }
+        }
     }
 
     private EvidenceTuple extractDescription(

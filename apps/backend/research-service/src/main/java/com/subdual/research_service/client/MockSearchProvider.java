@@ -16,6 +16,11 @@ public class MockSearchProvider implements SourceDiscoveryProvider {
     private static final Logger log = LoggerFactory.getLogger(MockSearchProvider.class);
 
     @Override
+    public List<DiscoveredSource> discover(String query, int maxResults) {
+        return search(query, maxResults);
+    }
+
+    @Override
     public List<DiscoveredSource> discoverSources(String query, int maxResults) {
         return search(query, maxResults);
     }

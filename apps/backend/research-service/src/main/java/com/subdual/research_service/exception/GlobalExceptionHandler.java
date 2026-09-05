@@ -83,11 +83,19 @@ public class GlobalExceptionHandler {
             status = HttpStatus.GATEWAY_TIMEOUT;
         }
 
-        ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(status, ex.getMessage());
+        String sanitizedMessage = sanitizeDetail(ex.getMessage());
+        ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(status, sanitizedMessage);
         problemDetail.setType(DEFAULT_TYPE);
         problemDetail.setTitle(status == HttpStatus.GATEWAY_TIMEOUT ? "Gateway Timeout" : "Bad Gateway");
         problemDetail.setInstance(URI.create(INSTANCE_PATH));
         return problemDetail;
+    }
+
+    private String sanitizeDetail(String rawMessage) {
+        if (rawMessage == null) {
+            return "An external service error occurred";
+        }
+        return rawMessage.replaceAll("(?i)(api[_-]?key|secret|token|password|auth)=[^&\\s]+", "$1=***");
     }
 
     @ExceptionHandler(Exception.class)
