@@ -11,3 +11,10 @@ management:
       exposure:
         include: health,info
 
+research:
+  discovery:
+    provider: ${SEARCH_PROVIDER_NAME:mock}
+    api-key: ${SEARCH_PROVIDER_API_KEY:}
+    base-url: ${SEARCH_PROVIDER_BASE_URL:https://api.tavily.com}
+    max-results: ${SEARCH_DISCOVERY_MAX_RESULTS:5}
+    timeout-ms: ${SEARCH_DISCOVERY_TIMEOUT_MS:4000}

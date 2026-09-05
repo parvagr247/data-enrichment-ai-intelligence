@@ -1,4 +1,0 @@
-# Data Enrichment & Research Engine - Local Development
-include:
-  - infrastructure/docker/docker-compose-dev-all.yml
-

@@ -97,9 +97,8 @@ data-enrichment-engine/
 │       ├── entity-model.md             # Generic domain and entity definitions
 │       └── api-design.md               # Minimal HTTP API surface and specifications
 │
-├── scripts/                            # Operational and setup scripts
-│
-├── docker-compose.yml                  # Minimal local development environment
+├── infrastructure/
+│   └── docker/                         # Canonical Docker Compose development files
 ├── README.md                           # Concise project summary and documentation index
 └── .gitignore                          # Git ignore definitions
 ```

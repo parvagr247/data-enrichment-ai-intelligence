@@ -36,6 +36,11 @@ services:
       SPRING_APPLICATION_NAME: research-service
       AI_INTELLIGENT_SERVICE_URL: http://ai-intelligent-service:9742
       DATASET_SERVICE_URL: http://dataset-service:9743
+      SEARCH_PROVIDER_NAME: ${SEARCH_PROVIDER_NAME:-mock}
+      SEARCH_PROVIDER_API_KEY: ${SEARCH_PROVIDER_API_KEY:-}
+      SEARCH_PROVIDER_BASE_URL: ${SEARCH_PROVIDER_BASE_URL:-https://api.tavily.com}
+      SEARCH_DISCOVERY_MAX_RESULTS: ${SEARCH_DISCOVERY_MAX_RESULTS:-5}
+      SEARCH_DISCOVERY_TIMEOUT_MS: ${SEARCH_DISCOVERY_TIMEOUT_MS:-4000}
     volumes:
       - maven_cache:/root/.m2
     develop:

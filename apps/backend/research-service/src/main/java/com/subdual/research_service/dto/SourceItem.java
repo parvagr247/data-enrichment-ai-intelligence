@@ -4,6 +4,12 @@ import java.time.Instant;
 
 public record SourceItem(
         String url,
+        String title,
+        String sourceType,
         Instant retrievedAt,
-        String sourceType
-) {}
+        Double relevance
+) {
+    public SourceItem(String url, Instant retrievedAt, String sourceType) {
+        this(url, null, sourceType, retrievedAt, 1.0);
+    }
+}

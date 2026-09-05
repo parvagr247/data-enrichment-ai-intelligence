@@ -4,5 +4,6 @@ public enum ResearchStatus {
     SUBMITTED,
     IN_PROGRESS,
     COMPLETED,
+    PARTIAL,
     FAILED
 }

@@ -2,7 +2,7 @@
 
 > **Document Type:** Architecture Roadmap & Technical Specification  
 > **Target Component:** `apps/backend/research-service`  
-> **Current Milestone:** Phase 0 Completed &rarr; Phase 1 (Web Discovery Slice) Next  
+> **Current Milestone:** Phase 1 Completed &rarr; Phase 2 (Polite Content Retrieval) Next  
 > **Last Updated:** 2026-09-05  
 
 ---
@@ -606,19 +606,167 @@ To maintain rapid development velocity and prevent premature over-engineering, t
 
 ---
 
-## 14. Immediate Implementation Checklist (Phase 1)
+## 14. Implementation Checklist (Phase 1 — COMPLETED)
 
-This checklist forms the exact scope for the upcoming implementation prompt:
+This checklist covers the delivered scope for Phase 1:
 
-- [ ] **1. Define Discovery Interfaces:** Create `SourceDiscoveryProvider` and `DiscoveredSource` domain contracts in `research-service`.
-- [ ] **2. Centralize Typed Configuration:** Implement `ResearchDiscoveryProperties` with `@ConfigurationProperties(prefix = "research.discovery")` for search provider name, base URL, timeout, and max results.
-- [ ] **3. Implement Mock/Configurable Discovery Provider:** Build a configurable provider implementation capable of returning realistic discovery metadata for test domains (e.g., GitHub, Spring, LinkedIn, corporate websites).
-- [ ] **4. Implement Search Query Construction:** Create a utility to formulate targeted queries from seed URL host, name, and `EntityType`.
-- [ ] **5. Implement URL Normalization & Deduplication:** Ensure discovered URLs are cleaned of tracking query parameters and duplicate links are pruned.
-- [ ] **6. Enhance DTO Models:** Update `SourceItem` to include `title` and `relevance` while retaining full backward compatibility.
-- [ ] **7. Wire Discovery into Service:** Update `DefaultResearchService` to invoke the discovery provider and populate `sources[]` in `ResearchResponse`.
-- [ ] **8. Update Error Handling:** Ensure discovery timeouts or provider failures are caught and handled with standard `ProblemDetail` or fallback empty results.
-- [ ] **9. Unit Tests:** Write tests for discovery query construction, URL deduplication, and source relevance ordering.
-- [ ] **10. Controller & Slice Tests:** Update `ResearchControllerTest` and `DefaultResearchServiceTest` to verify that `sources[]` returns discovered items with metadata.
-- [ ] **11. Environment Template Update:** Add search provider placeholder properties to `apps/.env.example`.
-- [ ] **12. Postman Verification:** Test `POST /api/v1/research` with sample GitHub and website URLs, verifying populated `sources[]` in the JSON response.
+- [x] **1. Define Discovery Interfaces:** Created `ResearchSourceClient`, `SourceDiscoveryProvider`, and `DiscoveredSource` domain contracts in `research-service`.
+- [x] **2. Centralize Typed Configuration:** Implemented `ResearchDiscoveryProperties` with `@ConfigurationProperties(prefix = "research.discovery")` for search provider name, base URL, timeout, and max results.
+- [x] **3. Implement Mock/Configurable Discovery Provider:** Built `MockResearchSourceClient` returning realistic discovery metadata for test domains (GitHub, Spring, LinkedIn, corporate websites) and `TavilyResearchSourceClient` for production search APIs.
+- [x] **4. Implement Search Query Construction:** Formulate targeted queries from seed URL host, name, and `EntityType`.
+- [x] **5. Implement URL Normalization & Deduplication:** Ensured discovered URLs are cleaned of tracking query parameters (`utm_*`, `ref`, etc.) and duplicate links are pruned.
+- [x] **6. Enhance DTO Models:** Updated `SourceItem` to include `title` and `relevance` while retaining full backward compatibility.
+- [x] **7. Wire Discovery into Service:** Updated `DefaultResearchService` to invoke `ResearchSourceClient` and populate structured `sources[]` in `ResearchResponse`.
+- [x] **8. Update Error Handling:** Handled discovery timeouts and provider failures with RFC 7807 `ProblemDetail` (502 Bad Gateway / 504 Gateway Timeout) via `GlobalExceptionHandler`.
+- [x] **9. Unit Tests:** Tested query formation, URL normalization, tracking parameter stripping, deduplication, and source relevance ordering.
+- [x] **10. Controller & Slice Tests:** Updated `ResearchControllerTest` and `DefaultResearchServiceTest` with 100% passing tests (22 total tests).
+- [x] **11. Environment Template Update:** Added search provider placeholder properties to `.env.example` and `infrastructure/docker/.env.example`.
+- [x] **12. Postman Verification:** Verified `POST /api/v1/research` returning populated `sources[]` with metadata.
+
+---
+
+## 15. Phase 1 Implementation Reference & Postman Guide
+
+### Endpoint Specification
+
+* **Method:** `POST`
+* **URL:** `http://localhost:9741/api/v1/research`
+* **Headers:**
+  * `Content-Type: application/json`
+  * `Accept: application/json`
+
+### Purpose
+
+Transitioned the Research API from shallow empty stub responses (`sources: []`) into an operational web discovery stage. Discovers, validates, canonicalizes, deduplicates, and scores candidate sources related to the entity seed URL.
+
+### Layered Architecture Flow
+
+```text
+HTTP Client (Postman / cURL)
+        │
+        ▼ POST /api/v1/research
+[ResearchController]
+        │
+        ▼ ResearchRequest(url, entityType, name)
+[DefaultResearchService]
+        │ ──► validateRequest(request)
+        │ ──► buildTarget(request) & compute deterministic SHA-256 entityId
+        │ ──► buildDiscoveryQuery(target)
+        │
+        ▼ query, maxResults
+[ResearchSourceClient] ◄── Interface
+        │
+        ├──► [MockResearchSourceClient]   (Default / Offline development)
+        └──► [TavilyResearchSourceClient] (External search API when configured)
+        │
+        ▼ List<DiscoveredSource>
+[DefaultResearchService]
+        │ ──► normalizeDiscoveredUrl(url) & strip tracking parameters (utm_*, ref, etc.)
+        │ ──► deduplicate seen URLs
+        │ ──► classifySourceType(url, target)
+        │ ──► sort by relevance descending
+        │ ──► mapSource() to SourceItem
+        ▼
+[ResearchResponse] ──► 200 OK with populated sources[]
+```
+
+### Request Payload Example
+
+```json
+{
+  "url": "https://www.linkedin.com/in/example",
+  "entityType": "ORGANIZATION",
+  "name": "Example"
+}
+```
+
+### Response Payload Example (`200 OK`)
+
+```json
+{
+  "status": "COMPLETED",
+  "entityId": "2b7d43cdcee74675bceb3084fd1ac7def2c1fc751b6a8e60a1ce275b7aaabe3f",
+  "result": {
+    "displayName": "Example",
+    "entityType": "ORGANIZATION",
+    "canonicalUrl": "https://www.linkedin.com/in/example",
+    "attributes": {}
+  },
+  "sources": [
+    {
+      "url": "https://www.example.com",
+      "title": "Example Inc. - Official Homepage",
+      "sourceType": "OFFICIAL_WEBSITE",
+      "retrievedAt": "2026-09-05T01:46:00Z",
+      "relevance": 1.0
+    },
+    {
+      "url": "https://www.linkedin.com/company/example",
+      "title": "Example Inc. | LinkedIn Profile",
+      "sourceType": "SOCIAL_PROFILE",
+      "retrievedAt": "2026-09-05T01:46:00Z",
+      "relevance": 0.9
+    },
+    {
+      "url": "https://en.wikipedia.org/wiki/Example_Inc",
+      "title": "Example Inc. - Overview & History",
+      "sourceType": "SEARCH_RESULT",
+      "retrievedAt": "2026-09-05T01:46:00Z",
+      "relevance": 0.85
+    }
+  ],
+  "executionTimeMs": 6
+}
+```
+
+### Error Scenarios & RFC 7807 Responses
+
+#### 1. Validation Error (`400 Bad Request`)
+* **Trigger:** Missing or invalid URL (e.g. `"url": "not-a-valid-url"` or missing `"url"` field).
+* **Response:**
+```json
+{
+  "type": "about:blank",
+  "title": "Bad Request",
+  "status": 400,
+  "detail": "Field 'url' must be a valid, well-formed HTTP/HTTPS URL",
+  "instance": "/api/v1/research"
+}
+```
+
+#### 2. External Provider Failure (`502 Bad Gateway`)
+* **Trigger:** Upstream search provider 5xx error or connection refusal.
+* **Response:**
+```json
+{
+  "type": "about:blank",
+  "title": "Bad Gateway",
+  "status": 502,
+  "detail": "Search provider unavailable; upstream service returned 502",
+  "instance": "/api/v1/research"
+}
+```
+
+#### 3. Provider Timeout (`504 Gateway Timeout`)
+* **Trigger:** Search provider exceeds configured timeout (default `4000ms`).
+* **Response:**
+```json
+{
+  "type": "about:blank",
+  "title": "Gateway Timeout",
+  "status": 504,
+  "detail": "Search discovery timed out after 4000ms",
+  "instance": "/api/v1/research"
+}
+```
+
+### Environment Configuration
+
+| Variable | Default | Purpose |
+| :--- | :--- | :--- |
+| `SEARCH_PROVIDER_NAME` | `mock` | Active provider: `mock` for deterministic development, `tavily` for external search API |
+| `SEARCH_PROVIDER_API_KEY` | *(empty)* | API key for external search provider (e.g. Tavily) |
+| `SEARCH_PROVIDER_BASE_URL` | `https://api.tavily.com` | Base URL of the discovery service |
+| `SEARCH_DISCOVERY_MAX_RESULTS` | `5` | Maximum number of candidate sources per entity |
+| `SEARCH_DISCOVERY_TIMEOUT_MS` | `4000` | HTTP client connect/read timeout in milliseconds |
+

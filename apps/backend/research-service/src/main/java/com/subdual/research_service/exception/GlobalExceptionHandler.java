@@ -62,6 +62,34 @@ public class GlobalExceptionHandler {
         return problemDetail;
     }
 
+    @ExceptionHandler(BusinessRuleException.class)
+    public ProblemDetail handleBusinessRuleException(BusinessRuleException ex) {
+        log.warn("Business rule violation on {}: {}", INSTANCE_PATH, ex.getMessage());
+
+        ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+        problemDetail.setType(DEFAULT_TYPE);
+        problemDetail.setTitle("Bad Request");
+        problemDetail.setInstance(URI.create(INSTANCE_PATH));
+        return problemDetail;
+    }
+
+    @ExceptionHandler(ExternalServiceException.class)
+    public ProblemDetail handleExternalServiceException(ExternalServiceException ex) {
+        log.error("External service failure on {}: {}", INSTANCE_PATH, ex.getMessage());
+
+        HttpStatus status = HttpStatus.BAD_GATEWAY;
+        if (ex.getCause() instanceof java.util.concurrent.TimeoutException
+                || (ex.getMessage() != null && ex.getMessage().toLowerCase().contains("timeout"))) {
+            status = HttpStatus.GATEWAY_TIMEOUT;
+        }
+
+        ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(status, ex.getMessage());
+        problemDetail.setType(DEFAULT_TYPE);
+        problemDetail.setTitle(status == HttpStatus.GATEWAY_TIMEOUT ? "Gateway Timeout" : "Bad Gateway");
+        problemDetail.setInstance(URI.create(INSTANCE_PATH));
+        return problemDetail;
+    }
+
     @ExceptionHandler(Exception.class)
     public ProblemDetail handleGenericException(Exception ex) {
         log.error("Unhandled server exception on {}: ", INSTANCE_PATH, ex);

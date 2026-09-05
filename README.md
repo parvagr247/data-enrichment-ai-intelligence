@@ -58,64 +58,79 @@ Clean Export (CSV / JSON / DB)
 ## 5. Project Structure
 
 ```text
-data-enrichment-engine/
+data-enrichment-ai-intelligence/
 │
+├── .github/                        # CI workflows and repository automation
 ├── apps/
-│   ├── backend/
-│   │   ├── research-service/           # Research orchestration & retrieval (Port 9741)
-│   │   ├── ai-intelligent-service/     # Spring AI model interaction & extraction (Port 9742)
-│   │   ├── dataset-service/            # Dataset ingestion & MySQL persistence boundary (Port 9743)
-│   │   ├── docs/                       # Backend architecture, workflows, and concept deep-dives
-│   │   │   ├── RESEARCH_WORKFLOW.md    # Pipeline roadmap & Phase 1 discovery specification
-│   │   │   └── concepts/               # Technical concept guides (e.g., HTTP content negotiation)
-│   │   └── one.md                      # Single compact backend reference
+│   ├── backend/                    # Spring Boot microservices
+│   │   ├── research-service/       # Research orchestration & retrieval (Port 9741)
+│   │   ├── ai-intelligent-service/ # Spring AI model interaction & extraction (Port 9742)
+│   │   └── dataset-service/        # Dataset ingestion & MySQL persistence boundary (Port 9743)
 │   │
-│   └── frontend/                       # Next.js + TypeScript frontend application (Port 3000)
+│   └── frontend/                   # Next.js + TypeScript frontend application (Port 3000)
 │
 ├── data/
-│   ├── input/                          # Staging raw input datasets (CSV, JSON)
-│   ├── output/                         # Enriched and evaluated output datasets
-│   └── samples/                        # Sample benchmark files (e.g., sample connection exports)
+│   ├── input/                      # Staging raw input datasets (CSV, JSON)
+│   ├── output/                     # Enriched and evaluated output datasets
+│   └── samples/                    # Sample benchmark files (e.g., sample connection exports)
 │
 ├── docs/
-│   ├── initial/                        # Preserved foundation definitions & architecture
-│   │   ├── problem.md                  # Problem definition, scope, and reality constraints
-│   │   ├── architecture.md             # Architecture blueprint, Spring stack, structure, ADRs
-│   │   └── enrichment.md               # Research engine, tool calling, evidence schema, limitations
-│   └── setup/                          # Pre-implementation technical setup & contracts
-│       ├── entity-model.md             # Generic domain and entity definitions
-│       └── api-design.md               # Minimal HTTP API surface and specifications
+│   ├── initial/                    # Preserved foundation definitions & architecture
+│   │   ├── problem.md              # Problem definition, scope, and reality constraints
+│   │   ├── architecture.md         # Architecture blueprint, Spring stack, structure, ADRs
+│   │   └── enrichment.md           # Research engine, tool calling, evidence schema, limitations
+│   ├── learning/                   # Technical concept guides & web standards
+│   │   ├── concepts-01-10.md       # Web & retrieval foundations
+│   │   ├── concepts-11-20.md       # AI research & evidence extraction
+│   │   ├── concepts-21-30.md       # Spring implementation & reliability
+│   │   └── http-media-type-negotiation.md # Content negotiation guards
+│   └── setup/                      # Technical setup, architecture, & pipeline workflows
+│       ├── project-structure.md    # Canonical directory & service responsibilities
+│       ├── research-workflow.md    # Pipeline roadmap & Phase 1 discovery specification
+│       ├── entity-model.md         # Generic domain and entity definitions
+│       └── api-design.md           # Minimal HTTP API surface and specifications
 │
-├── scripts/                            # Operational and benchmark automation scripts
+├── infrastructure/
+│   └── docker/                     # Canonical container orchestration
+│       ├── docker-compose-dev.yml      # Minimal infrastructure (MySQL only)
+│       ├── docker-compose-dev-all.yml  # Complete development stack with Compose Watch
+│       ├── commands.md                 # Docker execution workflows
+│       └── .env.example                # Container environment template
 │
-├── docker-compose.yml                  # Minimal local development environment
-├── README.md                           # Project summary and documentation index
-└── .gitignore                          # Git ignore definitions
+├── .env.example                    # Root environment configuration template
+├── .gitattributes                  # Line ending and git attribute configurations
+├── .gitignore                      # Git ignore definitions
+└── README.md                       # Project summary and documentation index
 ```
 
 ---
 
 ## 6. Current Status
 
-* **Status**: Current / Phase 0 Completed (Scaffold & In-Memory Research API Operational)
+* **Status**: Current / Phase 0 Completed &rarr; Phase 1 (Web Source Discovery)
 * **Next Implementation Milestone**: Phase 1 — Web Source Discovery (discovering candidate sources and returning populated `sources[]` with metadata).
-* **Technical Roadmap**: Detailed in [Research Workflow & Target Pipeline](apps/backend/docs/RESEARCH_WORKFLOW.md).
+* **Technical Roadmap**: Detailed in [Research Workflow & Target Pipeline](docs/setup/research-workflow.md).
 
 ---
 
 ## 7. Documentation Index
 
-The project documentation is organized into foundational definitions (`docs/initial/`), pre-implementation technical specifications (`docs/setup/`), and backend implementation roadmaps (`apps/backend/docs/`):
+The canonical platform documentation is centrally organized under `docs/`:
 
-### Backend Implementation Roadmaps & Workflows
-* 🚀 **[Research Workflow & Target Pipeline](apps/backend/docs/RESEARCH_WORKFLOW.md)**: Production-oriented technical roadmap for turning the Research API into an active discovery, retrieval, and enrichment pipeline.
-* 📚 **[Backend Documentation Index](apps/backend/docs/README.md)**: Comprehensive index of backend service specifications, media type negotiation, and concept deep-dives.
+### Technical Setup & Architecture
+* 🏛️ **[Project Structure & Service Responsibilities](docs/setup/project-structure.md)**: Canonical directory ownership, backend service boundaries, port mapping, and environment strategies.
+* 🚀 **[Research Workflow & Target Pipeline](docs/setup/research-workflow.md)**: Production-oriented technical roadmap for turning the Research API into an active discovery, retrieval, and enrichment pipeline.
+* 📐 **[Entity Model](docs/setup/entity-model.md)**: Minimal generic domain concepts (Entity, Research Request, Evidence, Enrichment Result) and in-memory vs. persistent design.
+* 🔌 **[API Design](docs/setup/api-design.md)**: Minimal synchronous research API endpoint (`POST /api/v1/research`), request/response schemas, and future microservice boundaries.
 
 ### Initial Foundations
 * 📄 **[Problem Statement & Scope](docs/initial/problem.md)**: Problem analysis, generic entity goals, scope boundaries, and reality constraints.
 * 🏗️ **[Architecture & Decisions](docs/initial/architecture.md)**: System design, Spring ecosystem direction, authoritative project structure, roadmap, and ADRs.
 * 🔍 **[Enrichment & Research Engine](docs/initial/enrichment.md)**: Autonomous research engine, Spring AI tool calling, evidence tuple pattern, confidence tiers, and research limitations.
 
-### Technical Setup
-* 📐 **[Entity Model](docs/setup/entity-model.md)**: Minimal generic domain concepts (Entity, Research Request, Evidence, Enrichment Result) and in-memory vs. persistent design.
-* 🔌 **[API Design](docs/setup/api-design.md)**: Minimal synchronous research API endpoint (`POST /api/v1/research`), request/response schemas, and future microservice boundaries.
+### Learning Guides
+* 🌐 **[HTTP Media Type Negotiation](docs/learning/http-media-type-negotiation.md)**: Deep dive on `consumes` and `produces` content negotiation guards and RFC 7807 error handling in Spring Boot.
+* 📚 **[Concepts 01–10: Web & Retrieval Foundations](docs/learning/concepts-01-10.md)**
+* 🤖 **[Concepts 11–20: AI Research & Evidence](docs/learning/concepts-11-20.md)**
+* ⚙️ **[Concepts 21–30: Spring Implementation & Reliability](docs/learning/concepts-21-30.md)**
+
