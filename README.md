@@ -160,16 +160,21 @@ The canonical platform documentation is centrally organized under `docs/`:
 * 🚀 **[Research Workflow & Target Pipeline](docs/setup/research-workflow.md)**: Production-oriented technical roadmap for discovery, retrieval, and enrichment.
 * 📐 **[Entity Model](docs/setup/entity-model.md)**: Generic domain concepts, evidence tuples, multi-source corroboration, and relational schema.
 * 🔌 **[API Design](docs/setup/api-design.md)**: Complete HTTP API specification across all microservices (sync, async jobs, entities, and extraction).
+* 📮 **[Postman Collection & CLI Guide](postman/README.md)**: Comprehensive Postman collection and Newman runner guide.
 
 ### Foundations & Architecture
 * 📄 **[Problem Statement & Scope](docs/initial/problem.md)**: Problem analysis, generic entity goals, scope boundaries, and reality constraints.
 * 🏗️ **[Architecture & Decisions](docs/initial/architecture.md)**: System design, Spring ecosystem direction, authoritative structure, and ADRs.
 * 🔍 **[Enrichment & Research Engine](docs/initial/enrichment.md)**: Autonomous research engine, Spring AI tool calling, evidence schema, and limitations.
 
-### Learning Guides
-* 🌐 **[HTTP Media Type Negotiation](docs/learning/http-media-type-negotiation.md)**: Deep dive on `consumes` and `produces` content negotiation guards and RFC 7807 error handling in Spring Boot.
-* 📚 **[Concepts 01–10: Web & Retrieval Foundations](docs/learning/concepts-01-10.md)**
-* 🤖 **[Concepts 11–20: AI Research & Evidence](docs/learning/concepts-11-20.md)**
-* ⚙️ **[Concepts 21–30: Spring Implementation & Reliability](docs/learning/concepts-21-30.md)**
+### Engineering & Learning Guides
+* 🌐 **[01. HTTP API Design & Media Types](docs/learning/01-http-api-design-and-media-types.md)**: Content negotiation guards, `consumes`/`produces`, and RFC 7807 ProblemDetail error handling.
+* 🧩 **[02. Spring Dependency Injection & Boundaries](docs/learning/02-spring-dependency-injection-and-boundaries.md)**: Constructor injection, thin controllers, and domain separation.
+* 📐 **[03. Service Abstraction & SOLID](docs/learning/03-service-abstraction-and-solid.md)**: Single responsibility decomposition, open/closed extension, and dependency inversion.
+* 🔌 **[04. Strategy & Adapter Patterns](docs/learning/04-strategy-and-adapter-patterns-in-provider-integrations.md)**: SearchProvider abstraction, Tavily integration, Mock offline fallbacks, and backward compatibility.
+* ⏱️ **[05. Async Job Lifecycle & Thread Pooling](docs/learning/05-async-job-lifecycle-and-thread-pooling.md)**: State machine, bounded ThreadPoolExecutor, and MDC logging.
+* 🧠 **[06. Evidence-Grounded AI Extraction](docs/learning/06-evidence-grounded-ai-extraction.md)**: Zero-hallucination fact verification, quote citations, and confidence scoring.
+* 🗄️ **[07. Transactional Persistence & Idempotency](docs/learning/07-transactional-persistence-and-idempotency.md)**: Flyway versioned migrations, orphan removal, and idempotent upserts.
+
 
 

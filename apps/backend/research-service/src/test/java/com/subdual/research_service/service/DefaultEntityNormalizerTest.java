@@ -2,7 +2,8 @@ package com.subdual.research_service.service;
 
 import com.subdual.research_service.domain.EntityType;
 import com.subdual.research_service.domain.ResearchTarget;
-import com.subdual.research_service.dto.ResearchRequest;
+import com.subdual.research_service.dto.request.ResearchRequest;
+import com.subdual.research_service.normalization.DefaultEntityNormalizer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

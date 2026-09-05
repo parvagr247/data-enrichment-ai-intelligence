@@ -1,8 +1,8 @@
 package com.subdual.research_service.controller;
 
-import com.subdual.research_service.dto.ResearchJobResponse;
-import com.subdual.research_service.dto.ResearchRequest;
-import com.subdual.research_service.dto.ResearchResponse;
+import com.subdual.research_service.dto.response.ResearchJobResponse;
+import com.subdual.research_service.dto.request.ResearchRequest;
+import com.subdual.research_service.dto.response.ResearchResponse;
 import com.subdual.research_service.service.InMemoryResearchJobService;
 import com.subdual.research_service.service.ResearchJobService;
 import com.subdual.research_service.service.ResearchService;

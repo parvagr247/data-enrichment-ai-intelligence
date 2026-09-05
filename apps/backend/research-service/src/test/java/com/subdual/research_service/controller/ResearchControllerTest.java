@@ -2,10 +2,10 @@ package com.subdual.research_service.controller;
 
 import com.subdual.research_service.domain.EntityType;
 import com.subdual.research_service.domain.ResearchStatus;
-import com.subdual.research_service.dto.ResearchRequest;
-import com.subdual.research_service.dto.ResearchResponse;
-import com.subdual.research_service.dto.ResearchResult;
-import com.subdual.research_service.dto.SourceItem;
+import com.subdual.research_service.dto.request.ResearchRequest;
+import com.subdual.research_service.dto.response.ResearchResponse;
+import com.subdual.research_service.dto.response.ResearchResult;
+import com.subdual.research_service.dto.response.SourceItem;
 import com.subdual.research_service.exception.ExternalServiceException;
 import com.subdual.research_service.exception.GlobalExceptionHandler;
 import com.subdual.research_service.service.ResearchService;
@@ -117,8 +117,42 @@ class ResearchControllerTest {
     }
 
     @Test
-    @DisplayName("Test 2: Missing required field (url) returns 400 Bad Request with ProblemDetail")
-    void shouldReturn400WhenUrlIsMissing() throws Exception {
+    @DisplayName("Test 2: Missing target (neither URL nor name) returns 400 Bad Request with ProblemDetail")
+    void shouldReturn400WhenTargetIsMissing() throws Exception {
+        String requestJson = """
+                {
+                  "entityType": "PERSON"
+                }
+                """;
+
+        mockMvc.perform(post("/api/v1/research")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestJson))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.title").value("Bad Request"))
+                .andExpect(jsonPath("$.detail").value("Either 'url' or 'name' must be provided for research"))
+                .andExpect(jsonPath("$.instance").value("/api/v1/research"));
+    }
+
+    @Test
+    @DisplayName("Test 2b: Discovery-first research succeeds when url is omitted but name is provided")
+    void shouldAcceptDiscoveryFirstRequestWhenUrlIsMissing() throws Exception {
+        ResearchResult result = new ResearchResult(
+                "Jane Doe",
+                EntityType.PERSON,
+                "urn:entity:person:jane-doe",
+                java.util.Map.of()
+        );
+        ResearchResponse mockResponse = new ResearchResponse(
+                ResearchStatus.COMPLETED,
+                "test-entity-id",
+                result,
+                List.of(),
+                120
+        );
+        when(researchService.executeResearch(any(ResearchRequest.class))).thenReturn(mockResponse);
+
         String requestJson = """
                 {
                   "entityType": "PERSON",
@@ -129,11 +163,10 @@ class ResearchControllerTest {
         mockMvc.perform(post("/api/v1/research")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestJson))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.status").value(400))
-                .andExpect(jsonPath("$.title").value("Bad Request"))
-                .andExpect(jsonPath("$.detail").value("Field 'url' must be a valid, well-formed HTTP/HTTPS URL"))
-                .andExpect(jsonPath("$.instance").value("/api/v1/research"));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("COMPLETED"))
+                .andExpect(jsonPath("$.entityId").value("test-entity-id"))
+                .andExpect(jsonPath("$.result.displayName").value("Jane Doe"));
     }
 
     @Test

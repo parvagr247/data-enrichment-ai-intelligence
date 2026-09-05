@@ -4,6 +4,7 @@ import com.subdual.research_service.domain.DiscoveredSource;
 import com.subdual.research_service.domain.EntityType;
 import com.subdual.research_service.domain.ResearchSource;
 import com.subdual.research_service.domain.ResearchTarget;
+import com.subdual.research_service.source.SourceProcessor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

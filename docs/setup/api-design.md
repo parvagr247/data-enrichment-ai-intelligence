@@ -134,10 +134,31 @@ Polls the state and results of a submitted job.
 
 ### 2.3 Synchronous Research (`POST /api/v1/research`)
 
-Synchronous execution pipeline for direct programmatic runs.
+Synchronous execution pipeline for direct programmatic runs. Supports both URL-based research and **discovery-first research** (where entity `name` is provided and `url` is omitted).
 
 * **Method**: `POST`
 * **Path**: `/api/v1/research`
+* **Content-Type**: `application/json`
+
+#### Request Payload (Standard URL-Based)
+```json
+{
+  "url": "https://github.com/spring-projects/spring-boot",
+  "entityType": "REPOSITORY",
+  "name": "Spring Boot"
+}
+```
+
+#### Request Payload (Discovery-First: URL Omitted)
+```json
+{
+  "entityType": "ORGANIZATION",
+  "name": "Acme Corporation"
+}
+```
+*When `url` is omitted, the normalizer generates a deterministic canonical URN (`urn:entity:organization:acme-corporation`) and computes a deterministic SHA-256 `entityId`.*
+
+* **Validation Rules**: At least one of `url` or `name` must be provided. If both are omitted or blank, returns `400 Bad Request` with RFC 7807 ProblemDetail.
 * **Response**: Returns `ResearchResponse` directly (`200 OK`).
 
 ---

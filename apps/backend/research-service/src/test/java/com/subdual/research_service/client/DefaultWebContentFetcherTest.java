@@ -1,6 +1,8 @@
 package com.subdual.research_service.client;
 
 import com.subdual.research_service.configuration.WebFetchProperties;
+import com.subdual.research_service.source.DefaultWebContentFetcher;
+import com.subdual.research_service.source.FetchedContent;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

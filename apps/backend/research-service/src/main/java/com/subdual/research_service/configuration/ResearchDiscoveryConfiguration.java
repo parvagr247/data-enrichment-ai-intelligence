@@ -1,15 +1,15 @@
 package com.subdual.research_service.configuration;
 
-import com.subdual.research_service.client.MockSearchProvider;
 import com.subdual.research_service.client.ResearchSourceClient;
-import com.subdual.research_service.client.SearchDiscoveryProvider;
-import com.subdual.research_service.client.SearchProvider;
-import com.subdual.research_service.client.TavilySearchProvider;
+import com.subdual.research_service.discovery.MockSearchProvider;
+import com.subdual.research_service.discovery.SearchProvider;
+import com.subdual.research_service.discovery.TavilySearchProvider;
 import com.subdual.research_service.exception.BusinessRuleException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 
 import java.util.Locale;
 
@@ -19,9 +19,10 @@ public class ResearchDiscoveryConfiguration {
     private static final Logger log = LoggerFactory.getLogger(ResearchDiscoveryConfiguration.class);
 
     @Bean
-    public SearchDiscoveryProvider searchDiscoveryProvider(ResearchDiscoveryProperties properties) {
+    @Primary
+    public SearchProvider searchProvider(ResearchDiscoveryProperties properties) {
         String providerName = properties.provider() != null ? properties.provider().trim().toLowerCase(Locale.ROOT) : "mock";
-        log.info("Initializing active SearchDiscoveryProvider: '{}'", providerName);
+        log.info("Initializing active SearchProvider: '{}'", providerName);
 
         if ("tavily".equals(providerName)) {
             return new TavilySearchProvider(properties);
@@ -33,19 +34,14 @@ public class ResearchDiscoveryConfiguration {
         }
     }
 
+    /**
+     * Backward-compatible bean for legacy tests expecting ResearchSourceClient.
+     */
     @Bean
-    public SearchProvider searchProvider(SearchDiscoveryProvider searchDiscoveryProvider) {
-        if (searchDiscoveryProvider instanceof SearchProvider sp) {
-            return sp;
-        }
-        return (query, maxResults) -> searchDiscoveryProvider.discover(query, maxResults);
-    }
-
-    @Bean
-    public ResearchSourceClient researchSourceClient(SearchDiscoveryProvider searchDiscoveryProvider) {
-        if (searchDiscoveryProvider instanceof ResearchSourceClient client) {
+    public ResearchSourceClient researchSourceClient(SearchProvider searchProvider) {
+        if (searchProvider instanceof ResearchSourceClient client) {
             return client;
         }
-        return (query, maxResults) -> searchDiscoveryProvider.discover(query, maxResults);
+        return (query, maxResults) -> searchProvider.search(query, maxResults);
     }
 }

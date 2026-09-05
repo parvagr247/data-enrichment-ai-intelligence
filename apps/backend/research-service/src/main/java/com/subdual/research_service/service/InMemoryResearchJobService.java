@@ -2,9 +2,9 @@ package com.subdual.research_service.service;
 
 import com.subdual.research_service.domain.ResearchJob;
 import com.subdual.research_service.domain.ResearchJobStatus;
-import com.subdual.research_service.dto.ResearchJobResponse;
-import com.subdual.research_service.dto.ResearchRequest;
-import com.subdual.research_service.dto.ResearchResponse;
+import com.subdual.research_service.dto.response.ResearchJobResponse;
+import com.subdual.research_service.dto.request.ResearchRequest;
+import com.subdual.research_service.dto.response.ResearchResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -94,7 +94,7 @@ public class InMemoryResearchJobService implements ResearchJobService, Disposabl
 
             updateJob(jobId, job -> job.withCompleted(response));
             log.info("[AsyncJob: COMPLETED] Research completed for jobId='{}' in {}ms",
-                    jobId, response.executionTimeMs());
+                    jobId, response != null ? response.executionTimeMs() : 0);
 
         } catch (Exception ex) {
             log.error("[AsyncJob: FAILED] Research job failed for jobId='{}': {}", jobId, ex.getMessage(), ex);

@@ -2,7 +2,7 @@ package com.subdual.ai_intelligent_service.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.subdual.ai_intelligent_service.configuration.ExtractionProperties;
+import com.subdual.ai_intelligent_service.configuration.AiProperties;
 import com.subdual.ai_intelligent_service.dto.ExtractedFact;
 import com.subdual.ai_intelligent_service.dto.ExtractionRequest;
 import com.subdual.ai_intelligent_service.dto.ExtractionResponse;
@@ -31,13 +31,13 @@ public class SpringAiExtractionService implements ExtractionService {
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private final ChatModel chatModel;
-    private final ExtractionProperties properties;
+    private final AiProperties properties;
     private final String geminiApiKey;
 
     @Autowired
     public SpringAiExtractionService(
             @Autowired(required = false) ChatModel chatModel,
-            ExtractionProperties properties,
+            AiProperties properties,
             @Value("${spring.ai.google.genai.api-key:mock-key}") String geminiApiKey
     ) {
         this.chatModel = chatModel;

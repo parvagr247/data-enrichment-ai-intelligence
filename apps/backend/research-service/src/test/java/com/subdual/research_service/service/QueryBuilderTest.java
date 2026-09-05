@@ -1,5 +1,6 @@
 package com.subdual.research_service.service;
 
+import com.subdual.research_service.discovery.QueryBuilder;
 import com.subdual.research_service.domain.EntityType;
 import com.subdual.research_service.domain.ResearchTarget;
 import org.junit.jupiter.api.BeforeEach;

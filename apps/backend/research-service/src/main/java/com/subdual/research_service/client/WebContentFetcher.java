@@ -1,5 +1,8 @@
 package com.subdual.research_service.client;
 
-public interface WebContentFetcher {
-    FetchedContent fetch(String url);
+/**
+ * Backward-compatible adapter. Prefer com.subdual.research_service.source.WebContentFetcher.
+ */
+@Deprecated
+public interface WebContentFetcher extends com.subdual.research_service.source.WebContentFetcher {
 }

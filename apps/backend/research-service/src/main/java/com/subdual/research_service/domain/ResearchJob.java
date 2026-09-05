@@ -1,7 +1,7 @@
 package com.subdual.research_service.domain;
 
-import com.subdual.research_service.dto.ResearchRequest;
-import com.subdual.research_service.dto.ResearchResponse;
+import com.subdual.research_service.dto.request.ResearchRequest;
+import com.subdual.research_service.dto.response.ResearchResponse;
 
 import java.time.Instant;
 

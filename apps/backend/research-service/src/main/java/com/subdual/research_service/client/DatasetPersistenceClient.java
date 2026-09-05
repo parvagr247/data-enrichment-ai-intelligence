@@ -1,12 +1,9 @@
 package com.subdual.research_service.client;
 
-import com.subdual.research_service.domain.ResearchSource;
-import com.subdual.research_service.domain.ResearchTarget;
-import com.subdual.research_service.dto.EvidenceTuple;
-
-import java.util.List;
-import java.util.Map;
-
-public interface DatasetPersistenceClient {
-    void persistEntity(ResearchTarget target, List<ResearchSource> sources, Map<String, EvidenceTuple> attributes);
+/**
+ * Backward-compatible adapter for legacy callers.
+ * Prefer com.subdual.research_service.persistence.DatasetPersistenceClient.
+ */
+@Deprecated
+public interface DatasetPersistenceClient extends com.subdual.research_service.persistence.DatasetPersistenceClient {
 }

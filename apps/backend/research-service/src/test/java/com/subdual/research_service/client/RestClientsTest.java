@@ -1,12 +1,14 @@
 package com.subdual.research_service.client;
 
-import com.subdual.research_service.client.dto.AiExtractedFact;
+import com.subdual.research_service.extraction.RestAiExtractionClient;
+import com.subdual.research_service.persistence.RestDatasetPersistenceClient;
+import com.subdual.research_service.extraction.dto.AiExtractedFact;
 import com.subdual.research_service.configuration.ServiceMeshProperties;
 import com.subdual.research_service.domain.ConfidenceTier;
 import com.subdual.research_service.domain.EntityType;
 import com.subdual.research_service.domain.ResearchSource;
 import com.subdual.research_service.domain.ResearchTarget;
-import com.subdual.research_service.dto.EvidenceTuple;
+import com.subdual.research_service.dto.response.EvidenceTuple;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 

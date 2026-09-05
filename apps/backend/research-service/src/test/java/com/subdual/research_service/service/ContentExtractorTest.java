@@ -1,6 +1,8 @@
 package com.subdual.research_service.service;
 
-import com.subdual.research_service.client.FetchedContent;
+import com.subdual.research_service.source.FetchedContent;
+import com.subdual.research_service.source.ContentExtractor;
+import com.subdual.research_service.source.ExtractedDocument;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

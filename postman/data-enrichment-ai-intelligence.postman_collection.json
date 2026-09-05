@@ -1,0 +1,330 @@
+{
+  "info": {
+    "_postman_id": "4b68e9a2-9741-4742-9743-a1b2c3d4e5f6",
+    "name": "Data Enrichment AI Intelligence Platform",
+    "description": "Production Postman collection for Data Enrichment AI Intelligence Platform microservices:\n- Research Service (:9741)\n- AI Intelligent Service (:9742)\n- Dataset Service (:9743)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseResearchUrl",
+      "value": "http://localhost:9741",
+      "type": "string"
+    },
+    {
+      "key": "baseAiUrl",
+      "value": "http://localhost:9742",
+      "type": "string"
+    },
+    {
+      "key": "baseDatasetUrl",
+      "value": "http://localhost:9743",
+      "type": "string"
+    },
+    {
+      "key": "jobId",
+      "value": "sample-job-id",
+      "type": "string"
+    },
+    {
+      "key": "entityId",
+      "value": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Research Service",
+      "item": [
+        {
+          "name": "Synchronous Research",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"url\": \"https://github.com/spring-projects/spring-boot\",\n  \"entityType\": \"REPOSITORY\",\n  \"name\": \"Spring Boot\"\n}"
+            },
+            "url": {
+              "raw": "{{baseResearchUrl}}/api/v1/research",
+              "host": ["{{baseResearchUrl}}"],
+              "path": ["api", "v1", "research"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Response contains completed status and entityId\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.status).to.be.oneOf([\"COMPLETED\", \"PARTIAL\"]);",
+                  "    pm.expect(json.entityId).to.be.a(\"string\");",
+                  "    pm.expect(json.result).to.be.an(\"object\");",
+                  "    pm.expect(json.sources).to.be.an(\"array\");",
+                  "    if (json.entityId) {",
+                  "        pm.collectionVariables.set(\"entityId\", json.entityId);",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Submit Research Job",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"url\": \"https://spring.io/projects/spring-boot\",\n  \"entityType\": \"WEBSITE\",\n  \"name\": \"Spring Boot\"\n}"
+            },
+            "url": {
+              "raw": "{{baseResearchUrl}}/api/v1/research/jobs",
+              "host": ["{{baseResearchUrl}}"],
+              "path": ["api", "v1", "research", "jobs"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 202 Accepted\", function () {",
+                  "    pm.response.to.have.status(202);",
+                  "});",
+                  "var json = pm.response.json();",
+                  "if (json.jobId) {",
+                  "    pm.collectionVariables.set(\"jobId\", json.jobId);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Research Job",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseResearchUrl}}/api/v1/research/jobs/{{jobId}}",
+              "host": ["{{baseResearchUrl}}"],
+              "path": ["api", "v1", "research", "jobs", "{{jobId}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "var json = pm.response.json();",
+                  "pm.expect(json.jobId).to.eql(pm.collectionVariables.get(\"jobId\"));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "AI Intelligent Service",
+      "item": [
+        {
+          "name": "Extract Facts",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"entityName\": \"Spring Boot\",\n  \"entityType\": \"REPOSITORY\",\n  \"sourceUrl\": \"https://github.com/spring-projects/spring-boot\",\n  \"textContent\": \"Spring Boot makes it easy to create stand-alone, production-grade Spring based Applications that you can just run. It takes an opinionated view of the Spring platform.\",\n  \"targetFields\": [\"role\", \"organization\", \"description\", \"summary\", \"headquarters\", \"technologies\"]\n}"
+            },
+            "url": {
+              "raw": "{{baseAiUrl}}/api/v1/ai/extract",
+              "host": ["{{baseAiUrl}}"],
+              "path": ["api", "v1", "ai", "extract"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "var json = pm.response.json();",
+                  "pm.expect(json.entityName).to.eql(\"Spring Boot\");",
+                  "pm.expect(json.facts).to.be.an(\"object\");"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Dataset Service",
+      "item": [
+        {
+          "name": "Create/Upsert Entity",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"entityId\": \"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\",\n  \"displayName\": \"Spring Boot\",\n  \"entityType\": \"REPOSITORY\",\n  \"canonicalUrl\": \"https://github.com/spring-projects/spring-boot\",\n  \"sources\": [\n    {\n      \"sourceUrl\": \"https://github.com/spring-projects/spring-boot\",\n      \"title\": \"spring-projects/spring-boot\",\n      \"snippet\": \"Spring Boot makes it easy to create stand-alone applications.\",\n      \"sourceType\": \"GITHUB\",\n      \"domain\": \"github.com\",\n      \"provider\": \"mock\",\n      \"relevance\": 1.0,\n      \"retrievedAt\": \"2026-09-05T09:00:00Z\"\n    }\n  ],\n  \"attributes\": [\n    {\n      \"attributeName\": \"description\",\n      \"attributeValue\": \"Spring Boot makes it easy to create stand-alone, production-grade Spring based Applications.\",\n      \"sourceUrl\": \"https://github.com/spring-projects/spring-boot\",\n      \"evidenceSnippet\": \"Spring Boot makes it easy to create stand-alone, production-grade Spring based Applications.\",\n      \"confidence\": \"HIGH\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseDatasetUrl}}/api/v1/entities",
+              "host": ["{{baseDatasetUrl}}"],
+              "path": ["api", "v1", "entities"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "var json = pm.response.json();",
+                  "pm.expect(json.entityId).to.eql(\"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\");",
+                  "pm.collectionVariables.set(\"entityId\", json.entityId);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Entity",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseDatasetUrl}}/api/v1/entities/{{entityId}}",
+              "host": ["{{baseDatasetUrl}}"],
+              "path": ["api", "v1", "entities", "{{entityId}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "var json = pm.response.json();",
+                  "pm.expect(json.entityId).to.eql(pm.collectionVariables.get(\"entityId\"));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Entities",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseDatasetUrl}}/api/v1/entities?page=0&size=20",
+              "host": ["{{baseDatasetUrl}}"],
+              "path": ["api", "v1", "entities"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "20"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "var json = pm.response.json();",
+                  "pm.expect(json).to.be.an(\"array\");"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
