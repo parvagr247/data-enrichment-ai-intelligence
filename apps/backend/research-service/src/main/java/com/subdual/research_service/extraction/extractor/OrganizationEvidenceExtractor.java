@@ -35,10 +35,6 @@ public class OrganizationEvidenceExtractor {
         this.evidenceMerger = evidenceMerger != null ? evidenceMerger : new EvidenceMerger();
     }
 
-    public OrganizationEvidenceExtractor() {
-        this(new EvidenceMerger());
-    }
-
     public void extractAttributes(
             ResearchTarget target,
             List<ExtractedDocument> documents,

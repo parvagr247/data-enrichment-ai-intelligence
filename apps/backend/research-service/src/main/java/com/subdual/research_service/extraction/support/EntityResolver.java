@@ -1,10 +1,9 @@
 package com.subdual.research_service.extraction.support;
 
-import com.subdual.research_service.extraction.ai.document.ExtractedDocument;
+import com.subdual.research_service.extraction.document.ExtractedDocument;
 import com.subdual.research_service.research.model.ConfidenceTier;
 import com.subdual.research_service.research.model.EntityType;
 import com.subdual.research_service.research.model.ResearchTarget;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.net.URI;
@@ -13,7 +12,6 @@ import java.util.Map;
 import java.util.Set;
 
 @Component
-@Slf4j
 public class EntityResolver {
 
     private static final Set<String> MULTI_TENANT_HOSTS = Set.of(

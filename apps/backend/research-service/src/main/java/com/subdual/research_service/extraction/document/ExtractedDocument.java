@@ -1,4 +1,4 @@
-package com.subdual.research_service.extraction.ai.document;
+package com.subdual.research_service.extraction.document;
 
 import java.time.Instant;
 

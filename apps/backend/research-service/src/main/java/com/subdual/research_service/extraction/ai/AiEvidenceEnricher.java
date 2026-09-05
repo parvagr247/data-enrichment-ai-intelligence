@@ -31,14 +31,6 @@ public class AiEvidenceEnricher {
         this.evidenceMerger = evidenceMerger != null ? evidenceMerger : new EvidenceMerger();
     }
 
-    public AiEvidenceEnricher(AiExtractionClient aiExtractionClient) {
-        this(aiExtractionClient, new EvidenceMerger());
-    }
-
-    public AiEvidenceEnricher() {
-        this(new NoOpAiExtractionClient(), new EvidenceMerger());
-    }
-
     public void enrichWithAiExtraction(
             ResearchTarget target,
             List<ExtractedDocument> documents,

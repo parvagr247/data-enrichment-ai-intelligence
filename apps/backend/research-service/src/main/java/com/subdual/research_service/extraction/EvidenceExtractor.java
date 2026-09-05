@@ -18,6 +18,7 @@ import com.subdual.research_service.research.model.ConfidenceTier;
 import com.subdual.research_service.research.model.EntityType;
 import com.subdual.research_service.research.model.ResearchSource;
 import com.subdual.research_service.research.model.ResearchTarget;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.LinkedHashMap;
@@ -36,6 +37,7 @@ public class EvidenceExtractor {
     private final AiEvidenceEnricher aiEvidenceEnricher;
     private final TargetFieldNormalizer targetFieldNormalizer;
 
+    @Autowired
     public EvidenceExtractor(
             EvidenceMerger evidenceMerger,
             CommonEvidenceExtractor commonExtractor,

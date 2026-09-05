@@ -26,10 +26,6 @@ public class RepositoryEvidenceExtractor {
         this.evidenceMerger = evidenceMerger != null ? evidenceMerger : new EvidenceMerger();
     }
 
-    public RepositoryEvidenceExtractor() {
-        this(new EvidenceMerger());
-    }
-
     public EvidenceTuple extractRepositoryInfo(ResearchTarget target, List<ExtractedDocument> documents) {
         if (target == null || target.canonicalUrl() == null) {
             return null;

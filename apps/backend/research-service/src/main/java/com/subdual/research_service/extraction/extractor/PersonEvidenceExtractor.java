@@ -51,10 +51,6 @@ public class PersonEvidenceExtractor {
         this.evidenceMerger = evidenceMerger != null ? evidenceMerger : new EvidenceMerger();
     }
 
-    public PersonEvidenceExtractor() {
-        this(new EvidenceMerger());
-    }
-
     public void extractAttributes(
             ResearchTarget target,
             List<ExtractedDocument> documents,

@@ -12,7 +12,7 @@ import com.subdual.research_service.discovery.provider.MockSearchProvider;
 import com.subdual.research_service.discovery.service.DefaultResearchDiscoveryService;
 import com.subdual.research_service.extraction.DefaultSourceEvidenceService;
 import com.subdual.research_service.extraction.EvidenceExtractor;
-import com.subdual.research_service.extraction.ai.document.ContentExtractor;
+import com.subdual.research_service.extraction.document.ContentExtractor;
 import com.subdual.research_service.extraction.support.EntityResolver;
 import com.subdual.research_service.integration.ai.NoOpAiExtractionClient;
 import com.subdual.research_service.integration.ai.dto.AiExtractedFact;

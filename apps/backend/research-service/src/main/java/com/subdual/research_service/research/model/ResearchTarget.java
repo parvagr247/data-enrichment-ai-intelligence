@@ -33,7 +33,6 @@ public record ResearchTarget(
         return null;
     }
 
-    @SuppressWarnings("unchecked")
     public List<String> targetFields() {
         if (metadata != null && metadata.containsKey("targetFields")) {
             Object obj = metadata.get("targetFields");
