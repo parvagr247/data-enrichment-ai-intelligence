@@ -62,11 +62,91 @@ public class MockSearchProvider implements SearchProvider {
         if (lowerQuery.contains("acme")) {
             return mockAcmeSources(now);
         }
+        if (lowerQuery.contains("jane-doe") || lowerQuery.contains("dr-jane-doe")) {
+            return mockJaneDoeSources(now);
+        }
+        if (lowerQuery.contains("parv-agrawal") || lowerQuery.contains("parv agrawal")) {
+            return mockParvAgrawalSources(now);
+        }
         if (lowerQuery.contains("linkedin") || lowerQuery.contains("example")) {
             return mockLinkedInSources(now);
         }
 
         return mockFallbackSources(rawQuery, lowerQuery, now);
+    }
+
+    private List<DiscoveredSource> mockParvAgrawalSources(Instant now) {
+        return List.of(
+                new DiscoveredSource(
+                        "https://www.linkedin.com/in/parv-agrawal-170174308",
+                        "[MOCK] Parv Agrawal - MNIT Jaipur | Chemical Engineering | LinkedIn",
+                        "SOCIAL_PROFILE",
+                        now,
+                        1.00,
+                        "Parv Agrawal is an undergraduate in Chemical Engineering at Malaviya National Institute of Technology Jaipur (MNIT Jaipur)."
+                ),
+                new DiscoveredSource(
+                        "https://mnit.ac.in/students/parv-agrawal",
+                        "[MOCK] Parv Agrawal - Department of Chemical Engineering - MNIT Jaipur",
+                        "OFFICIAL_WEBSITE",
+                        now,
+                        0.95,
+                        "Parv Agrawal is a student at Malaviya National Institute of Technology Jaipur. Department: Chemical Engineering. Location: Jaipur, India."
+                ),
+                new DiscoveredSource(
+                        "https://deshaw.com/people/parv-agrawal",
+                        "[MOCK] Parv Agrawal - Quantitative Analysis - D. E. Shaw",
+                        "SEARCH_RESULT",
+                        now,
+                        0.70,
+                        "Parv Agrawal is a Quantitative Analyst at D. E. Shaw in Hyderabad. Alumnus of IIT Delhi in Computer Science."
+                ),
+                new DiscoveredSource(
+                        "https://iitd.ac.in/alumni/parv-agrawal",
+                        "[MOCK] Parv Agrawal - IIT Delhi Alumni Network",
+                        "OFFICIAL_WEBSITE",
+                        now,
+                        0.65,
+                        "Parv Agrawal graduated from Indian Institute of Technology Delhi (IIT Delhi) in Computer Science."
+                )
+        );
+    }
+
+    private List<DiscoveredSource> mockJaneDoeSources(Instant now) {
+        return List.of(
+                new DiscoveredSource(
+                        "https://www.linkedin.com/in/jane-doe",
+                        "[MOCK] Jane Doe - Principal Infrastructure Engineer | LinkedIn",
+                        "SOCIAL_PROFILE",
+                        now,
+                        1.00,
+                        "Jane Doe is a Principal Infrastructure Engineer at CloudScale Systems in San Francisco, CA."
+                ),
+                new DiscoveredSource(
+                        "https://cloudscale.example.com/team/jane-doe",
+                        "[MOCK] Jane Doe - Engineering Leadership - CloudScale Systems",
+                        "OFFICIAL_WEBSITE",
+                        now,
+                        0.95,
+                        "Jane Doe is a Principal Infrastructure Engineer at CloudScale Systems, based in San Francisco, CA. Graduated from MIT. Connect: linkedin.com/in/jane-doe"
+                ),
+                new DiscoveredSource(
+                        "https://dentistry.example.com/dr-jane-doe",
+                        "[MOCK] Dr. Jane Doe, DDS - Family Dentistry & Dental Clinic",
+                        "OFFICIAL_WEBSITE",
+                        now,
+                        0.70,
+                        "Dr. Jane Doe, DDS is a family dentist at Downtown Dental Clinic in Chicago, IL specializing in pediatric dentistry."
+                ),
+                new DiscoveredSource(
+                        "https://imdb.example.com/name/jane-doe",
+                        "[MOCK] Jane Doe - Actress Filmography and Movie Credits",
+                        "SEARCH_RESULT",
+                        now,
+                        0.65,
+                        "Jane Doe is a theater and film actress known for dramatic roles in Los Angeles, CA."
+                )
+        );
     }
 
     private List<DiscoveredSource> mockSpringBootSources(Instant now) {

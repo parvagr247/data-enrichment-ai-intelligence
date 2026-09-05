@@ -19,6 +19,12 @@ public class ResearchDiagnostics {
                 + (reason != null ? reason : "Inaccessible"));
     }
 
+    public void recordPrimaryInaccessible(String domain, String statusDetail) {
+        addWarning("Primary source (" + (domain != null ? domain : "unknown")
+                + ") could not be directly fetched (" + (statusDetail != null ? statusDetail : "Inaccessible")
+                + "); continuing research using corroborating public sources.");
+    }
+
     public void recordPersistenceFailure(String message) {
         addWarning("Failed to persist entity to dataset-service: "
                 + (message != null ? message : "Unknown error"));

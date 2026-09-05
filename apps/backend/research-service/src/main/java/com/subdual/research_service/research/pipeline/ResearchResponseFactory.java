@@ -45,7 +45,9 @@ public class ResearchResponseFactory {
         );
 
         boolean hasDegradedSources = diagnostics != null && diagnostics.hasDegradedSources();
-        ResearchStatus status = hasDegradedSources
+        boolean hasExtractedAttributes = attributes != null && !attributes.isEmpty();
+
+        ResearchStatus status = (hasDegradedSources && !hasExtractedAttributes)
                 ? ResearchStatus.PARTIAL
                 : ResearchStatus.COMPLETED;
 

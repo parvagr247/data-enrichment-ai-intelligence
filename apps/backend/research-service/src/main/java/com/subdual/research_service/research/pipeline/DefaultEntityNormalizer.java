@@ -29,14 +29,52 @@ public class DefaultEntityNormalizer implements EntityNormalizer {
         if (request == null) throw new IllegalArgumentException("ResearchRequest must not be null");
         
         String rawUrl = request.url() != null ? request.url().trim() : "";
-        EntityType type = request.entityType() != null ? request.entityType() : EntityType.OTHER;
+        EntityType type = resolveEntityType(request.entityType(), rawUrl);
         String displayName = normalizeDisplayName(request.name(), rawUrl);
 
         String canonicalUrl = resolveCanonicalUrl(rawUrl, type, displayName);
         String entityId = computeEntityId(canonicalUrl);
-        Map<String, Object> metadata = request.metadata() != null ? Map.copyOf(request.metadata()) : Map.of();
+        Map<String, Object> metadata = buildTargetMetadata(request);
 
         return new ResearchTarget(rawUrl, canonicalUrl, entityId, type, displayName, metadata);
+    }
+
+    private EntityType resolveEntityType(EntityType type, String rawUrl) {
+        if (type != null && type != EntityType.OTHER) {
+            return type;
+        }
+        if (rawUrl == null || rawUrl.isBlank()) {
+            return EntityType.OTHER;
+        }
+        String lowerUrl = rawUrl.toLowerCase(Locale.ROOT);
+        if (lowerUrl.contains("linkedin.com/in/")) {
+            return EntityType.PERSON;
+        }
+        if (lowerUrl.contains("linkedin.com/company/")) {
+            return EntityType.ORGANIZATION;
+        }
+        if (lowerUrl.contains("github.com/")) {
+            String path = lowerUrl.replaceFirst("^https?://(www\\.)?github\\.com/", "").replaceAll("/+$", "");
+            return path.contains("/") ? EntityType.REPOSITORY : EntityType.ORGANIZATION;
+        }
+        return EntityType.OTHER;
+    }
+
+    private Map<String, Object> buildTargetMetadata(ResearchRequest request) {
+        java.util.Map<String, Object> metadata = new java.util.LinkedHashMap<>();
+        if (request.metadata() != null) {
+            metadata.putAll(request.metadata());
+        }
+        if (request.organization() != null && !request.organization().isBlank()) {
+            metadata.put("organization", request.organization().trim());
+        }
+        if (request.role() != null && !request.role().isBlank()) {
+            metadata.put("role", request.role().trim());
+        }
+        if (request.targetFields() != null && !request.targetFields().isEmpty()) {
+            metadata.put("targetFields", request.targetFields());
+        }
+        return Map.copyOf(metadata);
     }
 
     private String resolveCanonicalUrl(String rawUrl, EntityType type, String displayName) {

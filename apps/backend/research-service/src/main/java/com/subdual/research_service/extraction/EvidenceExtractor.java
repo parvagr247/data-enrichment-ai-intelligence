@@ -17,8 +17,36 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 @Component
 public class EvidenceExtractor {
+
+    private static final Pattern ROLE_AT_COMPANY_PATTERN = Pattern.compile(
+            "(?i)(?:is\\s+(?:a|an)\\s+|works\\s+as\\s+(?:a|an)\\s+)([A-Za-z0-9\\s]{3,40})\\s+at\\s+([A-Za-z0-9\\s]{2,40})"
+    );
+    private static final Pattern ROLE_LABEL_PATTERN = Pattern.compile(
+            "(?i)(?:^|[\\n\\r•|])\\s*(?:Role|Title|Position):\\s*([A-Za-z0-9\\s-]{2,40})"
+    );
+    private static final Pattern COMPANY_LABEL_PATTERN = Pattern.compile(
+            "(?i)(?:^|[\\n\\r•|])\\s*(?:Company|Organization|Employer):\\s*([A-Za-z0-9\\s-]{2,40})"
+    );
+    private static final Pattern LOCATION_LABEL_PATTERN = Pattern.compile(
+            "(?i)(?:^|[\\n\\r•|])\\s*(?:Location|Based in):\\s*([A-Za-z0-9\\s,.-]{2,40})"
+    );
+    private static final Pattern LOCATION_BASED_IN_PATTERN = Pattern.compile(
+            "(?i)(?:based\\s+in|located\\s+in)\\s+([A-Za-z0-9\\s,.-]{2,35})(?:[\\n\\r.,]|$)"
+    );
+    private static final Pattern EDUCATION_LABEL_PATTERN = Pattern.compile(
+            "(?i)(?:^|[\\n\\r•|])\\s*(?:Education|Degree|Alumni|Graduated from):\\s*([A-Za-z0-9\\s,.-]{2,40})"
+    );
+    private static final Pattern EDUCATION_GRADUATED_PATTERN = Pattern.compile(
+            "(?i)(?:graduated\\s+from|degree\\s+from|studied\\s+at)\\s+([A-Za-z0-9\\s]{2,30}?)(?:\\s+with|\\s+in|[\\n\\r.,]|$)"
+    );
+    private static final Pattern HQ_PATTERN = Pattern.compile(
+            "(?i)(?:headquarters|headquartered in|based in):?\\s*([A-Za-z0-9\\s,.-]{2,40})"
+    );
 
     private final AiExtractionClient aiExtractionClient;
 
@@ -42,15 +70,187 @@ public class EvidenceExtractor {
         putIfPresent(attributes, "title", extractTitle(target, documents, sources, resolutions));
         putIfPresent(attributes, "site_name", extractSiteName(documents, resolutions));
 
-        if (target.entityType() == EntityType.REPOSITORY) {
+        if (target.entityType() == EntityType.PERSON) {
+            extractPersonAttributes(target, documents, attributes, resolutions);
+        } else if (target.entityType() == EntityType.ORGANIZATION) {
+            extractOrganizationAttributes(target, documents, attributes, resolutions);
+        } else if (target.entityType() == EntityType.REPOSITORY) {
             putIfPresent(attributes, "repository", extractRepositoryInfo(target, documents));
+            extractRepositoryAttributes(target, documents, attributes, resolutions);
         }
 
         if (aiExtractionClient != null) {
             enrichWithAiExtraction(target, documents, resolutions, attributes);
         }
 
+        if (target.targetFields() != null && !target.targetFields().isEmpty()) {
+            filterToTargetFields(attributes, target.targetFields());
+        }
+
         return attributes;
+    }
+
+    private void filterToTargetFields(Map<String, EvidenceTuple> attributes, List<String> targetFields) {
+        java.util.Set<String> requested = targetFields.stream()
+                .map(f -> f.toLowerCase(Locale.ROOT).trim())
+                .collect(java.util.stream.Collectors.toSet());
+        attributes.keySet().removeIf(k -> !requested.contains(k.toLowerCase(Locale.ROOT)) && !"name".equals(k));
+    }
+
+    private void extractPersonAttributes(
+            ResearchTarget target,
+            List<ExtractedDocument> documents,
+            Map<String, EvidenceTuple> attributes,
+            Map<String, EntityResolver.ResolutionResult> resolutions
+    ) {
+        if (target.displayName() != null && !target.displayName().isBlank()) {
+            attributes.putIfAbsent("name", new EvidenceTuple(target.displayName(), target.canonicalUrl() != null ? target.canonicalUrl() : "", "Target display name", ConfidenceTier.HIGH));
+        }
+
+        for (ExtractedDocument doc : documents) {
+            if (!isMatchedDocument(doc, resolutions)) {
+                continue;
+            }
+            String text = doc.cleanText();
+            if (text == null || text.isBlank()) {
+                continue;
+            }
+
+            Matcher roleAtCompany = ROLE_AT_COMPANY_PATTERN.matcher(text);
+            if (roleAtCompany.find()) {
+                String role = roleAtCompany.group(1).trim();
+                String company = roleAtCompany.group(2).trim();
+                mergeAttribute(attributes, "role", role, doc.url(), "Pattern match: \"" + roleAtCompany.group(0) + "\"", ConfidenceTier.HIGH);
+                mergeAttribute(attributes, "current_organization", company, doc.url(), "Pattern match: \"" + roleAtCompany.group(0) + "\"", ConfidenceTier.HIGH);
+            }
+
+            Matcher roleLabel = ROLE_LABEL_PATTERN.matcher(text);
+            if (roleLabel.find()) {
+                String role = roleLabel.group(1).trim();
+                mergeAttribute(attributes, "role", role, doc.url(), "Role label: \"" + roleLabel.group(0).trim() + "\"", ConfidenceTier.HIGH);
+            }
+
+            Matcher compLabel = COMPANY_LABEL_PATTERN.matcher(text);
+            if (compLabel.find()) {
+                String company = compLabel.group(1).trim();
+                mergeAttribute(attributes, "current_organization", company, doc.url(), "Company label: \"" + compLabel.group(0).trim() + "\"", ConfidenceTier.HIGH);
+            }
+
+            Matcher locLabel = LOCATION_LABEL_PATTERN.matcher(text);
+            if (locLabel.find()) {
+                String location = locLabel.group(1).trim();
+                mergeAttribute(attributes, "location", location, doc.url(), "Location label: \"" + locLabel.group(0).trim() + "\"", ConfidenceTier.HIGH);
+            } else {
+                Matcher locBased = LOCATION_BASED_IN_PATTERN.matcher(text);
+                if (locBased.find()) {
+                    String location = locBased.group(1).trim();
+                    mergeAttribute(attributes, "location", location, doc.url(), "Location pattern: \"" + locBased.group(0).trim() + "\"", ConfidenceTier.MEDIUM);
+                }
+            }
+
+            Matcher eduLabel = EDUCATION_LABEL_PATTERN.matcher(text);
+            if (eduLabel.find()) {
+                String edu = eduLabel.group(1).trim();
+                mergeAttribute(attributes, "education", edu, doc.url(), "Education label: \"" + eduLabel.group(0).trim() + "\"", ConfidenceTier.HIGH);
+            } else {
+                Matcher eduGrad = EDUCATION_GRADUATED_PATTERN.matcher(text);
+                if (eduGrad.find()) {
+                    String edu = eduGrad.group(1).trim();
+                    mergeAttribute(attributes, "education", edu, doc.url(), "Education pattern: \"" + eduGrad.group(0).trim() + "\"", ConfidenceTier.HIGH);
+                }
+            }
+
+            if (target.metadata() != null) {
+                target.metadata().forEach((k, v) -> {
+                    if (v != null) {
+                        String valStr = v.toString().trim();
+                        if (valStr.length() >= 3 && text.toLowerCase(Locale.ROOT).contains(valStr.toLowerCase(Locale.ROOT))) {
+                            String attrKey = normalizeMetadataKey(k);
+                            if (!attributes.containsKey(attrKey)) {
+                                mergeAttribute(attributes, attrKey, valStr, doc.url(), "Corroborated by document text: \"" + valStr + "\"", ConfidenceTier.HIGH);
+                            }
+                        }
+                    }
+                });
+            }
+        }
+
+        if (attributes.containsKey("description") && !attributes.containsKey("summary")) {
+            EvidenceTuple desc = attributes.get("description");
+            attributes.put("summary", new EvidenceTuple(desc.value(), desc.sourceUrl(), desc.evidenceSnippet(), desc.confidence()));
+        }
+    }
+
+    private void extractOrganizationAttributes(
+            ResearchTarget target,
+            List<ExtractedDocument> documents,
+            Map<String, EvidenceTuple> attributes,
+            Map<String, EntityResolver.ResolutionResult> resolutions
+    ) {
+        if (target.displayName() != null && !target.displayName().isBlank()) {
+            attributes.putIfAbsent("name", new EvidenceTuple(target.displayName(), target.canonicalUrl() != null ? target.canonicalUrl() : "", "Display name of organization", ConfidenceTier.HIGH));
+        }
+        if (target.canonicalUrl() != null && !target.canonicalUrl().isBlank()) {
+            attributes.putIfAbsent("website", new EvidenceTuple(target.canonicalUrl(), target.canonicalUrl(), "Canonical organization website", ConfidenceTier.HIGH));
+        }
+
+        for (ExtractedDocument doc : documents) {
+            if (!isMatchedDocument(doc, resolutions)) continue;
+            String text = doc.cleanText();
+            if (text == null || text.isBlank()) continue;
+
+            Matcher hqMatcher = HQ_PATTERN.matcher(text);
+            if (hqMatcher.find()) {
+                String hq = hqMatcher.group(1).trim();
+                mergeAttribute(attributes, "headquarters", hq, doc.url(), "Headquarters pattern: \"" + hqMatcher.group(0).trim() + "\"", ConfidenceTier.MEDIUM);
+            }
+        }
+    }
+
+    private void extractRepositoryAttributes(
+            ResearchTarget target,
+            List<ExtractedDocument> documents,
+            Map<String, EvidenceTuple> attributes,
+            Map<String, EntityResolver.ResolutionResult> resolutions
+    ) {
+        if (target.displayName() != null && !target.displayName().isBlank()) {
+            attributes.putIfAbsent("name", new EvidenceTuple(target.displayName(), target.canonicalUrl() != null ? target.canonicalUrl() : "", "Repository name", ConfidenceTier.HIGH));
+        }
+
+        for (ExtractedDocument doc : documents) {
+            if (!isMatchedDocument(doc, resolutions)) continue;
+            String text = doc.cleanText();
+            if (text == null || text.isBlank()) continue;
+
+            List<String> techs = detectTechnologies(text);
+            if (!techs.isEmpty() && !attributes.containsKey("technologies")) {
+                String joined = String.join(", ", techs);
+                mergeAttribute(attributes, "technologies", joined, doc.url(), "Technologies mentioned in documentation: " + joined, ConfidenceTier.MEDIUM);
+            }
+        }
+    }
+
+    private List<String> detectTechnologies(String text) {
+        List<String> detected = new ArrayList<>();
+        String[] keywords = {"Java", "Kotlin", "TypeScript", "JavaScript", "Python", "Go", "Rust", "Spring Boot", "Docker", "Kubernetes"};
+        for (String kw : keywords) {
+            if (text.contains(kw)) {
+                detected.add(kw);
+            }
+        }
+        return detected;
+    }
+
+    private String normalizeMetadataKey(String key) {
+        if (key == null) return "attribute";
+        String lower = key.toLowerCase(Locale.ROOT);
+        if (lower.equals("company") || lower.equals("org") || lower.equals("organization")) {
+            return "current_organization";
+        }
+        if (lower.equals("title") || lower.equals("position") || lower.equals("role")) {
+            return "role";
+        }
+        return lower;
     }
 
     private void putIfPresent(Map<String, EvidenceTuple> attributes, String key, EvidenceTuple evidence) {
@@ -70,15 +270,19 @@ public class EvidenceExtractor {
                 continue;
             }
 
+            List<String> targetFields = (target.targetFields() != null && !target.targetFields().isEmpty())
+                    ? target.targetFields()
+                    : List.of("role", "organization", "description", "summary", "headquarters", "technologies");
+
             Map<String, AiExtractedFact> facts = aiExtractionClient.extractFacts(
                     target.displayName(),
                     target.entityType() != null ? target.entityType().name() : "OTHER",
                     doc.url(),
                     doc.cleanText(),
-                    List.of("role", "organization", "description", "summary", "headquarters", "technologies")
+                    targetFields
             );
 
-            mergeAiFacts(facts, doc.url(), attributes);
+            mergeAiFacts(facts, doc.url(), doc.cleanText(), attributes);
         }
     }
 
@@ -87,18 +291,36 @@ public class EvidenceExtractor {
         return res.matched() && doc.cleanText() != null && !doc.cleanText().isBlank();
     }
 
-    private void mergeAiFacts(Map<String, AiExtractedFact> facts, String sourceUrl, Map<String, EvidenceTuple> attributes) {
+    private void mergeAiFacts(Map<String, AiExtractedFact> facts, String sourceUrl, String docText, Map<String, EvidenceTuple> attributes) {
         if (facts == null) {
             return;
         }
 
         facts.forEach((factKey, fact) -> {
             if (fact != null && fact.value() != null && !fact.value().isBlank()) {
+                if (!isFactGroundedInSource(fact, docText)) {
+                    return;
+                }
                 ConfidenceTier tier = resolveAiConfidenceTier(fact.confidenceScore());
                 String snippet = resolveAiSnippet(fact.exactQuote());
                 mergeAttribute(attributes, factKey, fact.value(), sourceUrl, snippet, tier);
             }
         });
+    }
+
+    private boolean isFactGroundedInSource(AiExtractedFact fact, String docText) {
+        if (docText == null || docText.isBlank()) {
+            return false;
+        }
+        String lowerDoc = docText.toLowerCase(Locale.ROOT);
+        if (fact.exactQuote() != null && !fact.exactQuote().isBlank()) {
+            String quote = fact.exactQuote().trim().toLowerCase(Locale.ROOT);
+            if (lowerDoc.contains(quote)) {
+                return true;
+            }
+        }
+        String val = fact.value().trim().toLowerCase(Locale.ROOT);
+        return lowerDoc.contains(val);
     }
 
     private ConfidenceTier resolveAiConfidenceTier(double score) {

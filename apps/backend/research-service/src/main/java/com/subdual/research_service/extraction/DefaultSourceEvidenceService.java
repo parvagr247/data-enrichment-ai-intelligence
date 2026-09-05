@@ -60,27 +60,72 @@ public class DefaultSourceEvidenceService implements SourceEvidenceService {
     ) {
         FetchedContent fetched = webContentFetcher.fetch(source.url());
         if (fetched == null || !fetched.success()) {
-            handleInaccessibleSource(source, fetched, diagnostics);
+            handleInaccessibleSource(target, source, fetched, diagnostics);
             return;
         }
 
         int maxLength = pipelineProperties != null ? pipelineProperties.maxContentLength() : 50000;
         ExtractedDocument doc = contentExtractor.extract(fetched, maxLength);
-        extractedDocuments.add(doc);
-
         EntityResolver.ResolutionResult resolution = entityResolver.resolve(target, doc);
+
         resolutions.put(source.url(), resolution);
+        if (doc.url() != null) {
+            resolutions.put(doc.url(), resolution);
+        }
+
+        if (resolution.matched()) {
+            extractedDocuments.add(doc);
+        } else {
+            log.info("Document '{}' rejected by entity resolution: {}", source.url(), resolution.reason());
+        }
     }
 
     private void handleInaccessibleSource(
+            ResearchTarget target,
             ResearchSource source,
             FetchedContent fetched,
             ResearchDiagnostics diagnostics
     ) {
-        String errorMsg = fetched != null ? fetched.errorMessage() : "Inaccessible";
-        log.debug("Skipping unretrievable source URL '{}': {}", source.url(), errorMsg);
-        if (diagnostics != null) {
-            diagnostics.recordSourceSkipped(source.domain(), errorMsg);
+        boolean isPrimary = isPrimaryAnchor(source, target);
+        if (isPrimary) {
+            String domain = source.domain() != null ? source.domain() : "primary source";
+            int statusCode = fetched != null ? fetched.statusCode() : 0;
+            String statusMsg = statusCode > 0 ? "HTTP " + statusCode : (fetched != null ? fetched.errorMessage() : "Inaccessible");
+            log.info("Primary target source ({}) could not be directly fetched ({}); continuing with corroborating sources.", domain, statusMsg);
+            if (diagnostics != null) {
+                diagnostics.recordPrimaryInaccessible(domain, statusMsg);
+            }
+        } else {
+            String errorMsg = fetched != null ? fetched.errorMessage() : "Inaccessible";
+            log.debug("Skipping unretrievable source URL '{}': {}", source.url(), errorMsg);
+            if (diagnostics != null) {
+                diagnostics.recordSourceSkipped(source.domain(), errorMsg);
+            }
         }
+    }
+
+    private boolean isPrimaryAnchor(ResearchSource source, ResearchTarget target) {
+        if (source == null || target == null) {
+            return false;
+        }
+        if ("PRIMARY_ANCHOR".equalsIgnoreCase(source.sourceType())) {
+            return true;
+        }
+        if (target.canonicalUrl() != null && isSameUrl(source.url(), target.canonicalUrl())) {
+            return true;
+        }
+        if (target.rawUrl() != null && isSameUrl(source.url(), target.rawUrl())) {
+            return true;
+        }
+        return false;
+    }
+
+    private boolean isSameUrl(String u1, String u2) {
+        if (u1 == null || u2 == null) {
+            return false;
+        }
+        String s1 = u1.trim().replaceFirst("^https?://(www\\.)?", "").replaceFirst("/+$", "");
+        String s2 = u2.trim().replaceFirst("^https?://(www\\.)?", "").replaceFirst("/+$", "");
+        return s1.equalsIgnoreCase(s2);
     }
 }

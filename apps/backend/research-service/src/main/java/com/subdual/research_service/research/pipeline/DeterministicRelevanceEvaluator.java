@@ -22,6 +22,10 @@ public class DeterministicRelevanceEvaluator implements RelevanceEvaluator {
 
     @Override
     public double evaluateRelevance(double providerRelevance, String sourceType, String url, String title, ResearchTarget target) {
+        if (isAnchorUrl(url, target) || "PRIMARY_ANCHOR".equalsIgnoreCase(sourceType)) {
+            return 1.00;
+        }
+
         double boundedProvider = Math.max(0.0, Math.min(1.0, providerRelevance));
         double authorityWeight = calculateAuthorityWeight(sourceType, target);
         double combined = (boundedProvider * 0.50) + (authorityWeight * 0.50);
@@ -32,7 +36,7 @@ public class DeterministicRelevanceEvaluator implements RelevanceEvaluator {
 
     private double calculateAuthorityWeight(String sourceType, ResearchTarget target) {
         return switch (sourceType != null ? sourceType : "") {
-            case "OFFICIAL_WEBSITE" -> 1.00;
+            case "PRIMARY_ANCHOR", "OFFICIAL_WEBSITE" -> 1.00;
             case "DOCUMENTATION" -> 0.90;
             case "GOVERNMENT" -> 0.85;
             case "GITHUB" -> (target != null && target.entityType() == EntityType.REPOSITORY) ? 0.95 : 0.80;
@@ -56,11 +60,52 @@ public class DeterministicRelevanceEvaluator implements RelevanceEvaluator {
             String sourceHost = extractHost(sourceUri);
 
             if (!targetHost.isBlank() && targetHost.equalsIgnoreCase(sourceHost) && !"OFFICIAL_WEBSITE".equals(sourceType)) {
-                return Math.min(1.00, score + 0.05);
+                score = Math.min(1.00, score + 0.05);
+            }
+
+            String targetSlug = extractSlug(targetUri.getPath());
+            if (targetSlug != null && !targetSlug.isBlank() && url.toLowerCase(Locale.ROOT).contains(targetSlug.toLowerCase(Locale.ROOT))) {
+                score = Math.min(1.00, score + 0.10);
             }
         } catch (Exception ignored) {}
 
         return score;
+    }
+
+    private boolean isAnchorUrl(String url, ResearchTarget target) {
+        if (target == null || url == null) {
+            return false;
+        }
+        if (target.canonicalUrl() != null && isSameUrl(url, target.canonicalUrl())) {
+            return true;
+        }
+        if (target.rawUrl() != null && isSameUrl(url, target.rawUrl())) {
+            return true;
+        }
+        return false;
+    }
+
+    private boolean isSameUrl(String u1, String u2) {
+        if (u1 == null || u2 == null) {
+            return false;
+        }
+        String s1 = u1.trim().replaceFirst("^https?://(www\\.)?", "").replaceFirst("/+$", "");
+        String s2 = u2.trim().replaceFirst("^https?://(www\\.)?", "").replaceFirst("/+$", "");
+        return s1.equalsIgnoreCase(s2);
+    }
+
+    private String extractSlug(String path) {
+        if (path == null || path.isBlank()) {
+            return null;
+        }
+        String[] segments = path.split("/");
+        for (int i = segments.length - 1; i >= 0; i--) {
+            String seg = segments[i].trim();
+            if (!seg.isBlank() && !seg.equalsIgnoreCase("in") && !seg.equalsIgnoreCase("profile")) {
+                return seg;
+            }
+        }
+        return null;
     }
 
     private String extractHost(URI uri) {

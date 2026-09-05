@@ -1,5 +1,8 @@
 package com.subdual.research_service.research.model;
 
+import java.net.URI;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 public record ResearchTarget(
@@ -12,5 +15,54 @@ public record ResearchTarget(
 ) {
     public ResearchTarget(String rawUrl, String canonicalUrl, String entityId, EntityType entityType, String displayName) {
         this(rawUrl, canonicalUrl, entityId, entityType, displayName, Map.of());
+    }
+
+    public String seedOrganization() {
+        if (metadata != null && metadata.containsKey("organization")) {
+            Object val = metadata.get("organization");
+            return val != null ? val.toString().trim() : null;
+        }
+        return null;
+    }
+
+    public String seedRole() {
+        if (metadata != null && metadata.containsKey("role")) {
+            Object val = metadata.get("role");
+            return val != null ? val.toString().trim() : null;
+        }
+        return null;
+    }
+
+    @SuppressWarnings("unchecked")
+    public List<String> targetFields() {
+        if (metadata != null && metadata.containsKey("targetFields")) {
+            Object obj = metadata.get("targetFields");
+            if (obj instanceof List<?> list) {
+                return list.stream().map(String::valueOf).toList();
+            }
+        }
+        return List.of();
+    }
+
+    public boolean isUrlAnchored() {
+        return rawUrl != null && !rawUrl.isBlank() && (rawUrl.startsWith("http://") || rawUrl.startsWith("https://"));
+    }
+
+    public String primaryAnchorUrl() {
+        return isUrlAnchored() ? (canonicalUrl != null ? canonicalUrl : rawUrl) : null;
+    }
+
+    public String domain() {
+        String url = isUrlAnchored() ? primaryAnchorUrl() : null;
+        if (url == null || url.isBlank()) {
+            return null;
+        }
+        try {
+            URI uri = URI.create(url);
+            String host = uri.getHost();
+            return host != null ? host.replaceFirst("^www\\.", "").toLowerCase(Locale.ROOT) : null;
+        } catch (Exception ignored) {
+            return null;
+        }
     }
 }

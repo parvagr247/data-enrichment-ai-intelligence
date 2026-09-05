@@ -204,6 +204,12 @@ public class DefaultWebContentFetcher implements WebContentFetcher {
 
     private FetchedContent generateMockContent(String url) {
         String lowerUrl = url != null ? url.toLowerCase(Locale.ROOT) : "";
+
+        if (lowerUrl.contains("linkedin.com") && !lowerUrl.contains("mock-linkedin-allow")) {
+            log.info("[MOCK] Simulating LinkedIn HTTP 999 anti-bot response for '{}'", url);
+            return FetchedContent.failed(url, 999, "HTTP 999: Request Denied");
+        }
+
         MockData mock = resolveMockData(lowerUrl);
 
         String mockHtml = String.format("""
@@ -234,12 +240,52 @@ public class DefaultWebContentFetcher implements WebContentFetcher {
                     "Spring Boot makes it easy to create stand-alone, production-grade Spring based Applications that you can just run. It takes an opinionated view of the Spring platform."
             );
         }
+        if (lowerUrl.contains("mnit.ac.in") || (lowerUrl.contains("parv-agrawal") && lowerUrl.contains("mnit"))) {
+            return new MockData(
+                    "Parv Agrawal - Department of Chemical Engineering - MNIT Jaipur",
+                    "Parv Agrawal is a student of Chemical Engineering at Malaviya National Institute of Technology Jaipur.",
+                    "MNIT Jaipur",
+                    "Parv Agrawal is a student at Malaviya National Institute of Technology Jaipur. Role: Undergraduate Student. Organization: MNIT Jaipur. Department: Chemical Engineering. Location: Jaipur, Rajasthan, India. Graduated from MNIT Jaipur."
+            );
+        }
+        if (lowerUrl.contains("deshaw") || lowerUrl.contains("iitd.ac.in")) {
+            return new MockData(
+                    "Parv Agrawal - Quantitative Analyst - D. E. Shaw",
+                    "Parv Agrawal is a Quantitative Analyst at D. E. Shaw in Hyderabad.",
+                    "D. E. Shaw",
+                    "Parv Agrawal works as Quantitative Analyst at D. E. Shaw. Graduated from IIT Delhi in Computer Science. Location: Hyderabad, India."
+            );
+        }
+        if (lowerUrl.contains("dentistry") || lowerUrl.contains("dr-jane-doe")) {
+            return new MockData(
+                    "Dr. Jane Doe, DDS - Family Dentistry & Dental Clinic",
+                    "Dr. Jane Doe provides dental care, teeth whitening, and pediatric dentistry.",
+                    "Downtown Dentistry Clinic",
+                    "Dr. Jane Doe, DDS is a family dentist at Downtown Dental Clinic. Location: Chicago, IL. Specializes in oral hygiene and dental surgery."
+            );
+        }
+        if (lowerUrl.contains("imdb") || lowerUrl.contains("actress") || lowerUrl.contains("cinema")) {
+            return new MockData(
+                    "Jane Doe - Actress Filmography and Credits",
+                    "Jane Doe is a theater and film actress known for dramatic roles in independent movies.",
+                    "Internet Movie Database",
+                    "Jane Doe is an actress. Filmography includes award-winning short films and stage plays in Los Angeles, CA."
+            );
+        }
+        if (lowerUrl.contains("cloudscale") || (lowerUrl.contains("jane-doe") && lowerUrl.contains("team"))) {
+            return new MockData(
+                    "Jane Doe - Principal Infrastructure Engineer at CloudScale Systems",
+                    "Jane Doe is a Principal Infrastructure Engineer at CloudScale Systems based in San Francisco, CA. Graduated from MIT. Profile: linkedin.com/in/jane-doe",
+                    "CloudScale Systems",
+                    "Jane Doe is a Principal Infrastructure Engineer at CloudScale Systems, based in San Francisco, CA. She graduated from MIT with a degree in Computer Science. Connect with Jane Doe on LinkedIn at linkedin.com/in/jane-doe."
+            );
+        }
         if (lowerUrl.contains("jane-doe")) {
             return new MockData(
-                    "[MOCK] Jane Doe - Principal Infrastructure Engineer",
-                    "Jane Doe is a Principal Infrastructure Engineer specializing in resilient cloud platforms.",
+                    "Jane Doe - Principal Infrastructure Engineer",
+                    "Jane Doe is a Principal Infrastructure Engineer at CloudScale Systems based in San Francisco, CA. Graduated from MIT.",
                     "Jane Doe Profile",
-                    "Jane Doe is a Principal Infrastructure Engineer specializing in resilient cloud platforms and distributed systems."
+                    "Jane Doe is a Principal Infrastructure Engineer at CloudScale Systems, based in San Francisco, CA. She graduated from MIT."
             );
         }
         if (lowerUrl.contains("example") || lowerUrl.contains("linkedin.com/company/example")) {

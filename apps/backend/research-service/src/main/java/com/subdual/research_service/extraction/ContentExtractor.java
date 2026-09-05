@@ -55,7 +55,12 @@ public class ContentExtractor {
     }
 
     private void stripNoiseTags(Document doc) {
-        doc.select("script, style, nav, header, footer, noscript, svg, form").remove();
+        doc.select("script, style, nav, header, footer, noscript, svg, form, aside, " +
+                "[role='navigation'], [role='banner'], [role='contentinfo'], " +
+                "[class*='cookie'], [id*='cookie'], [class*='consent'], [id*='consent'], " +
+                "[class*='advertisement'], [id*='advertisement'], [class*='ads'], [id*='ads'], " +
+                "[class*='sidebar'], [id*='sidebar'], [class*='people-also-viewed'], " +
+                "[class*='related-profiles'], [id*='related-profiles'], [class*='recommended']").remove();
     }
 
     private String extractTitle(Document doc) {

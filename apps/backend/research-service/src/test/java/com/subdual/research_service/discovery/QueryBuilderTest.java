@@ -18,23 +18,23 @@ class QueryBuilderTest {
     }
 
     @Test
-    @DisplayName("Should build targeted query for organization with display name")
-    void shouldBuildOrganizationQuery() {
+    @DisplayName("Should build anchored query with domain and path when both URL and name are present")
+    void shouldBuildAnchoredQueryForUrlAndName() {
         ResearchTarget target = new ResearchTarget(
-                "https://openai.com",
-                "https://openai.com/",
+                "https://www.linkedin.com/in/jane-doe",
+                "https://www.linkedin.com/in/jane-doe",
                 "id-1",
-                EntityType.ORGANIZATION,
-                "OpenAI"
+                EntityType.PERSON,
+                "Jane Doe"
         );
 
         String query = queryBuilder.buildDiscoveryQuery(target);
-        assertThat(query).isEqualTo("OpenAI company official");
+        assertThat(query).isEqualTo("\"Jane Doe\" linkedin.com/in/jane-doe");
     }
 
     @Test
-    @DisplayName("Should build targeted query for repository with display name")
-    void shouldBuildRepositoryQuery() {
+    @DisplayName("Should build anchored query for repository with URL and display name")
+    void shouldBuildAnchoredQueryForRepositoryWithUrl() {
         ResearchTarget target = new ResearchTarget(
                 "https://github.com/spring-projects/spring-boot",
                 "https://github.com/spring-projects/spring-boot",
@@ -44,33 +44,48 @@ class QueryBuilderTest {
         );
 
         String query = queryBuilder.buildDiscoveryQuery(target);
-        assertThat(query).isEqualTo("Spring Boot repository source code");
+        assertThat(query).isEqualTo("\"Spring Boot\" github.com/spring-projects/spring-boot");
     }
 
     @Test
-    @DisplayName("Should build targeted query for person with display name")
-    void shouldBuildPersonQuery() {
+    @DisplayName("Should build anchored query for organization with URL and display name")
+    void shouldBuildAnchoredQueryForOrganizationWithUrl() {
         ResearchTarget target = new ResearchTarget(
-                "https://example.com/jane-doe",
-                "https://example.com/jane-doe",
+                "https://openai.com",
+                "https://openai.com/",
                 "id-3",
-                EntityType.PERSON,
-                "Jane Doe"
+                EntityType.ORGANIZATION,
+                "OpenAI"
         );
 
         String query = queryBuilder.buildDiscoveryQuery(target);
-        assertThat(query).isEqualTo("Jane Doe profile biography");
+        assertThat(query).isEqualTo("\"OpenAI\" openai.com company");
+    }
+
+    @Test
+    @DisplayName("Should build broad discovery query when only name is provided (no URL)")
+    void shouldBuildBroadQueryForNameOnly() {
+        ResearchTarget orgTarget = new ResearchTarget(
+                null, null, "id-4", EntityType.ORGANIZATION, "OpenAI"
+        );
+        assertThat(queryBuilder.buildDiscoveryQuery(orgTarget)).isEqualTo("OpenAI company official");
+
+        ResearchTarget repoTarget = new ResearchTarget(
+                null, null, "id-5", EntityType.REPOSITORY, "Spring Boot"
+        );
+        assertThat(queryBuilder.buildDiscoveryQuery(repoTarget)).isEqualTo("Spring Boot repository source code");
+
+        ResearchTarget personTarget = new ResearchTarget(
+                null, null, "id-6", EntityType.PERSON, "Jane Doe"
+        );
+        assertThat(queryBuilder.buildDiscoveryQuery(personTarget)).isEqualTo("Jane Doe profile biography");
     }
 
     @Test
     @DisplayName("Should handle null entityType gracefully without NullPointerException")
     void shouldHandleNullEntityTypeGracefully() {
         ResearchTarget target = new ResearchTarget(
-                "https://example.com/something",
-                "https://example.com/something",
-                "id-4",
-                null,
-                "Something"
+                null, null, "id-7", null, "Something"
         );
 
         String query = queryBuilder.buildDiscoveryQuery(target);
@@ -83,7 +98,7 @@ class QueryBuilderTest {
         ResearchTarget target = new ResearchTarget(
                 "https://github.com/spring-projects/spring-boot",
                 "https://github.com/spring-projects/spring-boot",
-                "id-5",
+                "id-8",
                 EntityType.REPOSITORY,
                 "https://github.com/spring-projects/spring-boot"
         );
@@ -96,5 +111,16 @@ class QueryBuilderTest {
     @DisplayName("Should return empty string for null target")
     void shouldReturnEmptyStringForNullTarget() {
         assertThat(queryBuilder.buildDiscoveryQuery(null)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Should resolve type keywords correctly")
+    void shouldResolveTypeKeywords() {
+        assertThat(queryBuilder.resolveTypeKeyword(EntityType.ORGANIZATION)).isEqualTo("company");
+        assertThat(queryBuilder.resolveTypeKeyword(EntityType.REPOSITORY)).isEqualTo("repository");
+        assertThat(queryBuilder.resolveTypeKeyword(EntityType.PERSON)).isEqualTo("profile");
+        assertThat(queryBuilder.resolveTypeKeyword(EntityType.PRODUCT)).isEqualTo("product");
+        assertThat(queryBuilder.resolveTypeKeyword(EntityType.WEBSITE)).isEqualTo("official");
+        assertThat(queryBuilder.resolveTypeKeyword(null)).isEqualTo("overview");
     }
 }
