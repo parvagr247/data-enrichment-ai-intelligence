@@ -6,7 +6,6 @@ import com.subdual.research_service.extraction.support.EntityResolver;
 import com.subdual.research_service.extraction.support.EvidenceMerger;
 import com.subdual.research_service.research.model.ConfidenceTier;
 import com.subdual.research_service.research.model.ResearchTarget;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -14,9 +13,6 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/**
- * Extracts attributes specific to ORGANIZATION entities such as headquarters, industry, products, and leadership.
- */
 @Component
 public class OrganizationEvidenceExtractor {
 
@@ -35,7 +31,6 @@ public class OrganizationEvidenceExtractor {
 
     private final EvidenceMerger evidenceMerger;
 
-    @Autowired
     public OrganizationEvidenceExtractor(EvidenceMerger evidenceMerger) {
         this.evidenceMerger = evidenceMerger != null ? evidenceMerger : new EvidenceMerger();
     }
@@ -50,7 +45,17 @@ public class OrganizationEvidenceExtractor {
             Map<String, EvidenceTuple> attributes,
             Map<String, EntityResolver.ResolutionResult> resolutions
     ) {
-        if (target.displayName() != null && !target.displayName().isBlank()) {
+        populateIdentityDefaults(target, attributes);
+
+        for (ExtractedDocument doc : documents) {
+            if (shouldProcessDocument(doc, resolutions)) {
+                extractFromDocument(doc, attributes);
+            }
+        }
+    }
+
+    private void populateIdentityDefaults(ResearchTarget target, Map<String, EvidenceTuple> attributes) {
+        if (target != null && target.displayName() != null && !target.displayName().isBlank()) {
             attributes.putIfAbsent("name", new EvidenceTuple(
                     target.displayName(),
                     target.canonicalUrl() != null ? target.canonicalUrl() : "",
@@ -58,7 +63,7 @@ public class OrganizationEvidenceExtractor {
                     ConfidenceTier.HIGH
             ));
         }
-        if (target.canonicalUrl() != null && !target.canonicalUrl().isBlank()) {
+        if (target != null && target.canonicalUrl() != null && !target.canonicalUrl().isBlank()) {
             attributes.putIfAbsent("website", new EvidenceTuple(
                     target.canonicalUrl(),
                     target.canonicalUrl(),
@@ -66,39 +71,53 @@ public class OrganizationEvidenceExtractor {
                     ConfidenceTier.HIGH
             ));
         }
+    }
 
-        for (ExtractedDocument doc : documents) {
-            if (!CommonEvidenceExtractor.isMatchedDocument(doc, resolutions)) {
-                continue;
-            }
-            String text = doc.cleanText();
-            if (text == null || text.isBlank()) {
-                continue;
-            }
+    private boolean shouldProcessDocument(ExtractedDocument doc, Map<String, EntityResolver.ResolutionResult> resolutions) {
+        return CommonEvidenceExtractor.isMatchedDocument(doc, resolutions)
+                && doc.cleanText() != null
+                && !doc.cleanText().isBlank();
+    }
 
-            Matcher hqMatcher = HQ_PATTERN.matcher(text);
-            if (hqMatcher.find()) {
-                String hq = hqMatcher.group(1).trim();
-                evidenceMerger.mergeAttribute(attributes, "headquarters", hq, doc.url(), "Headquarters pattern: \"" + hqMatcher.group(0).trim() + "\"", ConfidenceTier.MEDIUM);
-            }
+    private void extractFromDocument(ExtractedDocument doc, Map<String, EvidenceTuple> attributes) {
+        String text = doc.cleanText();
+        String url = doc.url();
 
-            Matcher indMatch = INDUSTRY_LABEL_PATTERN.matcher(text);
-            if (indMatch.find()) {
-                String ind = indMatch.group(1).trim();
-                evidenceMerger.mergeAttribute(attributes, "industry", ind, doc.url(), "Industry label: \"" + indMatch.group(0).trim() + "\"", ConfidenceTier.MEDIUM);
-            }
+        extractHeadquarters(text, url, attributes);
+        extractIndustry(text, url, attributes);
+        extractProducts(text, url, attributes);
+        extractLeadership(text, url, attributes);
+    }
 
-            Matcher prodMatch = PRODUCTS_LABEL_PATTERN.matcher(text);
-            if (prodMatch.find()) {
-                String prod = prodMatch.group(1).trim();
-                evidenceMerger.mergeAttribute(attributes, "products", prod, doc.url(), "Products label: \"" + prodMatch.group(0).trim() + "\"", ConfidenceTier.MEDIUM);
-            }
+    private void extractHeadquarters(String text, String url, Map<String, EvidenceTuple> attributes) {
+        Matcher matcher = HQ_PATTERN.matcher(text);
+        if (matcher.find()) {
+            String hq = matcher.group(1).trim();
+            evidenceMerger.mergeAttribute(attributes, "headquarters", hq, url, "Headquarters pattern: \"" + matcher.group(0).trim() + "\"", ConfidenceTier.MEDIUM);
+        }
+    }
 
-            Matcher leadMatch = LEADERSHIP_LABEL_PATTERN.matcher(text);
-            if (leadMatch.find()) {
-                String lead = leadMatch.group(1).trim();
-                evidenceMerger.mergeAttribute(attributes, "leadership", lead, doc.url(), "Leadership label: \"" + leadMatch.group(0).trim() + "\"", ConfidenceTier.MEDIUM);
-            }
+    private void extractIndustry(String text, String url, Map<String, EvidenceTuple> attributes) {
+        Matcher matcher = INDUSTRY_LABEL_PATTERN.matcher(text);
+        if (matcher.find()) {
+            String ind = matcher.group(1).trim();
+            evidenceMerger.mergeAttribute(attributes, "industry", ind, url, "Industry label: \"" + matcher.group(0).trim() + "\"", ConfidenceTier.MEDIUM);
+        }
+    }
+
+    private void extractProducts(String text, String url, Map<String, EvidenceTuple> attributes) {
+        Matcher matcher = PRODUCTS_LABEL_PATTERN.matcher(text);
+        if (matcher.find()) {
+            String prod = matcher.group(1).trim();
+            evidenceMerger.mergeAttribute(attributes, "products", prod, url, "Products label: \"" + matcher.group(0).trim() + "\"", ConfidenceTier.MEDIUM);
+        }
+    }
+
+    private void extractLeadership(String text, String url, Map<String, EvidenceTuple> attributes) {
+        Matcher matcher = LEADERSHIP_LABEL_PATTERN.matcher(text);
+        if (matcher.find()) {
+            String lead = matcher.group(1).trim();
+            evidenceMerger.mergeAttribute(attributes, "leadership", lead, url, "Leadership label: \"" + matcher.group(0).trim() + "\"", ConfidenceTier.MEDIUM);
         }
     }
 }

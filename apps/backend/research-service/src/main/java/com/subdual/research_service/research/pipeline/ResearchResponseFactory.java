@@ -25,17 +25,8 @@ public class ResearchResponseFactory {
             ResearchDiagnostics diagnostics,
             String provider
     ) {
-        List<SourceItem> sourceItems = rankedSources != null
-                ? rankedSources.stream().map(this::toSourceItem).toList()
-                : List.of();
-
-        ResearchResult result = new ResearchResult(
-                target.displayName(),
-                target.entityType(),
-                target.canonicalUrl(),
-                attributes != null ? attributes : Map.of()
-        );
-
+        List<SourceItem> sourceItems = mapToSourceItems(rankedSources);
+        ResearchResult result = buildResearchResult(target, attributes);
         Map<String, Object> metadata = buildMetadata(
                 provider,
                 totalDiscovered,
@@ -43,17 +34,8 @@ public class ResearchResponseFactory {
                 result.attributes().size(),
                 diagnostics
         );
-
-        boolean hasDegradedSources = diagnostics != null && diagnostics.hasDegradedSources();
-        boolean hasExtractedAttributes = attributes != null && !attributes.isEmpty();
-
-        ResearchStatus status = (hasDegradedSources && !hasExtractedAttributes)
-                ? ResearchStatus.PARTIAL
-                : ResearchStatus.COMPLETED;
-
-        List<String> warnings = diagnostics != null
-                ? diagnostics.warnings()
-                : List.of();
+        ResearchStatus status = determineResearchStatus(diagnostics, attributes);
+        List<String> warnings = extractWarnings(diagnostics);
 
         return new ResearchResponse(
                 status,
@@ -64,6 +46,35 @@ public class ResearchResponseFactory {
                 metadata,
                 warnings
         );
+    }
+
+    private List<SourceItem> mapToSourceItems(List<ResearchSource> rankedSources) {
+        if (rankedSources == null) {
+            return List.of();
+        }
+        return rankedSources.stream().map(this::toSourceItem).toList();
+    }
+
+    private ResearchResult buildResearchResult(ResearchTarget target, Map<String, EvidenceTuple> attributes) {
+        return new ResearchResult(
+                target.displayName(),
+                target.entityType(),
+                target.canonicalUrl(),
+                attributes != null ? attributes : Map.of()
+        );
+    }
+
+    private ResearchStatus determineResearchStatus(ResearchDiagnostics diagnostics, Map<String, EvidenceTuple> attributes) {
+        boolean hasDegradedSources = diagnostics != null && diagnostics.hasDegradedSources();
+        boolean hasExtractedAttributes = attributes != null && !attributes.isEmpty();
+
+        return (hasDegradedSources && !hasExtractedAttributes)
+                ? ResearchStatus.PARTIAL
+                : ResearchStatus.COMPLETED;
+    }
+
+    private List<String> extractWarnings(ResearchDiagnostics diagnostics) {
+        return diagnostics != null ? diagnostics.warnings() : List.of();
     }
 
     public SourceItem toSourceItem(ResearchSource source) {

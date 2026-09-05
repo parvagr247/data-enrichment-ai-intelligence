@@ -1,6 +1,6 @@
 package com.subdual.research_service.extraction.support;
 
-import com.subdual.research_service.extraction.document.ExtractedDocument;
+import com.subdual.research_service.extraction.ai.document.ExtractedDocument;
 import com.subdual.research_service.research.model.ConfidenceTier;
 import com.subdual.research_service.research.model.EntityType;
 import com.subdual.research_service.research.model.ResearchTarget;
@@ -12,10 +12,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
-/**
- * Resolves whether an extracted document matches the intended research target entity,
- * filtering out homonyms, competing professionals, and uncorroborated sources.
- */
 @Component
 @Slf4j
 public class EntityResolver {
@@ -35,7 +31,7 @@ public class EntityResolver {
     public record ResolutionResult(ConfidenceTier confidence, boolean matched, String reason) {}
 
     public ResolutionResult resolve(ResearchTarget target, ExtractedDocument document) {
-        if (target == null || document == null || document.url() == null) {
+        if (!isValidResolutionInput(target, document)) {
             return new ResolutionResult(ConfidenceTier.UNKNOWN, false, "Missing target or document");
         }
 
@@ -53,16 +49,9 @@ public class EntityResolver {
 
         String targetSlug = extractSlug(target.canonicalUrl() != null ? target.canonicalUrl() : target.rawUrl());
 
-        if (hasDistinctDisplayName(target)) {
-            String lowerName = target.displayName().toLowerCase(Locale.ROOT);
-            String docTitle = document.title() != null ? document.title().toLowerCase(Locale.ROOT) : "";
-
-            if (docTitle.contains(lowerName)) {
-                if (isAnchoredPersonTarget(target) && !hasCorroboratingSignals(targetSlug, target, document)) {
-                    return new ResolutionResult(ConfidenceTier.LOW, false, "Rejected: Name-only match without corroborating identity signals");
-                }
-                return new ResolutionResult(ConfidenceTier.HIGH, true, "Entity name matched in document title");
-            }
+        ResolutionResult titleResult = checkTitleMatch(target, document, targetSlug);
+        if (titleResult != null) {
+            return titleResult;
         }
 
         if (matchesSlugOrUrl(targetSlug, target.canonicalUrl(), document)) {
@@ -73,6 +62,31 @@ public class EntityResolver {
             return new ResolutionResult(ConfidenceTier.HIGH, true, "Entity name and corroborating identity signals matched");
         }
 
+        return resolveFallback(target, document);
+    }
+
+    private boolean isValidResolutionInput(ResearchTarget target, ExtractedDocument document) {
+        return target != null && document != null && document.url() != null;
+    }
+
+    private ResolutionResult checkTitleMatch(ResearchTarget target, ExtractedDocument document, String targetSlug) {
+        if (!hasDistinctDisplayName(target)) {
+            return null;
+        }
+
+        String lowerName = target.displayName().toLowerCase(Locale.ROOT);
+        String docTitle = document.title() != null ? document.title().toLowerCase(Locale.ROOT) : "";
+
+        if (docTitle.contains(lowerName)) {
+            if (isAnchoredPersonTarget(target) && !hasCorroboratingSignals(targetSlug, target, document)) {
+                return new ResolutionResult(ConfidenceTier.LOW, false, "Rejected: Name-only match without corroborating identity signals");
+            }
+            return new ResolutionResult(ConfidenceTier.HIGH, true, "Entity name matched in document title");
+        }
+        return null;
+    }
+
+    private ResolutionResult resolveFallback(ResearchTarget target, ExtractedDocument document) {
         if (!hasDistinctDisplayName(target)) {
             return resolveWithoutDisplayName(target.canonicalUrl(), document.url());
         }
@@ -134,30 +148,45 @@ public class EntityResolver {
     }
 
     private boolean isConflictingEntity(ResearchTarget target, ExtractedDocument document) {
-        String text = (document.title() != null ? document.title() : "") + " "
-                + (document.cleanText() != null ? document.cleanText() : "");
-        String lower = text.toLowerCase(Locale.ROOT);
+        String lowerText = extractFullDocumentText(document);
 
-        boolean hasConflictingProfession = CONFLICTING_PROFESSIONS.stream().anyMatch(lower::contains);
-        if (hasConflictingProfession) {
-            String targetContext = getTargetContext(target).toLowerCase(Locale.ROOT);
-            for (String prof : CONFLICTING_PROFESSIONS) {
-                if (lower.contains(prof) && targetContext.contains(prof)) {
-                    return false;
-                }
-            }
+        if (hasConflictingProfession(lowerText, target)) {
             return true;
         }
 
-        if (target != null && target.seedOrganization() != null && !target.seedOrganization().isBlank()) {
-            String seedOrg = target.seedOrganization().toLowerCase(Locale.ROOT);
-            if (!lower.contains(seedOrg)) {
-                if (lower.contains("d. e. shaw") || lower.contains("deshaw") || lower.contains("iit delhi")) {
-                    return true;
-                }
-            }
+        return hasConflictingOrganization(lowerText, target);
+    }
+
+    private String extractFullDocumentText(ExtractedDocument document) {
+        String title = document.title() != null ? document.title() : "";
+        String body = document.cleanText() != null ? document.cleanText() : "";
+        return (title + " " + body).toLowerCase(Locale.ROOT);
+    }
+
+    private boolean hasConflictingProfession(String lowerText, ResearchTarget target) {
+        boolean containsProfessionKeyword = CONFLICTING_PROFESSIONS.stream().anyMatch(lowerText::contains);
+        if (!containsProfessionKeyword) {
+            return false;
         }
 
+        String targetContext = getTargetContext(target).toLowerCase(Locale.ROOT);
+        for (String prof : CONFLICTING_PROFESSIONS) {
+            if (lowerText.contains(prof) && targetContext.contains(prof)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private boolean hasConflictingOrganization(String lowerText, ResearchTarget target) {
+        if (target == null || target.seedOrganization() == null || target.seedOrganization().isBlank()) {
+            return false;
+        }
+
+        String seedOrg = target.seedOrganization().toLowerCase(Locale.ROOT);
+        if (!lowerText.contains(seedOrg)) {
+            return lowerText.contains("d. e. shaw") || lowerText.contains("deshaw") || lowerText.contains("iit delhi");
+        }
         return false;
     }
 
@@ -222,8 +251,7 @@ public class EntityResolver {
         if (target.metadata() == null || target.metadata().isEmpty()) {
             return false;
         }
-        String docContent = ((document.title() != null ? document.title() : "") + " "
-                + (document.cleanText() != null ? document.cleanText() : "")).toLowerCase(Locale.ROOT);
+        String docContent = extractFullDocumentText(document);
 
         for (Map.Entry<String, Object> entry : target.metadata().entrySet()) {
             if (entry.getValue() != null) {

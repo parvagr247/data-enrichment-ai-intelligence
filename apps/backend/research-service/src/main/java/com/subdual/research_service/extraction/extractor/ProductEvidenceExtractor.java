@@ -6,7 +6,6 @@ import com.subdual.research_service.extraction.support.EntityResolver;
 import com.subdual.research_service.extraction.support.EvidenceMerger;
 import com.subdual.research_service.research.model.ConfidenceTier;
 import com.subdual.research_service.research.model.ResearchTarget;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -14,9 +13,6 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/**
- * Extracts attributes specific to PRODUCT and WEBSITE entities.
- */
 @Component
 public class ProductEvidenceExtractor {
 
@@ -26,7 +22,6 @@ public class ProductEvidenceExtractor {
 
     private final EvidenceMerger evidenceMerger;
 
-    @Autowired
     public ProductEvidenceExtractor(EvidenceMerger evidenceMerger) {
         this.evidenceMerger = evidenceMerger != null ? evidenceMerger : new EvidenceMerger();
     }
@@ -41,38 +36,8 @@ public class ProductEvidenceExtractor {
             Map<String, EvidenceTuple> attributes,
             Map<String, EntityResolver.ResolutionResult> resolutions
     ) {
-        if (target.displayName() != null && !target.displayName().isBlank()) {
-            attributes.putIfAbsent("name", new EvidenceTuple(
-                    target.displayName(),
-                    target.canonicalUrl() != null ? target.canonicalUrl() : "",
-                    "Product name",
-                    ConfidenceTier.HIGH
-            ));
-        }
-        if (target.canonicalUrl() != null && !target.canonicalUrl().isBlank()) {
-            attributes.putIfAbsent("website", new EvidenceTuple(
-                    target.canonicalUrl(),
-                    target.canonicalUrl(),
-                    "Canonical product website",
-                    ConfidenceTier.HIGH
-            ));
-        }
-
-        for (ExtractedDocument doc : documents) {
-            if (!CommonEvidenceExtractor.isMatchedDocument(doc, resolutions)) {
-                continue;
-            }
-            String text = doc.cleanText();
-            if (text == null || text.isBlank()) {
-                continue;
-            }
-
-            Matcher catMatch = CATEGORY_LABEL_PATTERN.matcher(text);
-            if (catMatch.find()) {
-                String cat = catMatch.group(1).trim();
-                evidenceMerger.mergeAttribute(attributes, "category", cat, doc.url(), "Category pattern: \"" + catMatch.group(0).trim() + "\"", ConfidenceTier.MEDIUM);
-            }
-        }
+        populateProductDefaults(target, attributes);
+        extractCategoriesFromDocuments(documents, resolutions, attributes);
     }
 
     public void extractWebsiteAttributes(
@@ -81,7 +46,7 @@ public class ProductEvidenceExtractor {
             Map<String, EvidenceTuple> attributes,
             Map<String, EntityResolver.ResolutionResult> resolutions
     ) {
-        if (target.displayName() != null && !target.displayName().isBlank()) {
+        if (target != null && target.displayName() != null && !target.displayName().isBlank()) {
             attributes.putIfAbsent("name", new EvidenceTuple(
                     target.displayName(),
                     target.canonicalUrl() != null ? target.canonicalUrl() : "",
@@ -89,13 +54,58 @@ public class ProductEvidenceExtractor {
                     ConfidenceTier.HIGH
             ));
         }
-        if (target.canonicalUrl() != null && !target.canonicalUrl().isBlank()) {
+        if (target != null && target.canonicalUrl() != null && !target.canonicalUrl().isBlank()) {
             attributes.putIfAbsent("url", new EvidenceTuple(
                     target.canonicalUrl(),
                     target.canonicalUrl(),
                     "Canonical URL",
                     ConfidenceTier.HIGH
             ));
+        }
+    }
+
+    private void populateProductDefaults(ResearchTarget target, Map<String, EvidenceTuple> attributes) {
+        if (target != null && target.displayName() != null && !target.displayName().isBlank()) {
+            attributes.putIfAbsent("name", new EvidenceTuple(
+                    target.displayName(),
+                    target.canonicalUrl() != null ? target.canonicalUrl() : "",
+                    "Product name",
+                    ConfidenceTier.HIGH
+            ));
+        }
+        if (target != null && target.canonicalUrl() != null && !target.canonicalUrl().isBlank()) {
+            attributes.putIfAbsent("website", new EvidenceTuple(
+                    target.canonicalUrl(),
+                    target.canonicalUrl(),
+                    "Canonical product website",
+                    ConfidenceTier.HIGH
+            ));
+        }
+    }
+
+    private void extractCategoriesFromDocuments(
+            List<ExtractedDocument> documents,
+            Map<String, EntityResolver.ResolutionResult> resolutions,
+            Map<String, EvidenceTuple> attributes
+    ) {
+        for (ExtractedDocument doc : documents) {
+            if (shouldProcessDocument(doc, resolutions)) {
+                extractCategoryFromDocument(doc, attributes);
+            }
+        }
+    }
+
+    private boolean shouldProcessDocument(ExtractedDocument doc, Map<String, EntityResolver.ResolutionResult> resolutions) {
+        return CommonEvidenceExtractor.isMatchedDocument(doc, resolutions)
+                && doc.cleanText() != null
+                && !doc.cleanText().isBlank();
+    }
+
+    private void extractCategoryFromDocument(ExtractedDocument doc, Map<String, EvidenceTuple> attributes) {
+        Matcher matcher = CATEGORY_LABEL_PATTERN.matcher(doc.cleanText());
+        if (matcher.find()) {
+            String cat = matcher.group(1).trim();
+            evidenceMerger.mergeAttribute(attributes, "category", cat, doc.url(), "Category pattern: \"" + matcher.group(0).trim() + "\"", ConfidenceTier.MEDIUM);
         }
     }
 }

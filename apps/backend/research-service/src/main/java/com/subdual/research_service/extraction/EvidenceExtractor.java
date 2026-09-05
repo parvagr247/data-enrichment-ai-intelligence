@@ -18,17 +18,12 @@ import com.subdual.research_service.research.model.ConfidenceTier;
 import com.subdual.research_service.research.model.EntityType;
 import com.subdual.research_service.research.model.ResearchSource;
 import com.subdual.research_service.research.model.ResearchTarget;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * High-level coordinator that orchestrates multi-source evidence extraction across
- * document signals, entity heuristics, AI grounding, and target field normalization.
- */
 @Component
 public class EvidenceExtractor {
 
@@ -41,7 +36,6 @@ public class EvidenceExtractor {
     private final AiEvidenceEnricher aiEvidenceEnricher;
     private final TargetFieldNormalizer targetFieldNormalizer;
 
-    @Autowired
     public EvidenceExtractor(
             EvidenceMerger evidenceMerger,
             CommonEvidenceExtractor commonExtractor,
@@ -83,36 +77,72 @@ public class EvidenceExtractor {
             List<ExtractedDocument> documents,
             Map<String, EntityResolver.ResolutionResult> resolutions
     ) {
-        Map<String, EvidenceTuple> attributes = new LinkedHashMap<>();
-
-        if (target == null || documents == null || documents.isEmpty()) {
-            return attributes;
+        if (!hasExtractableContent(target, documents)) {
+            return new LinkedHashMap<>();
         }
 
+        Map<String, EvidenceTuple> attributes = new LinkedHashMap<>();
+        extractCommonAttributes(target, sources, documents, resolutions, attributes);
+        extractEntityTypeAttributes(target, documents, resolutions, attributes);
+        enrichWithAiIfAvailable(target, documents, resolutions, attributes);
+        applyTargetFieldsIfRequested(target, attributes);
+
+        return attributes;
+    }
+
+    private boolean hasExtractableContent(ResearchTarget target, List<ExtractedDocument> documents) {
+        return target != null && documents != null && !documents.isEmpty();
+    }
+
+    private void extractCommonAttributes(
+            ResearchTarget target,
+            List<ResearchSource> sources,
+            List<ExtractedDocument> documents,
+            Map<String, EntityResolver.ResolutionResult> resolutions,
+            Map<String, EvidenceTuple> attributes
+    ) {
         putIfPresent(attributes, "description", commonExtractor.extractDescription(target, documents, sources, resolutions));
         putIfPresent(attributes, "title", commonExtractor.extractTitle(target, documents, sources, resolutions));
         putIfPresent(attributes, "site_name", commonExtractor.extractSiteName(documents, resolutions));
+    }
 
-        if (target.entityType() == EntityType.PERSON) {
-            personExtractor.extractAttributes(target, documents, attributes, resolutions);
-        } else if (target.entityType() == EntityType.ORGANIZATION) {
-            organizationExtractor.extractAttributes(target, documents, attributes, resolutions);
-        } else if (target.entityType() == EntityType.REPOSITORY) {
-            putIfPresent(attributes, "repository", repositoryExtractor.extractRepositoryInfo(target, documents));
-            repositoryExtractor.extractAttributes(target, documents, attributes, resolutions);
-        } else if (target.entityType() == EntityType.PRODUCT) {
-            productExtractor.extractAttributes(target, documents, attributes, resolutions);
-        } else if (target.entityType() == EntityType.WEBSITE) {
-            productExtractor.extractWebsiteAttributes(target, documents, attributes, resolutions);
+    private void extractEntityTypeAttributes(
+            ResearchTarget target,
+            List<ExtractedDocument> documents,
+            Map<String, EntityResolver.ResolutionResult> resolutions,
+            Map<String, EvidenceTuple> attributes
+    ) {
+        EntityType type = target.entityType();
+        if (type == null) {
+            return;
         }
 
-        aiEvidenceEnricher.enrichWithAiExtraction(target, documents, resolutions, attributes);
+        switch (type) {
+            case PERSON -> personExtractor.extractAttributes(target, documents, attributes, resolutions);
+            case ORGANIZATION -> organizationExtractor.extractAttributes(target, documents, attributes, resolutions);
+            case REPOSITORY -> {
+                putIfPresent(attributes, "repository", repositoryExtractor.extractRepositoryInfo(target, documents));
+                repositoryExtractor.extractAttributes(target, documents, attributes, resolutions);
+            }
+            case PRODUCT -> productExtractor.extractAttributes(target, documents, attributes, resolutions);
+            case WEBSITE -> productExtractor.extractWebsiteAttributes(target, documents, attributes, resolutions);
+            default -> {}
+        }
+    }
 
+    private void enrichWithAiIfAvailable(
+            ResearchTarget target,
+            List<ExtractedDocument> documents,
+            Map<String, EntityResolver.ResolutionResult> resolutions,
+            Map<String, EvidenceTuple> attributes
+    ) {
+        aiEvidenceEnricher.enrichWithAiExtraction(target, documents, resolutions, attributes);
+    }
+
+    private void applyTargetFieldsIfRequested(ResearchTarget target, Map<String, EvidenceTuple> attributes) {
         if (target.targetFields() != null && !target.targetFields().isEmpty()) {
             targetFieldNormalizer.applyTargetFields(target, attributes);
         }
-
-        return attributes;
     }
 
     public void applyTargetFields(ResearchTarget target, Map<String, EvidenceTuple> attributes) {

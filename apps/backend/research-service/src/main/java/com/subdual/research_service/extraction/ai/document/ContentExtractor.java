@@ -1,4 +1,4 @@
-package com.subdual.research_service.extraction.document;
+package com.subdual.research_service.extraction.ai.document;
 
 import com.subdual.research_service.integration.web.FetchedContent;
 import org.jsoup.Jsoup;

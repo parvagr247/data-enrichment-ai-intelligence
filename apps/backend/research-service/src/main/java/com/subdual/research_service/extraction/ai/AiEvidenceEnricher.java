@@ -10,24 +10,22 @@ import com.subdual.research_service.integration.ai.NoOpAiExtractionClient;
 import com.subdual.research_service.integration.ai.dto.AiExtractedFact;
 import com.subdual.research_service.research.model.ConfidenceTier;
 import com.subdual.research_service.research.model.ResearchTarget;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-/**
- * Coordinates structured AI fact extraction, strict anti-hallucination source grounding,
- * and evidence confidence mapping.
- */
 @Component
 public class AiEvidenceEnricher {
+
+    private static final List<String> DEFAULT_TARGET_FIELDS = List.of(
+            "role", "organization", "description", "summary", "headquarters", "technologies"
+    );
 
     private final AiExtractionClient aiExtractionClient;
     private final EvidenceMerger evidenceMerger;
 
-    @Autowired
     public AiEvidenceEnricher(AiExtractionClient aiExtractionClient, EvidenceMerger evidenceMerger) {
         this.aiExtractionClient = aiExtractionClient != null ? aiExtractionClient : new NoOpAiExtractionClient();
         this.evidenceMerger = evidenceMerger != null ? evidenceMerger : new EvidenceMerger();
@@ -47,29 +45,47 @@ public class AiEvidenceEnricher {
             Map<String, EntityResolver.ResolutionResult> resolutions,
             Map<String, EvidenceTuple> attributes
     ) {
-        if (aiExtractionClient == null || documents == null || documents.isEmpty()) {
+        if (!canEnrich(documents)) {
             return;
         }
 
+        List<String> targetFields = resolveTargetFields(target);
         for (ExtractedDocument doc : documents) {
-            if (!CommonEvidenceExtractor.isMatchedDocument(doc, resolutions)) {
-                continue;
+            if (CommonEvidenceExtractor.isMatchedDocument(doc, resolutions)) {
+                processDocumentAiFacts(target, doc, targetFields, attributes);
             }
-
-            List<String> targetFields = (target.targetFields() != null && !target.targetFields().isEmpty())
-                    ? target.targetFields()
-                    : List.of("role", "organization", "description", "summary", "headquarters", "technologies");
-
-            Map<String, AiExtractedFact> facts = aiExtractionClient.extractFacts(
-                    target.displayName(),
-                    target.entityType() != null ? target.entityType().name() : "OTHER",
-                    doc.url(),
-                    doc.cleanText(),
-                    targetFields
-            );
-
-            mergeAiFacts(facts, doc.url(), doc.cleanText(), attributes);
         }
+    }
+
+    private boolean canEnrich(List<ExtractedDocument> documents) {
+        return aiExtractionClient != null && documents != null && !documents.isEmpty();
+    }
+
+    private List<String> resolveTargetFields(ResearchTarget target) {
+        if (target != null && target.targetFields() != null && !target.targetFields().isEmpty()) {
+            return target.targetFields();
+        }
+        return DEFAULT_TARGET_FIELDS;
+    }
+
+    private void processDocumentAiFacts(
+            ResearchTarget target,
+            ExtractedDocument doc,
+            List<String> targetFields,
+            Map<String, EvidenceTuple> attributes
+    ) {
+        String entityType = target != null && target.entityType() != null ? target.entityType().name() : "OTHER";
+        String displayName = target != null ? target.displayName() : "";
+
+        Map<String, AiExtractedFact> facts = aiExtractionClient.extractFacts(
+                displayName,
+                entityType,
+                doc.url(),
+                doc.cleanText(),
+                targetFields
+        );
+
+        mergeAiFacts(facts, doc.url(), doc.cleanText(), attributes);
     }
 
     public void mergeAiFacts(Map<String, AiExtractedFact> facts, String sourceUrl, String docText, Map<String, EvidenceTuple> attributes) {

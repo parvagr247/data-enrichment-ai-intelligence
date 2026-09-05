@@ -6,7 +6,6 @@ import com.subdual.research_service.extraction.support.EntityResolver;
 import com.subdual.research_service.extraction.support.EvidenceMerger;
 import com.subdual.research_service.research.model.ConfidenceTier;
 import com.subdual.research_service.research.model.ResearchTarget;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.net.URI;
@@ -14,9 +13,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Extracts attributes specific to REPOSITORY entities such as repository coordinates and detected technologies.
- */
 @Component
 public class RepositoryEvidenceExtractor {
 
@@ -26,7 +22,6 @@ public class RepositoryEvidenceExtractor {
 
     private final EvidenceMerger evidenceMerger;
 
-    @Autowired
     public RepositoryEvidenceExtractor(EvidenceMerger evidenceMerger) {
         this.evidenceMerger = evidenceMerger != null ? evidenceMerger : new EvidenceMerger();
     }
@@ -62,7 +57,12 @@ public class RepositoryEvidenceExtractor {
             Map<String, EvidenceTuple> attributes,
             Map<String, EntityResolver.ResolutionResult> resolutions
     ) {
-        if (target.displayName() != null && !target.displayName().isBlank()) {
+        populateNameIfPresent(target, attributes);
+        extractTechnologiesFromDocuments(documents, resolutions, attributes);
+    }
+
+    private void populateNameIfPresent(ResearchTarget target, Map<String, EvidenceTuple> attributes) {
+        if (target != null && target.displayName() != null && !target.displayName().isBlank()) {
             attributes.putIfAbsent("name", new EvidenceTuple(
                     target.displayName(),
                     target.canonicalUrl() != null ? target.canonicalUrl() : "",
@@ -70,21 +70,31 @@ public class RepositoryEvidenceExtractor {
                     ConfidenceTier.HIGH
             ));
         }
+    }
 
+    private void extractTechnologiesFromDocuments(
+            List<ExtractedDocument> documents,
+            Map<String, EntityResolver.ResolutionResult> resolutions,
+            Map<String, EvidenceTuple> attributes
+    ) {
         for (ExtractedDocument doc : documents) {
-            if (!CommonEvidenceExtractor.isMatchedDocument(doc, resolutions)) {
-                continue;
+            if (shouldProcessDocument(doc, resolutions)) {
+                extractTechnologiesFromDocument(doc, attributes);
             }
-            String text = doc.cleanText();
-            if (text == null || text.isBlank()) {
-                continue;
-            }
+        }
+    }
 
-            List<String> techs = detectTechnologies(text);
-            if (!techs.isEmpty() && !attributes.containsKey("technologies")) {
-                String joined = String.join(", ", techs);
-                evidenceMerger.mergeAttribute(attributes, "technologies", joined, doc.url(), "Technologies mentioned in documentation: " + joined, ConfidenceTier.MEDIUM);
-            }
+    private boolean shouldProcessDocument(ExtractedDocument doc, Map<String, EntityResolver.ResolutionResult> resolutions) {
+        return CommonEvidenceExtractor.isMatchedDocument(doc, resolutions)
+                && doc.cleanText() != null
+                && !doc.cleanText().isBlank();
+    }
+
+    private void extractTechnologiesFromDocument(ExtractedDocument doc, Map<String, EvidenceTuple> attributes) {
+        List<String> techs = detectTechnologies(doc.cleanText());
+        if (!techs.isEmpty() && !attributes.containsKey("technologies")) {
+            String joined = String.join(", ", techs);
+            evidenceMerger.mergeAttribute(attributes, "technologies", joined, doc.url(), "Technologies mentioned in documentation: " + joined, ConfidenceTier.MEDIUM);
         }
     }
 

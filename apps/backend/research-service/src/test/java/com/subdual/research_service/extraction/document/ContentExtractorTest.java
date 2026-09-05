@@ -1,5 +1,7 @@
 package com.subdual.research_service.extraction.document;
 
+import com.subdual.research_service.extraction.ai.document.ContentExtractor;
+import com.subdual.research_service.extraction.ai.document.ExtractedDocument;
 import com.subdual.research_service.integration.web.FetchedContent;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

@@ -15,7 +15,6 @@ import com.subdual.research_service.research.model.ResearchTarget;
 import com.subdual.research_service.research.pipeline.EntityNormalizer;
 import com.subdual.research_service.research.pipeline.ResearchContext;
 import com.subdual.research_service.research.pipeline.ResearchDiagnostics;
-import com.subdual.research_service.research.pipeline.ResearchExecutionTimer;
 import com.subdual.research_service.research.pipeline.ResearchResponseFactory;
 import com.subdual.research_service.research.pipeline.SourceProcessor;
 import lombok.RequiredArgsConstructor;
@@ -85,50 +84,68 @@ public class ResearchOrchestrator implements ResearchService {
             Map<String, EvidenceTuple> attributes,
             ResearchDiagnostics diagnostics
     ) {
-        if (target == null || target.targetFields() == null || target.targetFields().isEmpty()) {
+        if (!canPerformAdaptiveResearch(target)) {
             return;
         }
 
         int maxAdaptive = target.depth() != null ? target.depth().maxAdaptiveQueries() : 1;
-        if (maxAdaptive <= 0) {
-            log.info("[Pipeline: ADAPTIVE_STOP] Depth '{}' allows 0 adaptive queries. Skipping follow-up search.", target.depth());
-            return;
-        }
-
         int adaptiveQueriesRun = 0;
         while (adaptiveQueriesRun < maxAdaptive) {
-            List<String> missingFields = identifyMissingTargetFields(target, attributes);
-            if (missingFields.isEmpty()) {
-                log.info("[Pipeline: ADAPTIVE_STOP] All requested target fields covered. Stopping early.");
+            boolean shouldContinue = runAdaptiveIteration(target, currentSources, attributes, diagnostics);
+            if (!shouldContinue) {
                 break;
             }
-
-            int currentCount = currentSources.size();
-            int maxTotal = target.depth() != null ? target.depth().maxSources() : 5;
-            int remainingAllowed = maxTotal - currentCount;
-            if (remainingAllowed <= 0) {
-                log.info("[Pipeline: ADAPTIVE_STOP] Source limit reached ({}). Stopping.", currentCount);
-                break;
-            }
-
-            List<DiscoveredSource> newDiscovered = discoveryService.discoverAdaptiveSources(target, missingFields, Math.min(3, remainingAllowed));
             adaptiveQueriesRun++;
-
-            if (newDiscovered == null || newDiscovered.isEmpty()) {
-                log.info("[Pipeline: ADAPTIVE_STOP] No new sources discovered for missing fields {}. Stopping.", missingFields);
-                break;
-            }
-
-            List<ResearchSource> newRanked = filterUnseenSources(newDiscovered, currentSources, target);
-            if (newRanked.isEmpty()) {
-                log.info("[Pipeline: ADAPTIVE_STOP] Discovered candidates already seen or filtered. Stopping.");
-                break;
-            }
-
-            currentSources.addAll(newRanked);
-            Map<String, EvidenceTuple> additionalAttrs = extractEvidence(target, newRanked, diagnostics);
-            mergeAdditionalAttributes(attributes, additionalAttrs);
         }
+    }
+
+    private boolean canPerformAdaptiveResearch(ResearchTarget target) {
+        if (target == null || target.targetFields() == null || target.targetFields().isEmpty()) {
+            return false;
+        }
+        int maxAdaptive = target.depth() != null ? target.depth().maxAdaptiveQueries() : 1;
+        if (maxAdaptive <= 0) {
+            log.info("[Pipeline: ADAPTIVE_STOP] Depth '{}' allows 0 adaptive queries. Skipping follow-up search.", target.depth());
+            return false;
+        }
+        return true;
+    }
+
+    private boolean runAdaptiveIteration(
+            ResearchTarget target,
+            List<ResearchSource> currentSources,
+            Map<String, EvidenceTuple> attributes,
+            ResearchDiagnostics diagnostics
+    ) {
+        List<String> missingFields = identifyMissingTargetFields(target, attributes);
+        if (missingFields.isEmpty()) {
+            log.info("[Pipeline: ADAPTIVE_STOP] All requested target fields covered. Stopping early.");
+            return false;
+        }
+
+        int maxTotal = target.depth() != null ? target.depth().maxSources() : 5;
+        int remainingAllowed = maxTotal - currentSources.size();
+        if (remainingAllowed <= 0) {
+            log.info("[Pipeline: ADAPTIVE_STOP] Source limit reached ({}). Stopping.", currentSources.size());
+            return false;
+        }
+
+        List<DiscoveredSource> newDiscovered = discoveryService.discoverAdaptiveSources(target, missingFields, Math.min(3, remainingAllowed));
+        if (newDiscovered == null || newDiscovered.isEmpty()) {
+            log.info("[Pipeline: ADAPTIVE_STOP] No new sources discovered for missing fields {}. Stopping.", missingFields);
+            return false;
+        }
+
+        List<ResearchSource> newRanked = filterUnseenSources(newDiscovered, currentSources, target);
+        if (newRanked.isEmpty()) {
+            log.info("[Pipeline: ADAPTIVE_STOP] Discovered candidates already seen or filtered. Stopping.");
+            return false;
+        }
+
+        currentSources.addAll(newRanked);
+        Map<String, EvidenceTuple> additionalAttrs = extractEvidence(target, newRanked, diagnostics);
+        mergeAdditionalAttributes(attributes, additionalAttrs);
+        return true;
     }
 
     private List<String> identifyMissingTargetFields(ResearchTarget target, Map<String, EvidenceTuple> attributes) {

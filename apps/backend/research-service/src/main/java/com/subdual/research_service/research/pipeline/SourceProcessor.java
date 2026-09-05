@@ -12,15 +12,13 @@ import java.net.URI;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-
-// It is the data-hygiene and ranking filter in the research pipeline.
-// Raw search engine results (from Tavily or mock providers) contain duplicates, tracking parameters, Malicious URLs, irrelevant domains, and homonym noise.
 @Component
 @RequiredArgsConstructor
 @Slf4j
@@ -28,18 +26,27 @@ public class SourceProcessor {
 
     private static final Set<String> TRACKING_PARAMS = Set.of(
             "utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content",
-            "ref", "ref_src", "fbclid", "gclid", "source", "feature","mc_eid"
-        );
+            "ref", "ref_src", "fbclid", "gclid", "source", "feature", "mc_eid"
+    );
+
+    private static final Set<String> CONFLICTING_PROFESSIONS = Set.of(
+            "dentist", "dentistry", "dental", "dds", "dmd",
+            "actress", "actor", "filmography", "hollywood", "imdb",
+            "realtor", "real estate", "broker",
+            "physician", "pediatrician", "surgeon"
+    );
 
     private final SourceClassifier sourceClassifier;
     private final RelevanceEvaluator relevanceEvaluator;
 
     public List<ResearchSource> processSources(List<DiscoveredSource> rawSources, ResearchTarget target, int maxSources) {
-        return processSources(rawSources, target, maxSources,null);
+        return processSources(rawSources, target, maxSources, null);
     }
 
     public List<ResearchSource> processSources(List<DiscoveredSource> rawSources, ResearchTarget target, int maxSources, String provider) {
-        if (rawSources == null || rawSources.isEmpty()) return List.of();
+        if (rawSources == null || rawSources.isEmpty()) {
+            return List.of();
+        }
 
         Set<String> seenUrls = new HashSet<>();
         List<ResearchSource> processed = new ArrayList<>();
@@ -54,9 +61,8 @@ public class SourceProcessor {
             if (!seenUrls.add(dedupKey)) continue;
 
             if (isConflictingCandidate(ds, normalizedUrl, target)) {
-
-                log.info("[Pipeline: SOURCE_FILTERED] Candidate '{}' rejected due to conflicting identity signals with target '{}'", ds.url(), target.displayName());
-
+                log.info("[Pipeline: SOURCE_FILTERED] Candidate '{}' rejected due to conflicting identity signals with target '{}'",
+                        ds.url(), target.displayName());
                 continue;
             }
 
@@ -66,41 +72,57 @@ public class SourceProcessor {
         return rankAndLimit(processed, target, maxSources);
     }
 
-    private static final Set<String> CONFLICTING_PROFESSIONS = Set.of(
-            "dentist", "dentistry", "dental", "dds", "dmd",
-            "actress", "actor", "filmography", "hollywood", "imdb", "realtor", "real estate", "broker", "physician", "pediatrician", "surgeon" );
-
     private boolean isConflictingCandidate(DiscoveredSource ds, String normalizedUrl, ResearchTarget target) {
-        if (target == null || ds == null) return false;
-
-        if (isPrimaryAnchor(normalizedUrl, target)) return false;
-
-        String text = (ds.title() != null ? ds.title() : "") + " " + (ds.snippet() != null ? ds.snippet() : "");
-        String lower = text.toLowerCase(Locale.ROOT);
-
-        if (target.entityType() == EntityType.PERSON) {
-            String targetContext = getTargetContext(target).toLowerCase(Locale.ROOT);
-            for (String prof : CONFLICTING_PROFESSIONS) {
-                if (lower.contains(prof) && !targetContext.contains(prof)) return true;
-            }
-
-            if (target.seedOrganization() != null && !target.seedOrganization().isBlank()) {
-                String seedOrg = target.seedOrganization().toLowerCase(Locale.ROOT);
-                
-                if (!lower.contains(seedOrg) && !normalizedUrl.toLowerCase(Locale.ROOT)
-                    .contains(seedOrg.replaceAll("[^a-z0-9]", ""))){
-                        if (isConflictingInstitution(lower)) return true;
-                }
-            }
+        if (!shouldCheckCandidateConflicts(ds, normalizedUrl, target)) {
+            return false;
         }
 
+        String lower = extractCandidateText(ds);
+        return hasConflictingProfession(lower, target)
+                || hasConflictingOrganization(lower, normalizedUrl, target);
+    }
+
+    private boolean shouldCheckCandidateConflicts(DiscoveredSource ds, String normalizedUrl, ResearchTarget target) {
+        if (target == null || ds == null) return false;
+        if (isPrimaryAnchor(normalizedUrl, target)) return false;
+        return target.entityType() == EntityType.PERSON;
+    }
+
+    private String extractCandidateText(DiscoveredSource ds) {
+        String title = ds.title() != null ? ds.title() : "";
+        String snippet = ds.snippet() != null ? ds.snippet() : "";
+        return (title + " " + snippet).toLowerCase(Locale.ROOT);
+    }
+
+    private boolean hasConflictingProfession(String lowerText, ResearchTarget target) {
+        String targetContext = getTargetContext(target).toLowerCase(Locale.ROOT);
+        for (String prof : CONFLICTING_PROFESSIONS) {
+            if (lowerText.contains(prof) && !targetContext.contains(prof)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean hasConflictingOrganization(String lowerText, String normalizedUrl, ResearchTarget target) {
+        if (target.seedOrganization() == null || target.seedOrganization().isBlank()) {
+            return false;
+        }
+
+        String seedOrg = target.seedOrganization().toLowerCase(Locale.ROOT);
+        String cleanOrg = seedOrg.replaceAll("[^a-z0-9]", "");
+        boolean urlHasOrg = normalizedUrl.toLowerCase(Locale.ROOT).contains(cleanOrg);
+
+        if (!lowerText.contains(seedOrg) && !urlHasOrg) {
+            return isConflictingInstitution(lowerText);
+        }
         return false;
     }
 
     private boolean isConflictingInstitution(String text) {
         return text.contains("d. e. shaw") || text.contains("deshaw")
-            || text.contains("iit delhi") || text.contains("iit bombay")
-            || text.contains("dental clinic") || text.contains("family dentistry");
+                || text.contains("iit delhi") || text.contains("iit bombay")
+                || text.contains("dental clinic") || text.contains("family dentistry");
     }
 
     private String getTargetContext(ResearchTarget target) {
@@ -127,7 +149,6 @@ public class SourceProcessor {
 
     private ResearchSource buildResearchSource(DiscoveredSource ds, String normalizedUrl, ResearchTarget target, String provider) {
         String title = resolveTitle(ds.title(), normalizedUrl);
-        
         String sourceType = classifySourceType(normalizedUrl, ds.sourceType(), target);
 
         Instant retrievedAt = ds.retrievedAt() != null ? ds.retrievedAt() : Instant.now();
@@ -136,8 +157,8 @@ public class SourceProcessor {
         String domain = ResearchSource.extractDomain(normalizedUrl);
 
         return new ResearchSource(
-            normalizedUrl, title, sourceType, retrievedAt,
-            providerRelevance, qualityScore, ds.snippet(), domain, provider
+                normalizedUrl, title, sourceType, retrievedAt,
+                providerRelevance, qualityScore, ds.snippet(), domain, provider
         );
     }
 
@@ -146,53 +167,51 @@ public class SourceProcessor {
     }
 
     private List<ResearchSource> rankAndLimit(List<ResearchSource> sources, ResearchTarget target, int maxSources) {
-        sources.sort((s1, s2) -> {
+        sources.sort(createRankingComparator(target));
+        int limit = Math.min(sources.size(), Math.max(1, maxSources));
+        return sources.subList(0, limit);
+    }
+
+    private Comparator<ResearchSource> createRankingComparator(ResearchTarget target) {
+        return (s1, s2) -> {
             boolean isAnchor1 = isPrimaryAnchor(s1, target);
             boolean isAnchor2 = isPrimaryAnchor(s2, target);
             if (isAnchor1 && !isAnchor2) return -1;
             if (!isAnchor1 && isAnchor2) return 1;
             return Double.compare(s2.qualityScore(), s1.qualityScore());
-        });
-        int limit = Math.min(sources.size(), Math.max(1, maxSources));
-        return sources.subList(0, limit);
+        };
     }
 
     private boolean isPrimaryAnchor(ResearchSource source, ResearchTarget target) {
-
         if (source == null || target == null) return false;
         if ("PRIMARY_ANCHOR".equalsIgnoreCase(source.sourceType())) return true;
         if (target.canonicalUrl() != null && isSameUrl(source.url(), target.canonicalUrl())) return true;
         if (target.rawUrl() != null && isSameUrl(source.url(), target.rawUrl())) return true;
-
         return false;
     }
 
     private boolean isSameUrl(String u1, String u2) {
         if (u1 == null || u2 == null) return false;
-
         String s1 = u1.trim().replaceFirst("^https?://(www\\.)?", "").replaceFirst("/+$", "");
-
         String s2 = u2.trim().replaceFirst("^https?://(www\\.)?", "").replaceFirst("/+$", "");
-
         return s1.equalsIgnoreCase(s2);
     }
 
     public String normalizeDiscoveredUrl(String rawUrl) {
+        if (rawUrl == null || rawUrl.isBlank()) {
+            return null;
+        }
+
         try {
             URI uri = URI.create(rawUrl.trim());
-
-            String scheme = uri.getScheme() != null ? uri.getScheme().toLowerCase(Locale.ROOT) : null;
-
-            if (!isSupportedScheme(scheme)) return null;
-
-            String host = uri.getHost() != null ? uri.getHost().toLowerCase(Locale.ROOT) : null;
-
-            if (host == null || host.isBlank()) return null;
+            String scheme = extractValidScheme(uri);
+            String host = extractValidHost(uri);
+            if (scheme == null || host == null) {
+                return null;
+            }
 
             String portPart = formatPort(scheme, uri.getPort());
-
             String path = normalizePath(uri.getPath());
-
             String cleanQuery = cleanTrackingQuery(uri.getQuery());
 
             return scheme + "://" + host + portPart + path + cleanQuery;
@@ -201,8 +220,14 @@ public class SourceProcessor {
         }
     }
 
-    private boolean isSupportedScheme(String scheme) {
-        return "http".equals(scheme) || "https".equals(scheme);
+    private String extractValidScheme(URI uri) {
+        String scheme = uri.getScheme() != null ? uri.getScheme().toLowerCase(Locale.ROOT) : null;
+        return ("http".equals(scheme) || "https".equals(scheme)) ? scheme : null;
+    }
+
+    private String extractValidHost(URI uri) {
+        String host = uri.getHost() != null ? uri.getHost().toLowerCase(Locale.ROOT) : null;
+        return (host != null && !host.isBlank()) ? host : null;
     }
 
     private String deduplicationKey(String url) {

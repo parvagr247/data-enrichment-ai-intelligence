@@ -56,19 +56,28 @@ public class DeterministicRelevanceEvaluator implements RelevanceEvaluator {
         try {
             URI targetUri = URI.create(target.canonicalUrl());
             URI sourceUri = URI.create(url);
-            String targetHost = extractHost(targetUri);
-            String sourceHost = extractHost(sourceUri);
 
-            if (!targetHost.isBlank() && targetHost.equalsIgnoreCase(sourceHost) && !"OFFICIAL_WEBSITE".equals(sourceType)) {
-                score = Math.min(1.00, score + 0.05);
-            }
+            double scoreWithHost = applySameHostBonus(score, targetUri, sourceUri, sourceType);
+            return applySlugMatchBonus(scoreWithHost, targetUri, url);
+        } catch (Exception ignored) {
+            return score;
+        }
+    }
 
-            String targetSlug = extractSlug(targetUri.getPath());
-            if (targetSlug != null && !targetSlug.isBlank() && url.toLowerCase(Locale.ROOT).contains(targetSlug.toLowerCase(Locale.ROOT))) {
-                score = Math.min(1.00, score + 0.10);
-            }
-        } catch (Exception ignored) {}
+    private double applySameHostBonus(double score, URI targetUri, URI sourceUri, String sourceType) {
+        String targetHost = extractHost(targetUri);
+        String sourceHost = extractHost(sourceUri);
+        if (!targetHost.isBlank() && targetHost.equalsIgnoreCase(sourceHost) && !"OFFICIAL_WEBSITE".equals(sourceType)) {
+            return Math.min(1.00, score + 0.05);
+        }
+        return score;
+    }
 
+    private double applySlugMatchBonus(double score, URI targetUri, String url) {
+        String targetSlug = extractSlug(targetUri.getPath());
+        if (targetSlug != null && !targetSlug.isBlank() && url.toLowerCase(Locale.ROOT).contains(targetSlug.toLowerCase(Locale.ROOT))) {
+            return Math.min(1.00, score + 0.10);
+        }
         return score;
     }
 

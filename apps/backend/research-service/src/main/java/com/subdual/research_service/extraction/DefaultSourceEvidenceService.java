@@ -1,15 +1,15 @@
 package com.subdual.research_service.extraction;
 
+import com.subdual.research_service.api.dto.EvidenceTuple;
+import com.subdual.research_service.config.ResearchPipelineProperties;
+import com.subdual.research_service.extraction.ai.document.ContentExtractor;
+import com.subdual.research_service.extraction.ai.document.ExtractedDocument;
+import com.subdual.research_service.extraction.support.EntityResolver;
 import com.subdual.research_service.integration.web.FetchedContent;
 import com.subdual.research_service.integration.web.WebContentFetcher;
-import com.subdual.research_service.config.ResearchPipelineProperties;
-import com.subdual.research_service.research.pipeline.ResearchDiagnostics;
 import com.subdual.research_service.research.model.ResearchSource;
 import com.subdual.research_service.research.model.ResearchTarget;
-import com.subdual.research_service.api.dto.EvidenceTuple;
-import com.subdual.research_service.extraction.document.ContentExtractor;
-import com.subdual.research_service.extraction.document.ExtractedDocument;
-import com.subdual.research_service.extraction.support.EntityResolver;
+import com.subdual.research_service.research.pipeline.ResearchDiagnostics;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -54,6 +54,11 @@ public class DefaultSourceEvidenceService implements SourceEvidenceService {
         return evidenceExtractor.extractEvidence(target, rankedSources, extractedDocuments, resolutions);
     }
 
+    @Override
+    public void applyTargetFields(ResearchTarget target, Map<String, EvidenceTuple> attributes) {
+        evidenceExtractor.applyTargetFields(target, attributes);
+    }
+
     private void processSource(
             ResearchTarget target,
             ResearchSource source,
@@ -61,33 +66,62 @@ public class DefaultSourceEvidenceService implements SourceEvidenceService {
             Map<String, EntityResolver.ResolutionResult> resolutions,
             ResearchDiagnostics diagnostics
     ) {
-        FetchedContent fetched = webContentFetcher.fetch(source.url());
-        ExtractedDocument doc;
-        if (fetched == null || !fetched.success()) {
-            handleInaccessibleSource(target, source, fetched, diagnostics);
-            if (source.snippet() != null && source.snippet().trim().length() > 50) {
-                log.info("Using search provider snippet fallback for blocked source '{}'", source.url());
-                doc = new ExtractedDocument(source.url(), source.title(), source.snippet(), null, source.domain());
-            } else {
-                return;
-            }
-        } else {
-            int maxLength = pipelineProperties != null ? pipelineProperties.maxContentLength() : 50000;
-            doc = contentExtractor.extract(fetched, maxLength);
+        ExtractedDocument doc = fetchOrFallbackDocument(source, target, diagnostics);
+        if (doc == null) {
+            return;
         }
 
         EntityResolver.ResolutionResult resolution = entityResolver.resolve(target, doc);
+        recordResolution(source, doc, resolution, resolutions);
+        filterAndAddDocument(doc, source.url(), resolution, extractedDocuments);
+    }
 
+    private ExtractedDocument fetchOrFallbackDocument(
+            ResearchSource source,
+            ResearchTarget target,
+            ResearchDiagnostics diagnostics
+    ) {
+        FetchedContent fetched = webContentFetcher.fetch(source.url());
+        if (fetched != null && fetched.success()) {
+            int maxLength = pipelineProperties != null ? pipelineProperties.maxContentLength() : 50000;
+            return contentExtractor.extract(fetched, maxLength);
+        }
+
+        handleInaccessibleSource(target, source, fetched, diagnostics);
+        return resolveSnippetFallbackDocument(source);
+    }
+
+    private ExtractedDocument resolveSnippetFallbackDocument(ResearchSource source) {
+        if (source.snippet() != null && source.snippet().trim().length() > 50) {
+            log.info("Using search provider snippet fallback for blocked source '{}'", source.url());
+            return new ExtractedDocument(source.url(), source.title(), source.snippet(), null, source.domain());
+        }
+        return null;
+    }
+
+    private void recordResolution(
+            ResearchSource source,
+            ExtractedDocument doc,
+            EntityResolver.ResolutionResult resolution,
+            Map<String, EntityResolver.ResolutionResult> resolutions
+    ) {
         resolutions.put(source.url(), resolution);
         if (doc.url() != null) {
             resolutions.put(doc.url(), resolution);
         }
+    }
 
+    private void filterAndAddDocument(
+            ExtractedDocument doc,
+            String sourceUrl,
+            EntityResolver.ResolutionResult resolution,
+            List<ExtractedDocument> extractedDocuments
+    ) {
         if (resolution != null && resolution.matched()) {
             extractedDocuments.add(doc);
         } else {
             String reason = resolution != null ? resolution.reason() : "resolution failed";
-            log.info("Document '{}' rejected by entity resolution: {}", source.url(), reason);
+            log.info("Document '{}' rejected by entity resolution: {}", sourceUrl, reason);
         }
     }
 
@@ -138,10 +172,5 @@ public class DefaultSourceEvidenceService implements SourceEvidenceService {
         String s1 = u1.trim().replaceFirst("^https?://(www\\.)?", "").replaceFirst("/+$", "");
         String s2 = u2.trim().replaceFirst("^https?://(www\\.)?", "").replaceFirst("/+$", "");
         return s1.equalsIgnoreCase(s2);
-    }
-
-    @Override
-    public void applyTargetFields(ResearchTarget target, Map<String, EvidenceTuple> attributes) {
-        evidenceExtractor.applyTargetFields(target, attributes);
     }
 }

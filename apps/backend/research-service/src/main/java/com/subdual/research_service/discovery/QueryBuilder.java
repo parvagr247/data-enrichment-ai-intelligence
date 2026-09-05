@@ -5,54 +5,113 @@ import com.subdual.research_service.research.model.ResearchTarget;
 import org.springframework.stereotype.Component;
 
 import java.net.URI;
-import java.util.Locale;
-
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 @Component
 public class QueryBuilder {
 
     public List<String> buildDiscoveryQueries(ResearchTarget target) {
-        if (target == null) {
+        if (!isValidTarget(target)) {
             return List.of();
         }
 
         List<String> queries = new ArrayList<>();
-        String primary = buildDiscoveryQuery(target);
-        if (!primary.isBlank()) {
-            queries.add(primary);
-        }
-
-        if (hasDistinctDisplayName(target)) {
-            String name = target.displayName().trim();
-            if (target.seedOrganization() != null && !target.seedOrganization().isBlank()) {
-                queries.add("\"" + name + "\" \"" + target.seedOrganization().trim() + "\"");
-            }
-            if (target.seedRole() != null && !target.seedRole().isBlank()) {
-                queries.add("\"" + name + "\" \"" + target.seedRole().trim() + "\"");
-            }
-        }
+        addPrimaryQuery(queries, target);
+        addAlternativeQueries(queries, target);
 
         return queries.stream().distinct().limit(3).toList();
     }
 
     public String buildAdaptiveQuery(ResearchTarget target, List<String> missingFields) {
-        if (target == null || missingFields == null || missingFields.isEmpty()) {
+        if (!hasMissingFields(missingFields) || !isValidTarget(target)) {
             return buildDiscoveryQuery(target);
         }
 
-        String name = hasDistinctDisplayName(target) ? target.displayName().trim() : "";
         String fieldTerm = normalizeFieldForQuery(missingFields.get(0));
+        return constructAdaptiveQuery(target, fieldTerm);
+    }
 
-        if (!name.isBlank()) {
-            if (target.seedOrganization() != null && !target.seedOrganization().isBlank()) {
-                return "\"" + name + "\" " + fieldTerm + " \"" + target.seedOrganization().trim() + "\"";
-            }
-            return "\"" + name + "\" " + fieldTerm;
+    public String buildDiscoveryQuery(ResearchTarget target) {
+        if (!isValidTarget(target)) {
+            return "";
         }
 
+        if (hasUrlAndName(target)) {
+            return buildUrlAndNameQuery(target);
+        }
+
+        if (hasValidHttpUrl(target)) {
+            return buildUrlOnlyQuery(target);
+        }
+
+        if (hasDistinctDisplayName(target)) {
+            return buildNameOnlyQuery(target);
+        }
+
+        return resolveFallbackQuery(target);
+    }
+
+    private boolean isValidTarget(ResearchTarget target) {
+        return target != null;
+    }
+
+    private boolean hasMissingFields(List<String> missingFields) {
+        return missingFields != null && !missingFields.isEmpty();
+    }
+
+    private boolean hasUrlAndName(ResearchTarget target) {
+        return hasValidHttpUrl(target) && hasDistinctDisplayName(target);
+    }
+
+    private boolean hasValidHttpUrl(ResearchTarget target) {
+        String url = target.canonicalUrl();
+        return url != null && (url.startsWith("http://") || url.startsWith("https://"));
+    }
+
+    private boolean hasDistinctDisplayName(ResearchTarget target) {
+        String name = target.displayName();
+        return name != null
+                && !name.isBlank()
+                && !name.equalsIgnoreCase(target.canonicalUrl())
+                && !name.equalsIgnoreCase(target.rawUrl());
+    }
+
+    private void addPrimaryQuery(List<String> queries, ResearchTarget target) {
+        String primary = buildDiscoveryQuery(target);
+        if (!primary.isBlank()) {
+            queries.add(primary);
+        }
+    }
+
+    private void addAlternativeQueries(List<String> queries, ResearchTarget target) {
+        if (!hasDistinctDisplayName(target)) {
+            return;
+        }
+
+        String name = target.displayName().trim();
+        if (target.seedOrganization() != null && !target.seedOrganization().isBlank()) {
+            queries.add("\"" + name + "\" \"" + target.seedOrganization().trim() + "\"");
+        }
+        if (target.seedRole() != null && !target.seedRole().isBlank()) {
+            queries.add("\"" + name + "\" \"" + target.seedRole().trim() + "\"");
+        }
+    }
+
+    private String constructAdaptiveQuery(ResearchTarget target, String fieldTerm) {
+        String name = hasDistinctDisplayName(target) ? target.displayName().trim() : "";
+        if (!name.isBlank()) {
+            return buildNamedAdaptiveQuery(target, name, fieldTerm);
+        }
         return fieldTerm + " " + buildDiscoveryQuery(target);
+    }
+
+    private String buildNamedAdaptiveQuery(ResearchTarget target, String name, String fieldTerm) {
+        if (target.seedOrganization() != null && !target.seedOrganization().isBlank()) {
+            return "\"" + name + "\" " + fieldTerm + " \"" + target.seedOrganization().trim() + "\"";
+        }
+        return "\"" + name + "\" " + fieldTerm;
     }
 
     private String normalizeFieldForQuery(String field) {
@@ -68,38 +127,6 @@ public class QueryBuilder {
             case "products", "services" -> "products services";
             default -> lower;
         };
-    }
-
-    public String buildDiscoveryQuery(ResearchTarget target) {
-        if (target == null) {
-            return "";
-        }
-
-        boolean hasUrl = hasValidHttpUrl(target);
-        boolean hasName = hasDistinctDisplayName(target);
-
-        if (hasUrl && hasName) {
-            return buildUrlAndNameQuery(target);
-        } else if (hasUrl) {
-            return buildUrlOnlyQuery(target);
-        } else if (hasName) {
-            return buildNameOnlyQuery(target);
-        }
-
-        return target.canonicalUrl() != null ? target.canonicalUrl() : "";
-    }
-
-    private boolean hasValidHttpUrl(ResearchTarget target) {
-        String url = target.canonicalUrl();
-        return url != null && (url.startsWith("http://") || url.startsWith("https://"));
-    }
-
-    private boolean hasDistinctDisplayName(ResearchTarget target) {
-        String name = target.displayName();
-        return name != null
-                && !name.isBlank()
-                && !name.equalsIgnoreCase(target.canonicalUrl())
-                && !name.equalsIgnoreCase(target.rawUrl());
     }
 
     private String buildUrlAndNameQuery(ResearchTarget target) {
@@ -146,6 +173,10 @@ public class QueryBuilder {
             case WEBSITE -> name + " official website";
             case OTHER -> name + " overview";
         };
+    }
+
+    private String resolveFallbackQuery(ResearchTarget target) {
+        return target.canonicalUrl() != null ? target.canonicalUrl() : "";
     }
 
     private String extractCleanHost(URI uri) {
