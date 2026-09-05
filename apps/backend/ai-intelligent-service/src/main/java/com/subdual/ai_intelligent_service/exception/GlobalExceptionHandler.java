@@ -20,40 +20,43 @@ public class GlobalExceptionHandler {
     private static final String INSTANCE_PATH = "/api/v1/ai/extract";
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ProblemDetail handleValidationException(MethodArgumentNotValidException ex) {
+    public ProblemDetail handleValidationException(MethodArgumentNotValidException ex, jakarta.servlet.http.HttpServletRequest request) {
         String detailMessage = ex.getBindingResult().getFieldErrors().stream()
                 .findFirst()
                 .map(FieldError::getDefaultMessage)
                 .orElse("Validation failed for extraction payload");
 
-        log.warn("Validation failure on {}: {}", INSTANCE_PATH, detailMessage);
+        String path = request != null ? request.getRequestURI() : "/api/v1/ai";
+        log.warn("Validation failure on {}: {}", path, detailMessage);
         ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, detailMessage);
         problemDetail.setType(DEFAULT_TYPE);
         problemDetail.setTitle("Bad Request");
-        problemDetail.setInstance(URI.create(INSTANCE_PATH));
+        problemDetail.setInstance(URI.create(path));
         return problemDetail;
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
-    public ProblemDetail handleMessageNotReadable(HttpMessageNotReadableException ex) {
-        log.warn("Malformed JSON on {}: {}", INSTANCE_PATH, ex.getMessage());
+    public ProblemDetail handleMessageNotReadable(HttpMessageNotReadableException ex, jakarta.servlet.http.HttpServletRequest request) {
+        String path = request != null ? request.getRequestURI() : "/api/v1/ai";
+        log.warn("Malformed JSON on {}: {}", path, ex.getMessage());
         ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Malformed JSON request payload");
         problemDetail.setType(DEFAULT_TYPE);
         problemDetail.setTitle("Bad Request");
-        problemDetail.setInstance(URI.create(INSTANCE_PATH));
+        problemDetail.setInstance(URI.create(path));
         return problemDetail;
     }
 
     @ExceptionHandler(Exception.class)
-    public ProblemDetail handleGenericException(Exception ex) {
-        log.error("Unhandled error on {}: ", INSTANCE_PATH, ex);
+    public ProblemDetail handleGenericException(Exception ex, jakarta.servlet.http.HttpServletRequest request) {
+        String path = request != null ? request.getRequestURI() : "/api/v1/ai";
+        log.error("Unhandled error on {}: ", path, ex);
         ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(
                 HttpStatus.INTERNAL_SERVER_ERROR,
-                "An unexpected internal error occurred during AI extraction"
+                "An unexpected internal error occurred"
         );
         problemDetail.setType(DEFAULT_TYPE);
         problemDetail.setTitle("Internal Server Error");
-        problemDetail.setInstance(URI.create(INSTANCE_PATH));
+        problemDetail.setInstance(URI.create(path));
         return problemDetail;
     }
 }

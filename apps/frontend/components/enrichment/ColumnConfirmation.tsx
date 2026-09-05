@@ -9,6 +9,8 @@ interface ColumnConfirmationProps {
   onMappingChange: (mapping: ColumnMapping) => void;
   entityType: EntityType;
   onEntityTypeChange: (type: EntityType) => void;
+  userRequirement?: string;
+  onUserRequirementChange?: (req: string) => void;
   onStartEnrichment: () => void;
   onBack: () => void;
   isSubmitting?: boolean;
@@ -20,6 +22,8 @@ export function ColumnConfirmation({
   onMappingChange,
   entityType,
   onEntityTypeChange,
+  userRequirement = "",
+  onUserRequirementChange,
   onStartEnrichment,
   onBack,
   isSubmitting = false,
@@ -164,6 +168,50 @@ export function ColumnConfirmation({
                 {t}
               </button>
             ))}
+          </div>
+        </div>
+
+        {/* Optional Enrichment Requirement Input (Task 18) */}
+        <div className="p-3.5 border border-zinc-200 dark:border-zinc-800 rounded-lg bg-zinc-50/50 dark:bg-zinc-800/30 md:col-span-2 space-y-2">
+          <div className="flex items-center justify-between">
+            <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+              What would you like to find? (Optional)
+            </label>
+            <span className="text-[11px] text-zinc-400">
+              Leave blank for automatic enrichment
+            </span>
+          </div>
+          <textarea
+            value={userRequirement}
+            onChange={(e) => onUserRequirementChange && onUserRequirementChange(e.target.value)}
+            disabled={isSubmitting}
+            placeholder="e.g. Find current company, current role, education, technical skills and location"
+            rows={2}
+            className="w-full text-xs bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-md p-2 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+          />
+          <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-zinc-500">
+            <span className="text-zinc-400">Quick suggestions:</span>
+            <button
+              type="button"
+              onClick={() => onUserRequirementChange && onUserRequirementChange("Find current company, current role, education and technical skills")}
+              className="px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-300 transition-colors"
+            >
+              Company, Role, Education &amp; Skills
+            </button>
+            <button
+              type="button"
+              onClick={() => onUserRequirementChange && onUserRequirementChange("Find company headquarters, industry, products, and employee count")}
+              className="px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-300 transition-colors"
+            >
+              Headquarters, Products &amp; Team Size
+            </button>
+            <button
+              type="button"
+              onClick={() => onUserRequirementChange && onUserRequirementChange("")}
+              className="px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 transition-colors"
+            >
+              Clear (Auto)
+            </button>
           </div>
         </div>
       </div>

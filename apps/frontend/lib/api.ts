@@ -44,6 +44,7 @@ export interface ResearchRequest {
   entityType?: EntityType;
   targetFields?: string[];
   depth?: 'SHALLOW' | 'NORMAL' | 'DEEP';
+  userRequirement?: string;
 }
 
 export interface ResearchResult {
@@ -210,7 +211,8 @@ export async function getResearchJob(jobId: string): Promise<ResearchJobResponse
 export async function enrichSingleRecord(
   row: RawRow,
   mapping: ColumnMapping,
-  defaultEntityType: EntityType = 'PERSON'
+  defaultEntityType: EntityType = 'PERSON',
+  userRequirement?: string
 ): Promise<ResearchResponse> {
   const name = mapping.nameColumn ? row[mapping.nameColumn]?.trim() : undefined;
   const url = mapping.urlColumn ? row[mapping.urlColumn]?.trim() : undefined;
@@ -231,7 +233,39 @@ export async function enrichSingleRecord(
     organization: org || undefined,
     role: role || undefined,
     entityType,
+    userRequirement: userRequirement?.trim() || undefined,
   });
+}
+
+export interface BatchEnrichmentJobRequest {
+  datasetName?: string;
+  userRequirement?: string;
+  defaultEntityType?: string;
+  columnMapping?: ColumnMapping;
+  rows: RawRow[];
+}
+
+export async function submitDatasetEnrichmentJob(
+  req: BatchEnrichmentJobRequest
+): Promise<ResearchJobResponse> {
+  const res = await fetch(`${DATASET_URL}/api/v1/enrichment/jobs`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify(req),
+  });
+  return handleResponse<ResearchJobResponse>(res);
+}
+
+export async function getDatasetEnrichmentJob(
+  jobId: string
+): Promise<ResearchJobResponse> {
+  const res = await fetch(`${DATASET_URL}/api/v1/enrichment/jobs/${encodeURIComponent(jobId)}`, {
+    headers: { Accept: 'application/json' },
+  });
+  return handleResponse<ResearchJobResponse>(res);
 }
 
 /**

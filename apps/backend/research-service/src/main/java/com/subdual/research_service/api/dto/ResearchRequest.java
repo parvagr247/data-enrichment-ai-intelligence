@@ -22,22 +22,28 @@ public record ResearchRequest(
 
         ResearchDepth depth,
 
-        Map<String, Object> metadata
+        Map<String, Object> metadata,
+
+        String userRequirement
 ) {
+    public ResearchRequest(String url, EntityType entityType, String name, String organization, String role, List<String> targetFields, ResearchDepth depth, Map<String, Object> metadata) {
+        this(url, entityType, name, organization, role, targetFields, depth, metadata, null);
+    }
+
     public ResearchRequest(String url, EntityType entityType, String name, String organization, String role, List<String> targetFields, Map<String, Object> metadata) {
-        this(url, entityType, name, organization, role, targetFields, ResearchDepth.NORMAL, metadata);
+        this(url, entityType, name, organization, role, targetFields, ResearchDepth.NORMAL, metadata, null);
     }
 
     public ResearchRequest(String url, EntityType entityType, String name, Map<String, Object> metadata) {
-        this(url, entityType, name, null, null, null, ResearchDepth.NORMAL, metadata);
+        this(url, entityType, name, null, null, null, ResearchDepth.NORMAL, metadata, null);
     }
 
     public ResearchRequest(String url, EntityType entityType, String name) {
-        this(url, entityType, name, null, null, null, ResearchDepth.NORMAL, null);
+        this(url, entityType, name, null, null, null, ResearchDepth.NORMAL, null, null);
     }
 
     public ResearchRequest(String url) {
-        this(url, EntityType.OTHER, null, null, null, null, ResearchDepth.NORMAL, null);
+        this(url, EntityType.OTHER, null, null, null, null, ResearchDepth.NORMAL, null, null);
     }
 
     public ResearchRequest {

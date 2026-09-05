@@ -34,4 +34,10 @@ management:
     db:
       enabled: false
 
+services:
+  research:
+    url: ${RESEARCH_SERVICE_URL:http://localhost:9741}
+  ai:
+    url: ${AI_INTELLIGENT_SERVICE_URL:http://localhost:9742}
+
 

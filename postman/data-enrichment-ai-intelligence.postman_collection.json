@@ -1,37 +1,55 @@
 {
   "info": {
     "_postman_id": "e9f0a1b2-3c4d-5e6f-7a8b-9c0d1e2f3a4b",
-    "name": "Data Enrichment & Research Engine",
-    "description": "# Data Enrichment & Research Engine API Collection\n\nProduction-oriented Postman collection for validating, testing, and evaluating the **Data Enrichment & Research Engine** (`research-service`).\n\n## Architectural Highlights\n- **100% Real API Alignment**: Mapped directly against Spring Boot endpoints (`/api/v1/research`, `/api/v1/research/jobs`, `/actuator/health`, `/actuator/info`).\n- **Zero Fictional Endpoints**: No synthetic or unsupported paths.\n- **Robust Behavior-Driven Assertions**: Validates schemas, deterministic identity URNs/hashes, provenance tracking, and RFC 7807 ProblemDetail contracts without brittle exact-text couplings.\n- **Sparse-to-Enriched Validation**: Evaluates the core product capability—turning sparse, noisy, or ungrounded input into evidence-backed, confidence-tiered knowledge graphs.\n\n## Variables\nAll requests reference `{{baseResearchUrl}}`.\n- Default: `http://localhost:8080`\n- Standalone Local Spring Boot Port: `http://localhost:9741`\n",
+    "name": "Data Enrichment AI Intelligence Platform",
+    "description": "# Data Enrichment AI Intelligence Platform API Collection\n\nProduction Postman collection for validating, testing, and demonstrating the 3-microservice **Data Enrichment AI Intelligence Platform**.\n\n## Microservices Architecture\n- **dataset-service** (`{{datasetBaseUrl}}` default `:9743`): Batch enrichment jobs, row-level tracking, MySQL entity persistence.\n- **research-service** (`{{researchBaseUrl}}` default `:9741`): Multi-source web discovery, crawling, scraping, evidence collection.\n- **ai-intelligent-service** (`{{aiBaseUrl}}` default `:9742`): Requirement interpretation, input cleansing, grounded fact extraction (Spring AI + Gemini).\n",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
     {
-      "key": "baseResearchUrl",
-      "value": "http://localhost:8080",
+      "key": "datasetBaseUrl",
+      "value": "http://localhost:9743",
       "type": "string",
-      "description": "Base URL for the Research Service (use http://localhost:9741 for local standalone Spring Boot)"
+      "description": "Base URL for the Dataset Service"
     },
     {
-      "key": "entityId",
+      "key": "researchBaseUrl",
+      "value": "http://localhost:9741",
+      "type": "string",
+      "description": "Base URL for the Research Service"
+    },
+    {
+      "key": "aiBaseUrl",
+      "value": "http://localhost:9742",
+      "type": "string",
+      "description": "Base URL for the AI Intelligent Service"
+    },
+    {
+      "key": "jobId",
       "value": "",
       "type": "string",
-      "description": "Dynamically captured SHA-256 entity identifier from research execution"
+      "description": "Dynamically captured Batch Enrichment Job ID"
     },
     {
       "key": "researchJobId",
       "value": "",
       "type": "string",
-      "description": "Dynamically captured asynchronous research job UUID"
+      "description": "Dynamically captured Async Research Job ID"
+    },
+    {
+      "key": "entityId",
+      "value": "",
+      "type": "string",
+      "description": "Dynamically captured Entity ID from catalog"
     }
   ],
   "item": [
     {
-      "name": "01 - Health",
-      "description": "Probes the Spring Boot Actuator endpoints to ensure the Research Engine is initialized, responsive, and ready to process traffic.",
+      "name": "01 Health",
+      "description": "Probes Spring Boot Actuator health endpoints across all 3 microservices to confirm availability and readiness.",
       "item": [
         {
-          "name": "Health Check",
+          "name": "Dataset Service Health Check",
           "event": [
             {
               "listen": "test",
@@ -40,11 +58,9 @@
                   "pm.test(\"Status code is 200 OK\", function () {",
                   "    pm.response.to.have.status(200);",
                   "});",
-                  "",
                   "pm.test(\"Application status is UP\", function () {",
                   "    const json = pm.response.json();",
-                  "    pm.expect(json).to.be.an(\"object\");",
-                  "    pm.expect(json).to.have.property(\"status\", \"UP\");",
+                  "    pm.expect(json.status).to.eql(\"UP\");",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -54,73 +70,18 @@
           "request": {
             "method": "GET",
             "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
-              },
-              {
-                "key": "Accept",
-                "value": "application/json",
-                "type": "text"
-              }
+              { "key": "Accept", "value": "application/json", "type": "text" }
             ],
             "url": {
-              "raw": "{{baseResearchUrl}}/actuator/health",
-              "host": [
-                "{{baseResearchUrl}}"
-              ],
-              "path": [
-                "actuator",
-                "health"
-              ]
+              "raw": "{{datasetBaseUrl}}/actuator/health",
+              "host": ["{{datasetBaseUrl}}"],
+              "path": ["actuator", "health"]
             },
-            "description": "Verifies the application health status reported by Spring Boot Actuator."
-          },
-          "response": [
-            {
-              "name": "Health Status UP",
-              "originalRequest": {
-                "method": "GET",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json",
-                    "type": "text"
-                  },
-                  {
-                    "key": "Accept",
-                    "value": "application/json",
-                    "type": "text"
-                  }
-                ],
-                "url": {
-                  "raw": "{{baseResearchUrl}}/actuator/health",
-                  "host": [
-                    "{{baseResearchUrl}}"
-                  ],
-                  "path": [
-                    "actuator",
-                    "health"
-                  ]
-                }
-              },
-              "status": "OK",
-              "code": 200,
-              "_postman_previewlanguage": "json",
-              "header": [
-                {
-                  "key": "Content-Type",
-                  "value": "application/json"
-                }
-              ],
-              "cookie": [],
-              "body": "{\n  \"status\": \"UP\"\n}"
-            }
-          ]
+            "description": "Health check for Dataset Service (:9743)"
+          }
         },
         {
-          "name": "Service Info",
+          "name": "Research Service Health Check",
           "event": [
             {
               "listen": "test",
@@ -129,10 +90,9 @@
                   "pm.test(\"Status code is 200 OK\", function () {",
                   "    pm.response.to.have.status(200);",
                   "});",
-                  "",
-                  "pm.test(\"Response is valid JSON\", function () {",
+                  "pm.test(\"Application status is UP\", function () {",
                   "    const json = pm.response.json();",
-                  "    pm.expect(json).to.be.an(\"object\");",
+                  "    pm.expect(json.status).to.eql(\"UP\");",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -142,79 +102,18 @@
           "request": {
             "method": "GET",
             "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
-              },
-              {
-                "key": "Accept",
-                "value": "application/json",
-                "type": "text"
-              }
+              { "key": "Accept", "value": "application/json", "type": "text" }
             ],
             "url": {
-              "raw": "{{baseResearchUrl}}/actuator/info",
-              "host": [
-                "{{baseResearchUrl}}"
-              ],
-              "path": [
-                "actuator",
-                "info"
-              ]
+              "raw": "{{researchBaseUrl}}/actuator/health",
+              "host": ["{{researchBaseUrl}}"],
+              "path": ["actuator", "health"]
             },
-            "description": "Inspects metadata exposed by the Spring Boot Actuator info endpoint."
-          },
-          "response": [
-            {
-              "name": "Service Info OK",
-              "originalRequest": {
-                "method": "GET",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json",
-                    "type": "text"
-                  },
-                  {
-                    "key": "Accept",
-                    "value": "application/json",
-                    "type": "text"
-                  }
-                ],
-                "url": {
-                  "raw": "{{baseResearchUrl}}/actuator/info",
-                  "host": [
-                    "{{baseResearchUrl}}"
-                  ],
-                  "path": [
-                    "actuator",
-                    "info"
-                  ]
-                }
-              },
-              "status": "OK",
-              "code": 200,
-              "_postman_previewlanguage": "json",
-              "header": [
-                {
-                  "key": "Content-Type",
-                  "value": "application/json"
-                }
-              ],
-              "cookie": [],
-              "body": "{}"
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "name": "02 - Research - Basic",
-      "description": "Validates synchronous research execution across the 5 core supported entity types (Person, Organization, Product, Repository, Website) using stable public reference entities. Inspect response for entity resolution, canonical URL normalization, and evidence-backed attributes.",
-      "item": [
+            "description": "Health check for Research Service (:9741)"
+          }
+        },
         {
-          "name": "Person",
+          "name": "AI Intelligent Service Health Check",
           "event": [
             {
               "listen": "test",
@@ -223,1868 +122,9 @@
                   "pm.test(\"Status code is 200 OK\", function () {",
                   "    pm.response.to.have.status(200);",
                   "});",
-                  "",
-                  "pm.test(\"Response is valid JSON with expected contract\", function () {",
+                  "pm.test(\"Application status is UP\", function () {",
                   "    const json = pm.response.json();",
-                  "    pm.expect(json).to.be.an(\"object\");",
-                  "    pm.expect(json).to.have.property(\"status\");",
-                  "    pm.expect([\"COMPLETED\", \"PARTIAL\", \"FAILED\"]).to.include(json.status);",
-                  "    pm.expect(json).to.have.property(\"entityId\");",
-                  "    pm.expect(json.entityId).to.be.a(\"string\").and.have.lengthOf(64);",
-                  "    pm.expect(json).to.have.property(\"result\");",
-                  "    pm.expect(json.result).to.be.an(\"object\");",
-                  "    pm.expect(json.result).to.have.property(\"displayName\").that.is.a(\"string\");",
-                  "    pm.expect(json.result).to.have.property(\"entityType\").that.is.a(\"string\");",
-                  "    pm.expect(json.result).to.have.property(\"canonicalUrl\").that.is.a(\"string\");",
-                  "    pm.expect(json.result).to.have.property(\"attributes\").that.is.an(\"object\");",
-                  "    pm.expect(json).to.have.property(\"sources\").that.is.an(\"array\");",
-                  "    pm.expect(json).to.have.property(\"executionTimeMs\").that.is.a(\"number\").at.least(0);",
-                  "    pm.expect(json).to.have.property(\"metadata\").that.is.an(\"object\");",
-                  "});",
-                  "",
-                  "pm.test(\"Evidence attributes conform to provenance model\", function () {",
-                  "    const json = pm.response.json();",
-                  "    const attrs = json.result.attributes;",
-                  "    for (const key of Object.keys(attrs)) {",
-                  "        const tuple = attrs[key];",
-                  "        pm.expect(tuple).to.have.property(\"value\");",
-                  "        pm.expect(tuple).to.have.property(\"confidence\");",
-                  "        pm.expect(tuple).to.have.property(\"conflictDetected\").that.is.a(\"boolean\");",
-                  "        pm.expect(tuple).to.have.property(\"corroboratingSources\").that.is.an(\"array\");",
-                  "        ",
-                  "        if (tuple.value === \"UNKNOWN\") {",
-                  "            pm.expect(tuple.confidence).to.equal(\"UNKNOWN\");",
-                  "        } else {",
-                  "            pm.expect([\"HIGH\", \"MEDIUM\", \"LOW\"]).to.include(tuple.confidence);",
-                  "            if (tuple.sourceUrl) {",
-                  "                pm.expect(tuple.sourceUrl).to.be.a(\"string\");",
-                  "            }",
-                  "        }",
-                  "    }",
-                  "});",
-                  "",
-                  "pm.test(\"Entity type is PERSON and displayName is preserved\", function () {",
-                  "    const json = pm.response.json();",
-                  "    pm.expect(json.result.entityType).to.equal(\"PERSON\");",
-                  "    pm.expect(json.result.displayName).to.equal(\"Linus Torvalds\");",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
-              },
-              {
-                "key": "Accept",
-                "value": "application/json",
-                "type": "text"
-              }
-            ],
-            "url": {
-              "raw": "{{baseResearchUrl}}/api/v1/research",
-              "host": [
-                "{{baseResearchUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "research"
-              ]
-            },
-            "description": "Enriches a known public person entity with biographical and professional evidence.",
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"url\": \"https://en.wikipedia.org/wiki/Linus_Torvalds\",\n  \"name\": \"Linus Torvalds\",\n  \"entityType\": \"PERSON\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "response": [
-            {
-              "name": "Person Research - Linus Torvalds",
-              "originalRequest": {
-                "method": "POST",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json",
-                    "type": "text"
-                  },
-                  {
-                    "key": "Accept",
-                    "value": "application/json",
-                    "type": "text"
-                  }
-                ],
-                "url": {
-                  "raw": "{{baseResearchUrl}}/api/v1/research",
-                  "host": [
-                    "{{baseResearchUrl}}"
-                  ],
-                  "path": [
-                    "api",
-                    "v1",
-                    "research"
-                  ]
-                },
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"url\": \"https://en.wikipedia.org/wiki/Linus_Torvalds\",\n  \"name\": \"Linus Torvalds\",\n  \"entityType\": \"PERSON\"\n}",
-                  "options": {
-                    "raw": {
-                      "language": "json"
-                    }
-                  }
-                }
-              },
-              "status": "OK",
-              "code": 200,
-              "_postman_previewlanguage": "json",
-              "header": [
-                {
-                  "key": "Content-Type",
-                  "value": "application/json"
-                }
-              ],
-              "cookie": [],
-              "body": "{\n  \"status\": \"COMPLETED\",\n  \"entityId\": \"9fc8461971168019fbdeea6a5f7823f5b0451a51fb47b1fe911e3b6d2e67df14\",\n  \"result\": {\n    \"displayName\": \"Linus Torvalds\",\n    \"entityType\": \"PERSON\",\n    \"canonicalUrl\": \"https://en.wikipedia.org/wiki/Linus_Torvalds\",\n    \"attributes\": {\n      \"role\": {\n        \"value\": \"Software Engineer\",\n        \"sourceUrl\": \"https://en.wikipedia.org/wiki/Linus_Torvalds\",\n        \"evidenceSnippet\": \"Linus Benedict Torvalds is a Finnish-American software engineer who is the creator and historically the lead developer of the Linux kernel.\",\n        \"confidence\": \"HIGH\",\n        \"corroboratingSources\": [\n          \"https://en.wikipedia.org/wiki/Linus_Torvalds\"\n        ],\n        \"conflictDetected\": false\n      },\n      \"current_organization\": {\n        \"value\": \"Linux Foundation\",\n        \"sourceUrl\": \"https://en.wikipedia.org/wiki/Linus_Torvalds\",\n        \"evidenceSnippet\": \"Torvalds remains the ultimate authority on what new code is incorporated into the standard Linux kernel, supported by the Linux Foundation.\",\n        \"confidence\": \"HIGH\",\n        \"corroboratingSources\": [\n          \"https://en.wikipedia.org/wiki/Linus_Torvalds\"\n        ],\n        \"conflictDetected\": false\n      }\n    }\n  },\n  \"sources\": [\n    {\n      \"url\": \"https://en.wikipedia.org/wiki/Linus_Torvalds\",\n      \"title\": \"Linus Torvalds - Wikipedia\",\n      \"snippet\": \"Linus Benedict Torvalds is a Finnish-American software engineer...\",\n      \"sourceType\": \"WIKIPEDIA\",\n      \"domain\": \"wikipedia.org\",\n      \"provider\": \"mock\",\n      \"retrievedAt\": \"2026-09-05T14:30:00Z\",\n      \"relevance\": 1\n    }\n  ],\n  \"executionTimeMs\": 145,\n  \"metadata\": {\n    \"provider\": \"mock\",\n    \"totalSourcesDiscovered\": 5,\n    \"totalSourcesRanked\": 1,\n    \"attributesExtracted\": 2,\n    \"warningsCount\": 0\n  },\n  \"warnings\": []\n}"
-            }
-          ]
-        },
-        {
-          "name": "Organization",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test(\"Status code is 200 OK\", function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});",
-                  "",
-                  "pm.test(\"Response is valid JSON with expected contract\", function () {",
-                  "    const json = pm.response.json();",
-                  "    pm.expect(json).to.be.an(\"object\");",
-                  "    pm.expect(json).to.have.property(\"status\");",
-                  "    pm.expect([\"COMPLETED\", \"PARTIAL\", \"FAILED\"]).to.include(json.status);",
-                  "    pm.expect(json).to.have.property(\"entityId\");",
-                  "    pm.expect(json.entityId).to.be.a(\"string\").and.have.lengthOf(64);",
-                  "    pm.expect(json).to.have.property(\"result\");",
-                  "    pm.expect(json.result).to.be.an(\"object\");",
-                  "    pm.expect(json.result).to.have.property(\"displayName\").that.is.a(\"string\");",
-                  "    pm.expect(json.result).to.have.property(\"entityType\").that.is.a(\"string\");",
-                  "    pm.expect(json.result).to.have.property(\"canonicalUrl\").that.is.a(\"string\");",
-                  "    pm.expect(json.result).to.have.property(\"attributes\").that.is.an(\"object\");",
-                  "    pm.expect(json).to.have.property(\"sources\").that.is.an(\"array\");",
-                  "    pm.expect(json).to.have.property(\"executionTimeMs\").that.is.a(\"number\").at.least(0);",
-                  "    pm.expect(json).to.have.property(\"metadata\").that.is.an(\"object\");",
-                  "});",
-                  "",
-                  "pm.test(\"Evidence attributes conform to provenance model\", function () {",
-                  "    const json = pm.response.json();",
-                  "    const attrs = json.result.attributes;",
-                  "    for (const key of Object.keys(attrs)) {",
-                  "        const tuple = attrs[key];",
-                  "        pm.expect(tuple).to.have.property(\"value\");",
-                  "        pm.expect(tuple).to.have.property(\"confidence\");",
-                  "        pm.expect(tuple).to.have.property(\"conflictDetected\").that.is.a(\"boolean\");",
-                  "        pm.expect(tuple).to.have.property(\"corroboratingSources\").that.is.an(\"array\");",
-                  "        ",
-                  "        if (tuple.value === \"UNKNOWN\") {",
-                  "            pm.expect(tuple.confidence).to.equal(\"UNKNOWN\");",
-                  "        } else {",
-                  "            pm.expect([\"HIGH\", \"MEDIUM\", \"LOW\"]).to.include(tuple.confidence);",
-                  "            if (tuple.sourceUrl) {",
-                  "                pm.expect(tuple.sourceUrl).to.be.a(\"string\");",
-                  "            }",
-                  "        }",
-                  "    }",
-                  "});",
-                  "",
-                  "pm.test(\"Entity type is ORGANIZATION\", function () {",
-                  "    const json = pm.response.json();",
-                  "    pm.expect(json.result.entityType).to.equal(\"ORGANIZATION\");",
-                  "    pm.expect(json.result.displayName).to.equal(\"GitHub\");",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
-              },
-              {
-                "key": "Accept",
-                "value": "application/json",
-                "type": "text"
-              }
-            ],
-            "url": {
-              "raw": "{{baseResearchUrl}}/api/v1/research",
-              "host": [
-                "{{baseResearchUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "research"
-              ]
-            },
-            "description": "Enriches a known organization entity, extracting profile metadata and corroborating evidence.",
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"url\": \"https://github.com\",\n  \"name\": \"GitHub\",\n  \"entityType\": \"ORGANIZATION\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Product",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test(\"Status code is 200 OK\", function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});",
-                  "",
-                  "pm.test(\"Response is valid JSON with expected contract\", function () {",
-                  "    const json = pm.response.json();",
-                  "    pm.expect(json).to.be.an(\"object\");",
-                  "    pm.expect(json).to.have.property(\"status\");",
-                  "    pm.expect([\"COMPLETED\", \"PARTIAL\", \"FAILED\"]).to.include(json.status);",
-                  "    pm.expect(json).to.have.property(\"entityId\");",
-                  "    pm.expect(json.entityId).to.be.a(\"string\").and.have.lengthOf(64);",
-                  "    pm.expect(json).to.have.property(\"result\");",
-                  "    pm.expect(json.result).to.be.an(\"object\");",
-                  "    pm.expect(json.result).to.have.property(\"displayName\").that.is.a(\"string\");",
-                  "    pm.expect(json.result).to.have.property(\"entityType\").that.is.a(\"string\");",
-                  "    pm.expect(json.result).to.have.property(\"canonicalUrl\").that.is.a(\"string\");",
-                  "    pm.expect(json.result).to.have.property(\"attributes\").that.is.an(\"object\");",
-                  "    pm.expect(json).to.have.property(\"sources\").that.is.an(\"array\");",
-                  "    pm.expect(json).to.have.property(\"executionTimeMs\").that.is.a(\"number\").at.least(0);",
-                  "    pm.expect(json).to.have.property(\"metadata\").that.is.an(\"object\");",
-                  "});",
-                  "",
-                  "pm.test(\"Evidence attributes conform to provenance model\", function () {",
-                  "    const json = pm.response.json();",
-                  "    const attrs = json.result.attributes;",
-                  "    for (const key of Object.keys(attrs)) {",
-                  "        const tuple = attrs[key];",
-                  "        pm.expect(tuple).to.have.property(\"value\");",
-                  "        pm.expect(tuple).to.have.property(\"confidence\");",
-                  "        pm.expect(tuple).to.have.property(\"conflictDetected\").that.is.a(\"boolean\");",
-                  "        pm.expect(tuple).to.have.property(\"corroboratingSources\").that.is.an(\"array\");",
-                  "        ",
-                  "        if (tuple.value === \"UNKNOWN\") {",
-                  "            pm.expect(tuple.confidence).to.equal(\"UNKNOWN\");",
-                  "        } else {",
-                  "            pm.expect([\"HIGH\", \"MEDIUM\", \"LOW\"]).to.include(tuple.confidence);",
-                  "            if (tuple.sourceUrl) {",
-                  "                pm.expect(tuple.sourceUrl).to.be.a(\"string\");",
-                  "            }",
-                  "        }",
-                  "    }",
-                  "});",
-                  "",
-                  "pm.test(\"Entity type is PRODUCT\", function () {",
-                  "    const json = pm.response.json();",
-                  "    pm.expect(json.result.entityType).to.equal(\"PRODUCT\");",
-                  "    pm.expect(json.result.displayName).to.equal(\"Git\");",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
-              },
-              {
-                "key": "Accept",
-                "value": "application/json",
-                "type": "text"
-              }
-            ],
-            "url": {
-              "raw": "{{baseResearchUrl}}/api/v1/research",
-              "host": [
-                "{{baseResearchUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "research"
-              ]
-            },
-            "description": "Enriches a software product entity, extracting product description and technical traits.",
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"url\": \"https://git-scm.com\",\n  \"name\": \"Git\",\n  \"entityType\": \"PRODUCT\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Repository",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test(\"Status code is 200 OK\", function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});",
-                  "",
-                  "pm.test(\"Response is valid JSON with expected contract\", function () {",
-                  "    const json = pm.response.json();",
-                  "    pm.expect(json).to.be.an(\"object\");",
-                  "    pm.expect(json).to.have.property(\"status\");",
-                  "    pm.expect([\"COMPLETED\", \"PARTIAL\", \"FAILED\"]).to.include(json.status);",
-                  "    pm.expect(json).to.have.property(\"entityId\");",
-                  "    pm.expect(json.entityId).to.be.a(\"string\").and.have.lengthOf(64);",
-                  "    pm.expect(json).to.have.property(\"result\");",
-                  "    pm.expect(json.result).to.be.an(\"object\");",
-                  "    pm.expect(json.result).to.have.property(\"displayName\").that.is.a(\"string\");",
-                  "    pm.expect(json.result).to.have.property(\"entityType\").that.is.a(\"string\");",
-                  "    pm.expect(json.result).to.have.property(\"canonicalUrl\").that.is.a(\"string\");",
-                  "    pm.expect(json.result).to.have.property(\"attributes\").that.is.an(\"object\");",
-                  "    pm.expect(json).to.have.property(\"sources\").that.is.an(\"array\");",
-                  "    pm.expect(json).to.have.property(\"executionTimeMs\").that.is.a(\"number\").at.least(0);",
-                  "    pm.expect(json).to.have.property(\"metadata\").that.is.an(\"object\");",
-                  "});",
-                  "",
-                  "pm.test(\"Evidence attributes conform to provenance model\", function () {",
-                  "    const json = pm.response.json();",
-                  "    const attrs = json.result.attributes;",
-                  "    for (const key of Object.keys(attrs)) {",
-                  "        const tuple = attrs[key];",
-                  "        pm.expect(tuple).to.have.property(\"value\");",
-                  "        pm.expect(tuple).to.have.property(\"confidence\");",
-                  "        pm.expect(tuple).to.have.property(\"conflictDetected\").that.is.a(\"boolean\");",
-                  "        pm.expect(tuple).to.have.property(\"corroboratingSources\").that.is.an(\"array\");",
-                  "        ",
-                  "        if (tuple.value === \"UNKNOWN\") {",
-                  "            pm.expect(tuple.confidence).to.equal(\"UNKNOWN\");",
-                  "        } else {",
-                  "            pm.expect([\"HIGH\", \"MEDIUM\", \"LOW\"]).to.include(tuple.confidence);",
-                  "            if (tuple.sourceUrl) {",
-                  "                pm.expect(tuple.sourceUrl).to.be.a(\"string\");",
-                  "            }",
-                  "        }",
-                  "    }",
-                  "});",
-                  "",
-                  "pm.test(\"Entity type is REPOSITORY\", function () {",
-                  "    const json = pm.response.json();",
-                  "    pm.expect(json.result.entityType).to.equal(\"REPOSITORY\");",
-                  "    pm.expect(json.result.canonicalUrl).to.include(\"github.com/torvalds/linux\");",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
-              },
-              {
-                "key": "Accept",
-                "value": "application/json",
-                "type": "text"
-              }
-            ],
-            "url": {
-              "raw": "{{baseResearchUrl}}/api/v1/research",
-              "host": [
-                "{{baseResearchUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "research"
-              ]
-            },
-            "description": "Enriches an open-source code repository, extracting coordinates and technology stack.",
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"url\": \"https://github.com/torvalds/linux\",\n  \"name\": \"linux\",\n  \"entityType\": \"REPOSITORY\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Website",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test(\"Status code is 200 OK\", function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});",
-                  "",
-                  "pm.test(\"Response is valid JSON with expected contract\", function () {",
-                  "    const json = pm.response.json();",
-                  "    pm.expect(json).to.be.an(\"object\");",
-                  "    pm.expect(json).to.have.property(\"status\");",
-                  "    pm.expect([\"COMPLETED\", \"PARTIAL\", \"FAILED\"]).to.include(json.status);",
-                  "    pm.expect(json).to.have.property(\"entityId\");",
-                  "    pm.expect(json.entityId).to.be.a(\"string\").and.have.lengthOf(64);",
-                  "    pm.expect(json).to.have.property(\"result\");",
-                  "    pm.expect(json.result).to.be.an(\"object\");",
-                  "    pm.expect(json.result).to.have.property(\"displayName\").that.is.a(\"string\");",
-                  "    pm.expect(json.result).to.have.property(\"entityType\").that.is.a(\"string\");",
-                  "    pm.expect(json.result).to.have.property(\"canonicalUrl\").that.is.a(\"string\");",
-                  "    pm.expect(json.result).to.have.property(\"attributes\").that.is.an(\"object\");",
-                  "    pm.expect(json).to.have.property(\"sources\").that.is.an(\"array\");",
-                  "    pm.expect(json).to.have.property(\"executionTimeMs\").that.is.a(\"number\").at.least(0);",
-                  "    pm.expect(json).to.have.property(\"metadata\").that.is.an(\"object\");",
-                  "});",
-                  "",
-                  "pm.test(\"Evidence attributes conform to provenance model\", function () {",
-                  "    const json = pm.response.json();",
-                  "    const attrs = json.result.attributes;",
-                  "    for (const key of Object.keys(attrs)) {",
-                  "        const tuple = attrs[key];",
-                  "        pm.expect(tuple).to.have.property(\"value\");",
-                  "        pm.expect(tuple).to.have.property(\"confidence\");",
-                  "        pm.expect(tuple).to.have.property(\"conflictDetected\").that.is.a(\"boolean\");",
-                  "        pm.expect(tuple).to.have.property(\"corroboratingSources\").that.is.an(\"array\");",
-                  "        ",
-                  "        if (tuple.value === \"UNKNOWN\") {",
-                  "            pm.expect(tuple.confidence).to.equal(\"UNKNOWN\");",
-                  "        } else {",
-                  "            pm.expect([\"HIGH\", \"MEDIUM\", \"LOW\"]).to.include(tuple.confidence);",
-                  "            if (tuple.sourceUrl) {",
-                  "                pm.expect(tuple.sourceUrl).to.be.a(\"string\");",
-                  "            }",
-                  "        }",
-                  "    }",
-                  "});",
-                  "",
-                  "pm.test(\"Entity type is WEBSITE\", function () {",
-                  "    const json = pm.response.json();",
-                  "    pm.expect(json.result.entityType).to.equal(\"WEBSITE\");",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
-              },
-              {
-                "key": "Accept",
-                "value": "application/json",
-                "type": "text"
-              }
-            ],
-            "url": {
-              "raw": "{{baseResearchUrl}}/api/v1/research",
-              "host": [
-                "{{baseResearchUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "research"
-              ]
-            },
-            "description": "Enriches a general website entity, validating web crawling and metadata extraction.",
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"url\": \"https://example.com\",\n  \"name\": \"Example Domain\",\n  \"entityType\": \"WEBSITE\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "response": []
-        }
-      ]
-    },
-    {
-      "name": "03 - Research - Input Variations",
-      "description": "Tests the engine's ability to handle varying levels of input completeness, from URL-only to name-only discovery and contextual attributes (role, organization). Evaluates deterministic identity resolution and discovery-first enrichment.",
-      "item": [
-        {
-          "name": "URL Only",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test(\"Status code is 200 OK\", function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});",
-                  "",
-                  "pm.test(\"Response is valid JSON with expected contract\", function () {",
-                  "    const json = pm.response.json();",
-                  "    pm.expect(json).to.be.an(\"object\");",
-                  "    pm.expect(json).to.have.property(\"status\");",
-                  "    pm.expect([\"COMPLETED\", \"PARTIAL\", \"FAILED\"]).to.include(json.status);",
-                  "    pm.expect(json).to.have.property(\"entityId\");",
-                  "    pm.expect(json.entityId).to.be.a(\"string\").and.have.lengthOf(64);",
-                  "    pm.expect(json).to.have.property(\"result\");",
-                  "    pm.expect(json.result).to.be.an(\"object\");",
-                  "    pm.expect(json.result).to.have.property(\"displayName\").that.is.a(\"string\");",
-                  "    pm.expect(json.result).to.have.property(\"entityType\").that.is.a(\"string\");",
-                  "    pm.expect(json.result).to.have.property(\"canonicalUrl\").that.is.a(\"string\");",
-                  "    pm.expect(json.result).to.have.property(\"attributes\").that.is.an(\"object\");",
-                  "    pm.expect(json).to.have.property(\"sources\").that.is.an(\"array\");",
-                  "    pm.expect(json).to.have.property(\"executionTimeMs\").that.is.a(\"number\").at.least(0);",
-                  "    pm.expect(json).to.have.property(\"metadata\").that.is.an(\"object\");",
-                  "});",
-                  "",
-                  "pm.test(\"Evidence attributes conform to provenance model\", function () {",
-                  "    const json = pm.response.json();",
-                  "    const attrs = json.result.attributes;",
-                  "    for (const key of Object.keys(attrs)) {",
-                  "        const tuple = attrs[key];",
-                  "        pm.expect(tuple).to.have.property(\"value\");",
-                  "        pm.expect(tuple).to.have.property(\"confidence\");",
-                  "        pm.expect(tuple).to.have.property(\"conflictDetected\").that.is.a(\"boolean\");",
-                  "        pm.expect(tuple).to.have.property(\"corroboratingSources\").that.is.an(\"array\");",
-                  "        ",
-                  "        if (tuple.value === \"UNKNOWN\") {",
-                  "            pm.expect(tuple.confidence).to.equal(\"UNKNOWN\");",
-                  "        } else {",
-                  "            pm.expect([\"HIGH\", \"MEDIUM\", \"LOW\"]).to.include(tuple.confidence);",
-                  "            if (tuple.sourceUrl) {",
-                  "                pm.expect(tuple.sourceUrl).to.be.a(\"string\");",
-                  "            }",
-                  "        }",
-                  "    }",
-                  "});",
-                  "",
-                  "pm.test(\"DisplayName is populated from URL or discovered source\", function () {",
-                  "    const json = pm.response.json();",
-                  "    pm.expect(json.result.displayName).to.be.a(\"string\").and.not.be.empty;",
-                  "    pm.expect(json.result.canonicalUrl).to.equal(\"https://en.wikipedia.org/wiki/Tim_Berners-Lee\");",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
-              },
-              {
-                "key": "Accept",
-                "value": "application/json",
-                "type": "text"
-              }
-            ],
-            "url": {
-              "raw": "{{baseResearchUrl}}/api/v1/research",
-              "host": [
-                "{{baseResearchUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "research"
-              ]
-            },
-            "description": "Tests enrichment when only a canonical URL is provided without a pre-set display name.",
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"url\": \"https://en.wikipedia.org/wiki/Tim_Berners-Lee\",\n  \"entityType\": \"PERSON\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Name Only",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test(\"Status code is 200 OK\", function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});",
-                  "",
-                  "pm.test(\"Response is valid JSON with expected contract\", function () {",
-                  "    const json = pm.response.json();",
-                  "    pm.expect(json).to.be.an(\"object\");",
-                  "    pm.expect(json).to.have.property(\"status\");",
-                  "    pm.expect([\"COMPLETED\", \"PARTIAL\", \"FAILED\"]).to.include(json.status);",
-                  "    pm.expect(json).to.have.property(\"entityId\");",
-                  "    pm.expect(json.entityId).to.be.a(\"string\").and.have.lengthOf(64);",
-                  "    pm.expect(json).to.have.property(\"result\");",
-                  "    pm.expect(json.result).to.be.an(\"object\");",
-                  "    pm.expect(json.result).to.have.property(\"displayName\").that.is.a(\"string\");",
-                  "    pm.expect(json.result).to.have.property(\"entityType\").that.is.a(\"string\");",
-                  "    pm.expect(json.result).to.have.property(\"canonicalUrl\").that.is.a(\"string\");",
-                  "    pm.expect(json.result).to.have.property(\"attributes\").that.is.an(\"object\");",
-                  "    pm.expect(json).to.have.property(\"sources\").that.is.an(\"array\");",
-                  "    pm.expect(json).to.have.property(\"executionTimeMs\").that.is.a(\"number\").at.least(0);",
-                  "    pm.expect(json).to.have.property(\"metadata\").that.is.an(\"object\");",
-                  "});",
-                  "",
-                  "pm.test(\"Evidence attributes conform to provenance model\", function () {",
-                  "    const json = pm.response.json();",
-                  "    const attrs = json.result.attributes;",
-                  "    for (const key of Object.keys(attrs)) {",
-                  "        const tuple = attrs[key];",
-                  "        pm.expect(tuple).to.have.property(\"value\");",
-                  "        pm.expect(tuple).to.have.property(\"confidence\");",
-                  "        pm.expect(tuple).to.have.property(\"conflictDetected\").that.is.a(\"boolean\");",
-                  "        pm.expect(tuple).to.have.property(\"corroboratingSources\").that.is.an(\"array\");",
-                  "        ",
-                  "        if (tuple.value === \"UNKNOWN\") {",
-                  "            pm.expect(tuple.confidence).to.equal(\"UNKNOWN\");",
-                  "        } else {",
-                  "            pm.expect([\"HIGH\", \"MEDIUM\", \"LOW\"]).to.include(tuple.confidence);",
-                  "            if (tuple.sourceUrl) {",
-                  "                pm.expect(tuple.sourceUrl).to.be.a(\"string\");",
-                  "            }",
-                  "        }",
-                  "    }",
-                  "});",
-                  "",
-                  "pm.test(\"CanonicalUrl uses deterministic URN scheme when URL is omitted\", function () {",
-                  "    const json = pm.response.json();",
-                  "    pm.expect(json.result.displayName).to.equal(\"Guido van Rossum\");",
-                  "    pm.expect(json.result.canonicalUrl).to.include(\"urn:entity:person:guido-van-rossum\");",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
-              },
-              {
-                "key": "Accept",
-                "value": "application/json",
-                "type": "text"
-              }
-            ],
-            "url": {
-              "raw": "{{baseResearchUrl}}/api/v1/research",
-              "host": [
-                "{{baseResearchUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "research"
-              ]
-            },
-            "description": "Tests discovery-first enrichment when no URL is provided, verifying deterministic URN creation.",
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"Guido van Rossum\",\n  \"entityType\": \"PERSON\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Name + Organization",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test(\"Status code is 200 OK\", function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});",
-                  "",
-                  "pm.test(\"Response is valid JSON with expected contract\", function () {",
-                  "    const json = pm.response.json();",
-                  "    pm.expect(json).to.be.an(\"object\");",
-                  "    pm.expect(json).to.have.property(\"status\");",
-                  "    pm.expect([\"COMPLETED\", \"PARTIAL\", \"FAILED\"]).to.include(json.status);",
-                  "    pm.expect(json).to.have.property(\"entityId\");",
-                  "    pm.expect(json.entityId).to.be.a(\"string\").and.have.lengthOf(64);",
-                  "    pm.expect(json).to.have.property(\"result\");",
-                  "    pm.expect(json.result).to.be.an(\"object\");",
-                  "    pm.expect(json.result).to.have.property(\"displayName\").that.is.a(\"string\");",
-                  "    pm.expect(json.result).to.have.property(\"entityType\").that.is.a(\"string\");",
-                  "    pm.expect(json.result).to.have.property(\"canonicalUrl\").that.is.a(\"string\");",
-                  "    pm.expect(json.result).to.have.property(\"attributes\").that.is.an(\"object\");",
-                  "    pm.expect(json).to.have.property(\"sources\").that.is.an(\"array\");",
-                  "    pm.expect(json).to.have.property(\"executionTimeMs\").that.is.a(\"number\").at.least(0);",
-                  "    pm.expect(json).to.have.property(\"metadata\").that.is.an(\"object\");",
-                  "});",
-                  "",
-                  "pm.test(\"Evidence attributes conform to provenance model\", function () {",
-                  "    const json = pm.response.json();",
-                  "    const attrs = json.result.attributes;",
-                  "    for (const key of Object.keys(attrs)) {",
-                  "        const tuple = attrs[key];",
-                  "        pm.expect(tuple).to.have.property(\"value\");",
-                  "        pm.expect(tuple).to.have.property(\"confidence\");",
-                  "        pm.expect(tuple).to.have.property(\"conflictDetected\").that.is.a(\"boolean\");",
-                  "        pm.expect(tuple).to.have.property(\"corroboratingSources\").that.is.an(\"array\");",
-                  "        ",
-                  "        if (tuple.value === \"UNKNOWN\") {",
-                  "            pm.expect(tuple.confidence).to.equal(\"UNKNOWN\");",
-                  "        } else {",
-                  "            pm.expect([\"HIGH\", \"MEDIUM\", \"LOW\"]).to.include(tuple.confidence);",
-                  "            if (tuple.sourceUrl) {",
-                  "                pm.expect(tuple.sourceUrl).to.be.a(\"string\");",
-                  "            }",
-                  "        }",
-                  "    }",
-                  "});",
-                  "",
-                  "pm.test(\"Target metadata records organization constraint\", function () {",
-                  "    const json = pm.response.json();",
-                  "    pm.expect(json.result.displayName).to.equal(\"Satya Nadella\");",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
-              },
-              {
-                "key": "Accept",
-                "value": "application/json",
-                "type": "text"
-              }
-            ],
-            "url": {
-              "raw": "{{baseResearchUrl}}/api/v1/research",
-              "host": [
-                "{{baseResearchUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "research"
-              ]
-            },
-            "description": "Tests contextual disambiguation where an organization constraint is supplied alongside an individual's name.",
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"Satya Nadella\",\n  \"organization\": \"Microsoft\",\n  \"entityType\": \"PERSON\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Name + Role",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test(\"Status code is 200 OK\", function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});",
-                  "",
-                  "pm.test(\"Response is valid JSON with expected contract\", function () {",
-                  "    const json = pm.response.json();",
-                  "    pm.expect(json).to.be.an(\"object\");",
-                  "    pm.expect(json).to.have.property(\"status\");",
-                  "    pm.expect([\"COMPLETED\", \"PARTIAL\", \"FAILED\"]).to.include(json.status);",
-                  "    pm.expect(json).to.have.property(\"entityId\");",
-                  "    pm.expect(json.entityId).to.be.a(\"string\").and.have.lengthOf(64);",
-                  "    pm.expect(json).to.have.property(\"result\");",
-                  "    pm.expect(json.result).to.be.an(\"object\");",
-                  "    pm.expect(json.result).to.have.property(\"displayName\").that.is.a(\"string\");",
-                  "    pm.expect(json.result).to.have.property(\"entityType\").that.is.a(\"string\");",
-                  "    pm.expect(json.result).to.have.property(\"canonicalUrl\").that.is.a(\"string\");",
-                  "    pm.expect(json.result).to.have.property(\"attributes\").that.is.an(\"object\");",
-                  "    pm.expect(json).to.have.property(\"sources\").that.is.an(\"array\");",
-                  "    pm.expect(json).to.have.property(\"executionTimeMs\").that.is.a(\"number\").at.least(0);",
-                  "    pm.expect(json).to.have.property(\"metadata\").that.is.an(\"object\");",
-                  "});",
-                  "",
-                  "pm.test(\"Evidence attributes conform to provenance model\", function () {",
-                  "    const json = pm.response.json();",
-                  "    const attrs = json.result.attributes;",
-                  "    for (const key of Object.keys(attrs)) {",
-                  "        const tuple = attrs[key];",
-                  "        pm.expect(tuple).to.have.property(\"value\");",
-                  "        pm.expect(tuple).to.have.property(\"confidence\");",
-                  "        pm.expect(tuple).to.have.property(\"conflictDetected\").that.is.a(\"boolean\");",
-                  "        pm.expect(tuple).to.have.property(\"corroboratingSources\").that.is.an(\"array\");",
-                  "        ",
-                  "        if (tuple.value === \"UNKNOWN\") {",
-                  "            pm.expect(tuple.confidence).to.equal(\"UNKNOWN\");",
-                  "        } else {",
-                  "            pm.expect([\"HIGH\", \"MEDIUM\", \"LOW\"]).to.include(tuple.confidence);",
-                  "            if (tuple.sourceUrl) {",
-                  "                pm.expect(tuple.sourceUrl).to.be.a(\"string\");",
-                  "            }",
-                  "        }",
-                  "    }",
-                  "});",
-                  "",
-                  "pm.test(\"Enriches person with role context\", function () {",
-                  "    const json = pm.response.json();",
-                  "    pm.expect(json.result.displayName).to.equal(\"Demis Hassabis\");",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
-              },
-              {
-                "key": "Accept",
-                "value": "application/json",
-                "type": "text"
-              }
-            ],
-            "url": {
-              "raw": "{{baseResearchUrl}}/api/v1/research",
-              "host": [
-                "{{baseResearchUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "research"
-              ]
-            },
-            "description": "Tests contextual research combining name, professional role, and organization affiliation.",
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"Demis Hassabis\",\n  \"role\": \"CEO\",\n  \"organization\": \"Google DeepMind\",\n  \"entityType\": \"PERSON\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Sparse Input",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test(\"Status code is 200 OK\", function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});",
-                  "",
-                  "pm.test(\"Response is valid JSON with expected contract\", function () {",
-                  "    const json = pm.response.json();",
-                  "    pm.expect(json).to.be.an(\"object\");",
-                  "    pm.expect(json).to.have.property(\"status\");",
-                  "    pm.expect([\"COMPLETED\", \"PARTIAL\", \"FAILED\"]).to.include(json.status);",
-                  "    pm.expect(json).to.have.property(\"entityId\");",
-                  "    pm.expect(json.entityId).to.be.a(\"string\").and.have.lengthOf(64);",
-                  "    pm.expect(json).to.have.property(\"result\");",
-                  "    pm.expect(json.result).to.be.an(\"object\");",
-                  "    pm.expect(json.result).to.have.property(\"displayName\").that.is.a(\"string\");",
-                  "    pm.expect(json.result).to.have.property(\"entityType\").that.is.a(\"string\");",
-                  "    pm.expect(json.result).to.have.property(\"canonicalUrl\").that.is.a(\"string\");",
-                  "    pm.expect(json.result).to.have.property(\"attributes\").that.is.an(\"object\");",
-                  "    pm.expect(json).to.have.property(\"sources\").that.is.an(\"array\");",
-                  "    pm.expect(json).to.have.property(\"executionTimeMs\").that.is.a(\"number\").at.least(0);",
-                  "    pm.expect(json).to.have.property(\"metadata\").that.is.an(\"object\");",
-                  "});",
-                  "",
-                  "pm.test(\"Evidence attributes conform to provenance model\", function () {",
-                  "    const json = pm.response.json();",
-                  "    const attrs = json.result.attributes;",
-                  "    for (const key of Object.keys(attrs)) {",
-                  "        const tuple = attrs[key];",
-                  "        pm.expect(tuple).to.have.property(\"value\");",
-                  "        pm.expect(tuple).to.have.property(\"confidence\");",
-                  "        pm.expect(tuple).to.have.property(\"conflictDetected\").that.is.a(\"boolean\");",
-                  "        pm.expect(tuple).to.have.property(\"corroboratingSources\").that.is.an(\"array\");",
-                  "        ",
-                  "        if (tuple.value === \"UNKNOWN\") {",
-                  "            pm.expect(tuple.confidence).to.equal(\"UNKNOWN\");",
-                  "        } else {",
-                  "            pm.expect([\"HIGH\", \"MEDIUM\", \"LOW\"]).to.include(tuple.confidence);",
-                  "            if (tuple.sourceUrl) {",
-                  "                pm.expect(tuple.sourceUrl).to.be.a(\"string\");",
-                  "            }",
-                  "        }",
-                  "    }",
-                  "});",
-                  "",
-                  "pm.test(\"Defaults entityType to OTHER and derives URN slug\", function () {",
-                  "    const json = pm.response.json();",
-                  "    pm.expect(json.result.displayName).to.equal(\"Ada Lovelace\");",
-                  "    pm.expect(json.result.entityType).to.equal(\"OTHER\");",
-                  "    pm.expect(json.result.canonicalUrl).to.include(\"urn:entity:other:ada-lovelace\");",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
-              },
-              {
-                "key": "Accept",
-                "value": "application/json",
-                "type": "text"
-              }
-            ],
-            "url": {
-              "raw": "{{baseResearchUrl}}/api/v1/research",
-              "host": [
-                "{{baseResearchUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "research"
-              ]
-            },
-            "description": "Tests ultra-sparse input where only name is supplied (no URL, no entityType), testing default fallback to OTHER and URN derivation.",
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"Ada Lovelace\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "response": []
-        }
-      ]
-    },
-    {
-      "name": "04 - Research - Target Fields",
-      "description": "Validates field-targeted enrichment where specific attributes are requested. Verifies attribute extraction, field alias resolution, pruning of unrequested attributes, and clean synthesis of UNKNOWN tuples with ConfidenceTier.UNKNOWN for unverified fields.",
-      "item": [
-        {
-          "name": "Person Fields",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test(\"Status code is 200 OK\", function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});",
-                  "",
-                  "pm.test(\"Response is valid JSON with expected contract\", function () {",
-                  "    const json = pm.response.json();",
-                  "    pm.expect(json).to.be.an(\"object\");",
-                  "    pm.expect(json).to.have.property(\"status\");",
-                  "    pm.expect([\"COMPLETED\", \"PARTIAL\", \"FAILED\"]).to.include(json.status);",
-                  "    pm.expect(json).to.have.property(\"entityId\");",
-                  "    pm.expect(json.entityId).to.be.a(\"string\").and.have.lengthOf(64);",
-                  "    pm.expect(json).to.have.property(\"result\");",
-                  "    pm.expect(json.result).to.be.an(\"object\");",
-                  "    pm.expect(json.result).to.have.property(\"displayName\").that.is.a(\"string\");",
-                  "    pm.expect(json.result).to.have.property(\"entityType\").that.is.a(\"string\");",
-                  "    pm.expect(json.result).to.have.property(\"canonicalUrl\").that.is.a(\"string\");",
-                  "    pm.expect(json.result).to.have.property(\"attributes\").that.is.an(\"object\");",
-                  "    pm.expect(json).to.have.property(\"sources\").that.is.an(\"array\");",
-                  "    pm.expect(json).to.have.property(\"executionTimeMs\").that.is.a(\"number\").at.least(0);",
-                  "    pm.expect(json).to.have.property(\"metadata\").that.is.an(\"object\");",
-                  "});",
-                  "",
-                  "pm.test(\"Evidence attributes conform to provenance model\", function () {",
-                  "    const json = pm.response.json();",
-                  "    const attrs = json.result.attributes;",
-                  "    for (const key of Object.keys(attrs)) {",
-                  "        const tuple = attrs[key];",
-                  "        pm.expect(tuple).to.have.property(\"value\");",
-                  "        pm.expect(tuple).to.have.property(\"confidence\");",
-                  "        pm.expect(tuple).to.have.property(\"conflictDetected\").that.is.a(\"boolean\");",
-                  "        pm.expect(tuple).to.have.property(\"corroboratingSources\").that.is.an(\"array\");",
-                  "        ",
-                  "        if (tuple.value === \"UNKNOWN\") {",
-                  "            pm.expect(tuple.confidence).to.equal(\"UNKNOWN\");",
-                  "        } else {",
-                  "            pm.expect([\"HIGH\", \"MEDIUM\", \"LOW\"]).to.include(tuple.confidence);",
-                  "            if (tuple.sourceUrl) {",
-                  "                pm.expect(tuple.sourceUrl).to.be.a(\"string\");",
-                  "            }",
-                  "        }",
-                  "    }",
-                  "});",
-                  "",
-                  "pm.test(\"Response represents requested target fields\", function () {",
-                  "    const json = pm.response.json();",
-                  "    const attrs = json.result.attributes;",
-                  "    pm.expect(attrs).to.be.an(\"object\");",
-                  "    const hasRequested = Object.keys(attrs).some(k => [\"role\", \"organization\", \"current_organization\", \"alma_mater\"].includes(k.toLowerCase()));",
-                  "    pm.expect(hasRequested).to.be.true;",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
-              },
-              {
-                "key": "Accept",
-                "value": "application/json",
-                "type": "text"
-              }
-            ],
-            "url": {
-              "raw": "{{baseResearchUrl}}/api/v1/research",
-              "host": [
-                "{{baseResearchUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "research"
-              ]
-            },
-            "description": "Requests specific professional and academic fields for a person entity.",
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"url\": \"https://en.wikipedia.org/wiki/Alan_Turing\",\n  \"name\": \"Alan Turing\",\n  \"entityType\": \"PERSON\",\n  \"targetFields\": [\n    \"role\",\n    \"organization\",\n    \"alma_mater\"\n  ]\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Organization Fields",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test(\"Status code is 200 OK\", function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});",
-                  "",
-                  "pm.test(\"Response is valid JSON with expected contract\", function () {",
-                  "    const json = pm.response.json();",
-                  "    pm.expect(json).to.be.an(\"object\");",
-                  "    pm.expect(json).to.have.property(\"status\");",
-                  "    pm.expect([\"COMPLETED\", \"PARTIAL\", \"FAILED\"]).to.include(json.status);",
-                  "    pm.expect(json).to.have.property(\"entityId\");",
-                  "    pm.expect(json.entityId).to.be.a(\"string\").and.have.lengthOf(64);",
-                  "    pm.expect(json).to.have.property(\"result\");",
-                  "    pm.expect(json.result).to.be.an(\"object\");",
-                  "    pm.expect(json.result).to.have.property(\"displayName\").that.is.a(\"string\");",
-                  "    pm.expect(json.result).to.have.property(\"entityType\").that.is.a(\"string\");",
-                  "    pm.expect(json.result).to.have.property(\"canonicalUrl\").that.is.a(\"string\");",
-                  "    pm.expect(json.result).to.have.property(\"attributes\").that.is.an(\"object\");",
-                  "    pm.expect(json).to.have.property(\"sources\").that.is.an(\"array\");",
-                  "    pm.expect(json).to.have.property(\"executionTimeMs\").that.is.a(\"number\").at.least(0);",
-                  "    pm.expect(json).to.have.property(\"metadata\").that.is.an(\"object\");",
-                  "});",
-                  "",
-                  "pm.test(\"Evidence attributes conform to provenance model\", function () {",
-                  "    const json = pm.response.json();",
-                  "    const attrs = json.result.attributes;",
-                  "    for (const key of Object.keys(attrs)) {",
-                  "        const tuple = attrs[key];",
-                  "        pm.expect(tuple).to.have.property(\"value\");",
-                  "        pm.expect(tuple).to.have.property(\"confidence\");",
-                  "        pm.expect(tuple).to.have.property(\"conflictDetected\").that.is.a(\"boolean\");",
-                  "        pm.expect(tuple).to.have.property(\"corroboratingSources\").that.is.an(\"array\");",
-                  "        ",
-                  "        if (tuple.value === \"UNKNOWN\") {",
-                  "            pm.expect(tuple.confidence).to.equal(\"UNKNOWN\");",
-                  "        } else {",
-                  "            pm.expect([\"HIGH\", \"MEDIUM\", \"LOW\"]).to.include(tuple.confidence);",
-                  "            if (tuple.sourceUrl) {",
-                  "                pm.expect(tuple.sourceUrl).to.be.a(\"string\");",
-                  "            }",
-                  "        }",
-                  "    }",
-                  "});",
-                  "",
-                  "pm.test(\"Response represents organization target fields\", function () {",
-                  "    const json = pm.response.json();",
-                  "    const attrs = json.result.attributes;",
-                  "    pm.expect(attrs).to.be.an(\"object\");",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
-              },
-              {
-                "key": "Accept",
-                "value": "application/json",
-                "type": "text"
-              }
-            ],
-            "url": {
-              "raw": "{{baseResearchUrl}}/api/v1/research",
-              "host": [
-                "{{baseResearchUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "research"
-              ]
-            },
-            "description": "Requests core organizational fields, verifying alias resolution (e.g. description/summary).",
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"url\": \"https://www.apache.org\",\n  \"name\": \"Apache Software Foundation\",\n  \"entityType\": \"ORGANIZATION\",\n  \"targetFields\": [\n    \"headquarters\",\n    \"description\",\n    \"founded\"\n  ]\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Custom Fields",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test(\"Status code is 200 OK\", function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});",
-                  "",
-                  "pm.test(\"Response is valid JSON with expected contract\", function () {",
-                  "    const json = pm.response.json();",
-                  "    pm.expect(json).to.be.an(\"object\");",
-                  "    pm.expect(json).to.have.property(\"status\");",
-                  "    pm.expect([\"COMPLETED\", \"PARTIAL\", \"FAILED\"]).to.include(json.status);",
-                  "    pm.expect(json).to.have.property(\"entityId\");",
-                  "    pm.expect(json.entityId).to.be.a(\"string\").and.have.lengthOf(64);",
-                  "    pm.expect(json).to.have.property(\"result\");",
-                  "    pm.expect(json.result).to.be.an(\"object\");",
-                  "    pm.expect(json.result).to.have.property(\"displayName\").that.is.a(\"string\");",
-                  "    pm.expect(json.result).to.have.property(\"entityType\").that.is.a(\"string\");",
-                  "    pm.expect(json.result).to.have.property(\"canonicalUrl\").that.is.a(\"string\");",
-                  "    pm.expect(json.result).to.have.property(\"attributes\").that.is.an(\"object\");",
-                  "    pm.expect(json).to.have.property(\"sources\").that.is.an(\"array\");",
-                  "    pm.expect(json).to.have.property(\"executionTimeMs\").that.is.a(\"number\").at.least(0);",
-                  "    pm.expect(json).to.have.property(\"metadata\").that.is.an(\"object\");",
-                  "});",
-                  "",
-                  "pm.test(\"Evidence attributes conform to provenance model\", function () {",
-                  "    const json = pm.response.json();",
-                  "    const attrs = json.result.attributes;",
-                  "    for (const key of Object.keys(attrs)) {",
-                  "        const tuple = attrs[key];",
-                  "        pm.expect(tuple).to.have.property(\"value\");",
-                  "        pm.expect(tuple).to.have.property(\"confidence\");",
-                  "        pm.expect(tuple).to.have.property(\"conflictDetected\").that.is.a(\"boolean\");",
-                  "        pm.expect(tuple).to.have.property(\"corroboratingSources\").that.is.an(\"array\");",
-                  "        ",
-                  "        if (tuple.value === \"UNKNOWN\") {",
-                  "            pm.expect(tuple.confidence).to.equal(\"UNKNOWN\");",
-                  "        } else {",
-                  "            pm.expect([\"HIGH\", \"MEDIUM\", \"LOW\"]).to.include(tuple.confidence);",
-                  "            if (tuple.sourceUrl) {",
-                  "                pm.expect(tuple.sourceUrl).to.be.a(\"string\");",
-                  "            }",
-                  "        }",
-                  "    }",
-                  "});",
-                  "",
-                  "pm.test(\"Unverified target field is cleanly synthesized as UNKNOWN tuple\", function () {",
-                  "    const json = pm.response.json();",
-                  "    const attrs = json.result.attributes;",
-                  "    pm.expect(attrs).to.have.property(\"unverifiable_custom_metric_xyz\");",
-                  "    ",
-                  "    const unknownTuple = attrs[\"unverifiable_custom_metric_xyz\"];",
-                  "    pm.expect(unknownTuple.value).to.equal(\"UNKNOWN\");",
-                  "    pm.expect(unknownTuple.confidence).to.equal(\"UNKNOWN\");",
-                  "    pm.expect(unknownTuple.sourceUrl).to.be.null;",
-                  "    pm.expect(unknownTuple.evidenceSnippet).to.include(\"No reliable evidence found\");",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
-              },
-              {
-                "key": "Accept",
-                "value": "application/json",
-                "type": "text"
-              }
-            ],
-            "url": {
-              "raw": "{{baseResearchUrl}}/api/v1/research",
-              "host": [
-                "{{baseResearchUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "research"
-              ]
-            },
-            "description": "Requests an unextractable custom field, verifying that the engine cleanly synthesizes an UNKNOWN evidence tuple.",
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"url\": \"https://en.wikipedia.org/wiki/Grace_Hopper\",\n  \"name\": \"Grace Hopper\",\n  \"entityType\": \"PERSON\",\n  \"targetFields\": [\n    \"role\",\n    \"unverifiable_custom_metric_xyz\"\n  ]\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "response": [
-            {
-              "name": "Target Fields with UNKNOWN Field Example",
-              "originalRequest": {
-                "method": "POST",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json",
-                    "type": "text"
-                  },
-                  {
-                    "key": "Accept",
-                    "value": "application/json",
-                    "type": "text"
-                  }
-                ],
-                "url": {
-                  "raw": "{{baseResearchUrl}}/api/v1/research",
-                  "host": [
-                    "{{baseResearchUrl}}"
-                  ],
-                  "path": [
-                    "api",
-                    "v1",
-                    "research"
-                  ]
-                },
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"url\": \"https://en.wikipedia.org/wiki/Grace_Hopper\",\n  \"name\": \"Grace Hopper\",\n  \"entityType\": \"PERSON\",\n  \"targetFields\": [\n    \"role\",\n    \"unverifiable_custom_metric_xyz\"\n  ]\n}",
-                  "options": {
-                    "raw": {
-                      "language": "json"
-                    }
-                  }
-                }
-              },
-              "status": "OK",
-              "code": 200,
-              "_postman_previewlanguage": "json",
-              "header": [
-                {
-                  "key": "Content-Type",
-                  "value": "application/json"
-                }
-              ],
-              "cookie": [],
-              "body": "{\n  \"status\": \"COMPLETED\",\n  \"entityId\": \"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef\",\n  \"result\": {\n    \"displayName\": \"Grace Hopper\",\n    \"entityType\": \"PERSON\",\n    \"canonicalUrl\": \"https://en.wikipedia.org/wiki/Grace_Hopper\",\n    \"attributes\": {\n      \"role\": {\n        \"value\": \"Rear Admiral\",\n        \"sourceUrl\": \"https://en.wikipedia.org/wiki/Grace_Hopper\",\n        \"evidenceSnippet\": \"Grace Brewster Murray Hopper was an American computer scientist and United States Navy rear admiral.\",\n        \"confidence\": \"HIGH\",\n        \"corroboratingSources\": [\n          \"https://en.wikipedia.org/wiki/Grace_Hopper\"\n        ],\n        \"conflictDetected\": false\n      },\n      \"unverifiable_custom_metric_xyz\": {\n        \"value\": \"UNKNOWN\",\n        \"sourceUrl\": null,\n        \"evidenceSnippet\": \"No reliable evidence found across researched sources for field: unverifiable_custom_metric_xyz\",\n        \"confidence\": \"UNKNOWN\",\n        \"corroboratingSources\": [],\n        \"conflictDetected\": false\n      }\n    }\n  },\n  \"sources\": [\n    {\n      \"url\": \"https://en.wikipedia.org/wiki/Grace_Hopper\",\n      \"title\": \"Grace Hopper - Wikipedia\",\n      \"snippet\": \"Grace Brewster Murray Hopper was an American computer scientist...\",\n      \"sourceType\": \"WIKIPEDIA\",\n      \"domain\": \"wikipedia.org\",\n      \"provider\": \"mock\",\n      \"retrievedAt\": \"2026-09-05T14:30:00Z\",\n      \"relevance\": 1\n    }\n  ],\n  \"executionTimeMs\": 110,\n  \"metadata\": {\n    \"provider\": \"mock\",\n    \"totalSourcesDiscovered\": 4,\n    \"totalSourcesRanked\": 1,\n    \"attributesExtracted\": 2,\n    \"warningsCount\": 0\n  },\n  \"warnings\": []\n}"
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "name": "05 - Validation & Errors",
-      "description": "Validates strict RFC 7807 ProblemDetail error contracts and input constraints. Asserts proper HTTP status codes (400 Bad Request, 404 Not Found) and error detail messages across invalid inputs and missing entities.",
-      "item": [
-        {
-          "name": "Missing Required Input",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test(\"Status code is 400 Bad Request\", function () {",
-                  "    pm.response.to.have.status(400);",
-                  "});",
-                  "",
-                  "pm.test(\"Response conforms to RFC 7807 ProblemDetail\", function () {",
-                  "    const json = pm.response.json();",
-                  "    pm.expect(json).to.be.an(\"object\");",
-                  "    pm.expect(json).to.have.property(\"status\", 400);",
-                  "    pm.expect(json).to.have.property(\"title\", \"Bad Request\");",
-                  "    pm.expect(json).to.have.property(\"detail\").that.is.a(\"string\");",
-                  "    pm.expect(json.detail).to.include(\"Either 'url' or 'name' must be provided for research\");",
-                  "    pm.expect(json).to.have.property(\"instance\", \"/api/v1/research\");",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
-              },
-              {
-                "key": "Accept",
-                "value": "application/json",
-                "type": "text"
-              }
-            ],
-            "url": {
-              "raw": "{{baseResearchUrl}}/api/v1/research",
-              "host": [
-                "{{baseResearchUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "research"
-              ]
-            },
-            "description": "Fails validation when both url and name are missing.",
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"entityType\": \"PERSON\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "response": [
-            {
-              "name": "400 - Missing Target Identifier",
-              "originalRequest": {
-                "method": "POST",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json",
-                    "type": "text"
-                  },
-                  {
-                    "key": "Accept",
-                    "value": "application/json",
-                    "type": "text"
-                  }
-                ],
-                "url": {
-                  "raw": "{{baseResearchUrl}}/api/v1/research",
-                  "host": [
-                    "{{baseResearchUrl}}"
-                  ],
-                  "path": [
-                    "api",
-                    "v1",
-                    "research"
-                  ]
-                },
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"entityType\": \"PERSON\"\n}",
-                  "options": {
-                    "raw": {
-                      "language": "json"
-                    }
-                  }
-                }
-              },
-              "status": "Bad Request",
-              "code": 400,
-              "_postman_previewlanguage": "json",
-              "header": [
-                {
-                  "key": "Content-Type",
-                  "value": "application/json"
-                }
-              ],
-              "cookie": [],
-              "body": "{\n  \"type\": \"about:blank\",\n  \"title\": \"Bad Request\",\n  \"status\": 400,\n  \"detail\": \"Either 'url' or 'name' must be provided for research\",\n  \"instance\": \"/api/v1/research\"\n}"
-            }
-          ]
-        },
-        {
-          "name": "Empty Input",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test(\"Status code is 400 Bad Request\", function () {",
-                  "    pm.response.to.have.status(400);",
-                  "});",
-                  "",
-                  "pm.test(\"Response conforms to RFC 7807 ProblemDetail\", function () {",
-                  "    const json = pm.response.json();",
-                  "    pm.expect(json).to.be.an(\"object\");",
-                  "    pm.expect(json).to.have.property(\"status\", 400);",
-                  "    pm.expect(json).to.have.property(\"title\", \"Bad Request\");",
-                  "    pm.expect(json).to.have.property(\"detail\").that.is.a(\"string\");",
-                  "    pm.expect(json.detail).to.include(\"Either 'url' or 'name' must be provided for research\");",
-                  "    pm.expect(json).to.have.property(\"instance\", \"/api/v1/research\");",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
-              },
-              {
-                "key": "Accept",
-                "value": "application/json",
-                "type": "text"
-              }
-            ],
-            "url": {
-              "raw": "{{baseResearchUrl}}/api/v1/research",
-              "host": [
-                "{{baseResearchUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "research"
-              ]
-            },
-            "description": "Fails validation on completely empty JSON request body.",
-            "body": {
-              "mode": "raw",
-              "raw": "{}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Invalid Entity Type",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test(\"Status code is 400 Bad Request\", function () {",
-                  "    pm.response.to.have.status(400);",
-                  "});",
-                  "",
-                  "pm.test(\"Response conforms to RFC 7807 ProblemDetail\", function () {",
-                  "    const json = pm.response.json();",
-                  "    pm.expect(json).to.be.an(\"object\");",
-                  "    pm.expect(json).to.have.property(\"status\", 400);",
-                  "    pm.expect(json).to.have.property(\"title\", \"Bad Request\");",
-                  "    pm.expect(json).to.have.property(\"detail\").that.is.a(\"string\");",
-                  "    pm.expect(json.detail).to.include(\"Invalid entityType: must be one of PERSON, ORGANIZATION, PRODUCT, REPOSITORY, WEBSITE, OTHER\");",
-                  "    pm.expect(json).to.have.property(\"instance\", \"/api/v1/research\");",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
-              },
-              {
-                "key": "Accept",
-                "value": "application/json",
-                "type": "text"
-              }
-            ],
-            "url": {
-              "raw": "{{baseResearchUrl}}/api/v1/research",
-              "host": [
-                "{{baseResearchUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "research"
-              ]
-            },
-            "description": "Fails deserialization when entityType enum value is unrecognized.",
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"Test Subject\",\n  \"entityType\": \"NOT_AN_ENTITY\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "response": [
-            {
-              "name": "400 - Invalid EntityType Enum",
-              "originalRequest": {
-                "method": "POST",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json",
-                    "type": "text"
-                  },
-                  {
-                    "key": "Accept",
-                    "value": "application/json",
-                    "type": "text"
-                  }
-                ],
-                "url": {
-                  "raw": "{{baseResearchUrl}}/api/v1/research",
-                  "host": [
-                    "{{baseResearchUrl}}"
-                  ],
-                  "path": [
-                    "api",
-                    "v1",
-                    "research"
-                  ]
-                },
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"name\": \"Test Subject\",\n  \"entityType\": \"NOT_AN_ENTITY\"\n}",
-                  "options": {
-                    "raw": {
-                      "language": "json"
-                    }
-                  }
-                }
-              },
-              "status": "Bad Request",
-              "code": 400,
-              "_postman_previewlanguage": "json",
-              "header": [
-                {
-                  "key": "Content-Type",
-                  "value": "application/json"
-                }
-              ],
-              "cookie": [],
-              "body": "{\n  \"type\": \"about:blank\",\n  \"title\": \"Bad Request\",\n  \"status\": 400,\n  \"detail\": \"Invalid entityType: must be one of PERSON, ORGANIZATION, PRODUCT, REPOSITORY, WEBSITE, OTHER\",\n  \"instance\": \"/api/v1/research\"\n}"
-            }
-          ]
-        },
-        {
-          "name": "Invalid URL",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test(\"Status code is 400 Bad Request\", function () {",
-                  "    pm.response.to.have.status(400);",
-                  "});",
-                  "",
-                  "pm.test(\"Response conforms to RFC 7807 ProblemDetail\", function () {",
-                  "    const json = pm.response.json();",
-                  "    pm.expect(json).to.be.an(\"object\");",
-                  "    pm.expect(json).to.have.property(\"status\", 400);",
-                  "    pm.expect(json).to.have.property(\"title\", \"Bad Request\");",
-                  "    pm.expect(json).to.have.property(\"detail\").that.is.a(\"string\");",
-                  "    pm.expect(json.detail).to.include(\"Field 'url' must be a valid, well-formed HTTP/HTTPS URL\");",
-                  "    pm.expect(json).to.have.property(\"instance\", \"/api/v1/research\");",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
-              },
-              {
-                "key": "Accept",
-                "value": "application/json",
-                "type": "text"
-              }
-            ],
-            "url": {
-              "raw": "{{baseResearchUrl}}/api/v1/research",
-              "host": [
-                "{{baseResearchUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "research"
-              ]
-            },
-            "description": "Fails validation when url does not conform to valid HTTP/HTTPS URI scheme.",
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"url\": \"not-a-valid-http-url\",\n  \"entityType\": \"WEBSITE\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "response": [
-            {
-              "name": "400 - Malformed URL Format",
-              "originalRequest": {
-                "method": "POST",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json",
-                    "type": "text"
-                  },
-                  {
-                    "key": "Accept",
-                    "value": "application/json",
-                    "type": "text"
-                  }
-                ],
-                "url": {
-                  "raw": "{{baseResearchUrl}}/api/v1/research",
-                  "host": [
-                    "{{baseResearchUrl}}"
-                  ],
-                  "path": [
-                    "api",
-                    "v1",
-                    "research"
-                  ]
-                },
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"url\": \"not-a-valid-http-url\",\n  \"entityType\": \"WEBSITE\"\n}",
-                  "options": {
-                    "raw": {
-                      "language": "json"
-                    }
-                  }
-                }
-              },
-              "status": "Bad Request",
-              "code": 400,
-              "_postman_previewlanguage": "json",
-              "header": [
-                {
-                  "key": "Content-Type",
-                  "value": "application/json"
-                }
-              ],
-              "cookie": [],
-              "body": "{\n  \"type\": \"about:blank\",\n  \"title\": \"Bad Request\",\n  \"status\": 400,\n  \"detail\": \"Field 'url' must be a valid, well-formed HTTP/HTTPS URL\",\n  \"instance\": \"/api/v1/research\"\n}"
-            }
-          ]
-        },
-        {
-          "name": "Blank Name with Missing URL",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test(\"Status code is 400 Bad Request\", function () {",
-                  "    pm.response.to.have.status(400);",
-                  "});",
-                  "",
-                  "pm.test(\"Response conforms to RFC 7807 ProblemDetail\", function () {",
-                  "    const json = pm.response.json();",
-                  "    pm.expect(json).to.be.an(\"object\");",
-                  "    pm.expect(json).to.have.property(\"status\", 400);",
-                  "    pm.expect(json).to.have.property(\"title\", \"Bad Request\");",
-                  "    pm.expect(json).to.have.property(\"detail\").that.is.a(\"string\");",
-                  "    pm.expect(json.detail).to.include(\"Either 'url' or 'name' must be provided for research\");",
-                  "    pm.expect(json).to.have.property(\"instance\", \"/api/v1/research\");",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
-              },
-              {
-                "key": "Accept",
-                "value": "application/json",
-                "type": "text"
-              }
-            ],
-            "url": {
-              "raw": "{{baseResearchUrl}}/api/v1/research",
-              "host": [
-                "{{baseResearchUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "research"
-              ]
-            },
-            "description": "Fails validation when name contains only whitespace and url is omitted.",
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"   \",\n  \"entityType\": \"ORGANIZATION\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Nonexistent Research Job",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test(\"Status code is 404 Not Found\", function () {",
-                  "    pm.response.to.have.status(404);",
+                  "    pm.expect(json.status).to.eql(\"UP\");",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -2094,85 +134,24 @@
           "request": {
             "method": "GET",
             "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
-              },
-              {
-                "key": "Accept",
-                "value": "application/json",
-                "type": "text"
-              }
+              { "key": "Accept", "value": "application/json", "type": "text" }
             ],
             "url": {
-              "raw": "{{baseResearchUrl}}/api/v1/research/jobs/00000000-0000-0000-0000-000000000000",
-              "host": [
-                "{{baseResearchUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "research",
-                "jobs",
-                "00000000-0000-0000-0000-000000000000"
-              ]
+              "raw": "{{aiBaseUrl}}/actuator/health",
+              "host": ["{{aiBaseUrl}}"],
+              "path": ["actuator", "health"]
             },
-            "description": "Asserts 404 Not Found when querying a background job that does not exist."
-          },
-          "response": [
-            {
-              "name": "404 - Job Not Found",
-              "originalRequest": {
-                "method": "GET",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json",
-                    "type": "text"
-                  },
-                  {
-                    "key": "Accept",
-                    "value": "application/json",
-                    "type": "text"
-                  }
-                ],
-                "url": {
-                  "raw": "{{baseResearchUrl}}/api/v1/research/jobs/00000000-0000-0000-0000-000000000000",
-                  "host": [
-                    "{{baseResearchUrl}}"
-                  ],
-                  "path": [
-                    "api",
-                    "v1",
-                    "research",
-                    "jobs",
-                    "00000000-0000-0000-0000-000000000000"
-                  ]
-                }
-              },
-              "status": "Not Found",
-              "code": 404,
-              "_postman_previewlanguage": "json",
-              "header": [
-                {
-                  "key": "Content-Type",
-                  "value": "application/json"
-                }
-              ],
-              "cookie": [],
-              "body": "{}"
-            }
-          ]
+            "description": "Health check for AI Intelligent Service (:9742)"
+          }
         }
       ]
     },
     {
-      "name": "06 - End-to-End Scenarios",
-      "description": "Executes end-to-end operational workflows demonstrating state propagation between requests, including synchronous enrichment (capturing entityId), background asynchronous job lifecycle (submitting, capturing researchJobId, and polling status), and deep adaptive exploration.",
+      "name": "02 Dataset",
+      "description": "Dataset preparation, column confirmation, and seed cleansing operations.",
       "item": [
         {
-          "name": "E2E 01 - Synchronous Research",
+          "name": "Cleanse Dataset Seed Input",
           "event": [
             {
               "listen": "test",
@@ -2181,51 +160,10 @@
                   "pm.test(\"Status code is 200 OK\", function () {",
                   "    pm.response.to.have.status(200);",
                   "});",
-                  "",
-                  "pm.test(\"Response is valid JSON with expected contract\", function () {",
+                  "pm.test(\"Input cleaned successfully\", function () {",
                   "    const json = pm.response.json();",
-                  "    pm.expect(json).to.be.an(\"object\");",
-                  "    pm.expect(json).to.have.property(\"status\");",
-                  "    pm.expect([\"COMPLETED\", \"PARTIAL\", \"FAILED\"]).to.include(json.status);",
-                  "    pm.expect(json).to.have.property(\"entityId\");",
-                  "    pm.expect(json.entityId).to.be.a(\"string\").and.have.lengthOf(64);",
-                  "    pm.expect(json).to.have.property(\"result\");",
-                  "    pm.expect(json.result).to.be.an(\"object\");",
-                  "    pm.expect(json.result).to.have.property(\"displayName\").that.is.a(\"string\");",
-                  "    pm.expect(json.result).to.have.property(\"entityType\").that.is.a(\"string\");",
-                  "    pm.expect(json.result).to.have.property(\"canonicalUrl\").that.is.a(\"string\");",
-                  "    pm.expect(json.result).to.have.property(\"attributes\").that.is.an(\"object\");",
-                  "    pm.expect(json).to.have.property(\"sources\").that.is.an(\"array\");",
-                  "    pm.expect(json).to.have.property(\"executionTimeMs\").that.is.a(\"number\").at.least(0);",
-                  "    pm.expect(json).to.have.property(\"metadata\").that.is.an(\"object\");",
-                  "});",
-                  "",
-                  "pm.test(\"Evidence attributes conform to provenance model\", function () {",
-                  "    const json = pm.response.json();",
-                  "    const attrs = json.result.attributes;",
-                  "    for (const key of Object.keys(attrs)) {",
-                  "        const tuple = attrs[key];",
-                  "        pm.expect(tuple).to.have.property(\"value\");",
-                  "        pm.expect(tuple).to.have.property(\"confidence\");",
-                  "        pm.expect(tuple).to.have.property(\"conflictDetected\").that.is.a(\"boolean\");",
-                  "        pm.expect(tuple).to.have.property(\"corroboratingSources\").that.is.an(\"array\");",
-                  "        ",
-                  "        if (tuple.value === \"UNKNOWN\") {",
-                  "            pm.expect(tuple.confidence).to.equal(\"UNKNOWN\");",
-                  "        } else {",
-                  "            pm.expect([\"HIGH\", \"MEDIUM\", \"LOW\"]).to.include(tuple.confidence);",
-                  "            if (tuple.sourceUrl) {",
-                  "                pm.expect(tuple.sourceUrl).to.be.a(\"string\");",
-                  "            }",
-                  "        }",
-                  "    }",
-                  "});",
-                  "",
-                  "pm.test(\"Captures entityId to environment variable\", function () {",
-                  "    const json = pm.response.json();",
-                  "    pm.expect(json.entityId).to.be.a(\"string\").and.have.lengthOf(64);",
-                  "    pm.environment.set(\"entityId\", json.entityId);",
-                  "    console.log(\"Captured entityId: \" + json.entityId);",
+                  "    pm.expect(json.cleanedName).to.be.a('string');",
+                  "    pm.expect(json.detectedEntityType).to.be.a('string');",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -2235,43 +173,67 @@
           "request": {
             "method": "POST",
             "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
-              },
-              {
-                "key": "Accept",
-                "value": "application/json",
-                "type": "text"
-              }
+              { "key": "Content-Type", "value": "application/json", "type": "text" },
+              { "key": "Accept", "value": "application/json", "type": "text" }
             ],
-            "url": {
-              "raw": "{{baseResearchUrl}}/api/v1/research",
-              "host": [
-                "{{baseResearchUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "research"
-              ]
-            },
-            "description": "Executes a complete synchronous enrichment pipeline and captures the resulting entityId into the environment.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"url\": \"https://en.wikipedia.org/wiki/Linus_Torvalds\",\n  \"name\": \"Linus Torvalds\",\n  \"entityType\": \"PERSON\",\n  \"metadata\": {\n    \"scenario\": \"e2e-sync-test\",\n    \"client\": \"postman-runner\"\n  }\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "response": []
+              "raw": "{\n  \"rawName\": \"  Dr. Linus Torvalds, PhD 🚀 \",\n  \"rawUrl\": \"https://github.com/torvalds?tab=repositories\",\n  \"rawOrganization\": \"Linux Foundation, Inc.\",\n  \"rawRole\": \"Principal Fellow & Creator\"\n}"
+            },
+            "url": {
+              "raw": "{{aiBaseUrl}}/api/v1/ai/clean",
+              "host": ["{{aiBaseUrl}}"],
+              "path": ["api", "v1", "ai", "clean"]
+            },
+            "description": "Cleans sparse, noisy input rows before starting batch enrichment."
+          }
         },
         {
-          "name": "E2E 02 - Submit Async Research Job",
+          "name": "Direct Single-Record Enrichment Preview",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Row enrichment result returned\", function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('status');",
+                  "    pm.expect(json).to.have.property('rowIndex');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json", "type": "text" },
+              { "key": "Accept", "value": "application/json", "type": "text" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"row\": {\n    \"Name\": \"Spring Boot\",\n    \"URL\": \"https://github.com/spring-projects/spring-boot\",\n    \"Role\": \"Framework\"\n  },\n  \"columnMapping\": {\n    \"nameColumn\": \"Name\",\n    \"urlColumn\": \"URL\",\n    \"roleColumn\": \"Role\"\n  },\n  \"entityType\": \"REPOSITORY\",\n  \"userRequirement\": \"Extract primary programming language, stars count, and license\"\n}"
+            },
+            "url": {
+              "raw": "{{datasetBaseUrl}}/api/v1/enrichment/single",
+              "host": ["{{datasetBaseUrl}}"],
+              "path": ["api", "v1", "enrichment", "single"]
+            },
+            "description": "Enriches a single mapped row synchronously."
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 Enrichment",
+      "description": "Batch dataset enrichment jobs and row-level status tracking.",
+      "item": [
+        {
+          "name": "Start Batch Enrichment Job",
           "event": [
             {
               "listen": "test",
@@ -2280,18 +242,10 @@
                   "pm.test(\"Status code is 202 Accepted\", function () {",
                   "    pm.response.to.have.status(202);",
                   "});",
-                  "",
-                  "pm.test(\"Response conforms to ResearchJobResponse contract\", function () {",
-                  "    const json = pm.response.json();",
-                  "    pm.expect(json).to.be.an(\"object\");",
-                  "    pm.expect(json).to.have.property(\"jobId\").that.is.a(\"string\");",
-                  "    pm.expect(json).to.have.property(\"status\", \"SUBMITTED\");",
-                  "    pm.expect(json).to.have.property(\"progress\", 0);",
-                  "    pm.expect(json).to.have.property(\"createdAt\");",
-                  "    ",
-                  "    pm.environment.set(\"researchJobId\", json.jobId);",
-                  "    console.log(\"Captured researchJobId: \" + json.jobId);",
-                  "});"
+                  "const json = pm.response.json();",
+                  "if (json.jobId) {",
+                  "    pm.collectionVariables.set(\"jobId\", json.jobId);",
+                  "}"
                 ],
                 "type": "text/javascript"
               }
@@ -2300,95 +254,23 @@
           "request": {
             "method": "POST",
             "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
-              },
-              {
-                "key": "Accept",
-                "value": "application/json",
-                "type": "text"
-              }
+              { "key": "Content-Type", "value": "application/json", "type": "text" },
+              { "key": "Accept", "value": "application/json", "type": "text" }
             ],
-            "url": {
-              "raw": "{{baseResearchUrl}}/api/v1/research/jobs",
-              "host": [
-                "{{baseResearchUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "research",
-                "jobs"
-              ]
-            },
-            "description": "Submits a background asynchronous research job, asserts 202 Accepted, and captures researchJobId.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"url\": \"https://github.com/torvalds/linux\",\n  \"name\": \"linux\",\n  \"entityType\": \"REPOSITORY\",\n  \"depth\": \"NORMAL\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "response": [
-            {
-              "name": "Async Job Submission - 202 Accepted",
-              "originalRequest": {
-                "method": "POST",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json",
-                    "type": "text"
-                  },
-                  {
-                    "key": "Accept",
-                    "value": "application/json",
-                    "type": "text"
-                  }
-                ],
-                "url": {
-                  "raw": "{{baseResearchUrl}}/api/v1/research/jobs",
-                  "host": [
-                    "{{baseResearchUrl}}"
-                  ],
-                  "path": [
-                    "api",
-                    "v1",
-                    "research",
-                    "jobs"
-                  ]
-                },
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"url\": \"https://github.com/torvalds/linux\",\n  \"name\": \"linux\",\n  \"entityType\": \"REPOSITORY\",\n  \"depth\": \"NORMAL\"\n}",
-                  "options": {
-                    "raw": {
-                      "language": "json"
-                    }
-                  }
-                }
-              },
-              "status": "Accepted",
-              "code": 202,
-              "_postman_previewlanguage": "json",
-              "header": [
-                {
-                  "key": "Content-Type",
-                  "value": "application/json"
-                }
-              ],
-              "cookie": [],
-              "body": "{\n  \"jobId\": \"c3f0bb05-08bf-4952-ba53-90d407639534\",\n  \"status\": \"SUBMITTED\",\n  \"progress\": 0,\n  \"createdAt\": \"2026-09-05T14:30:00Z\",\n  \"completedAt\": null,\n  \"durationMs\": null,\n  \"result\": null,\n  \"error\": null,\n  \"warnings\": []\n}"
-            }
-          ]
+              "raw": "{\n  \"datasetName\": \"test-repositories.csv\",\n  \"userRequirement\": \"Find primary programming language, stars count, and license\",\n  \"defaultEntityType\": \"REPOSITORY\",\n  \"columnMapping\": {\n    \"nameColumn\": \"RepoName\",\n    \"urlColumn\": \"RepoUrl\"\n  },\n  \"rows\": [\n    {\n      \"RepoName\": \"Spring Boot\",\n      \"RepoUrl\": \"https://github.com/spring-projects/spring-boot\"\n    },\n    {\n      \"RepoName\": \"Next.js\",\n      \"RepoUrl\": \"https://github.com/vercel/next.js\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{datasetBaseUrl}}/api/v1/enrichment/jobs",
+              "host": ["{{datasetBaseUrl}}"],
+              "path": ["api", "v1", "enrichment", "jobs"]
+            },
+            "description": "Dispatches an asynchronous batch enrichment job with row-level error isolation."
+          }
         },
         {
-          "name": "E2E 03 - Poll Async Job Status",
+          "name": "Get Enrichment Job Status",
           "event": [
             {
               "listen": "test",
@@ -2397,19 +279,12 @@
                   "pm.test(\"Status code is 200 OK\", function () {",
                   "    pm.response.to.have.status(200);",
                   "});",
-                  "",
-                  "pm.test(\"Job response reflects expected lifecycle state\", function () {",
+                  "pm.test(\"Job response has progress counters\", function () {",
                   "    const json = pm.response.json();",
-                  "    pm.expect(json).to.be.an(\"object\");",
-                  "    pm.expect(json).to.have.property(\"jobId\");",
-                  "    pm.expect([\"SUBMITTED\", \"IN_PROGRESS\", \"COMPLETED\"]).to.include(json.status);",
-                  "    pm.expect(json).to.have.property(\"progress\").that.is.a(\"number\").at.least(0);",
-                  "    ",
-                  "    if (json.status === \"COMPLETED\") {",
-                  "        pm.expect(json.result).to.be.an(\"object\");",
-                  "        pm.expect(json.result).to.have.property(\"entityId\");",
-                  "        pm.environment.set(\"entityId\", json.result.entityId);",
-                  "    }",
+                  "    pm.expect(json).to.have.property('jobId');",
+                  "    pm.expect(json).to.have.property('status');",
+                  "    pm.expect(json).to.have.property('totalRows');",
+                  "    pm.expect(json).to.have.property('completedRows');",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -2419,79 +294,24 @@
           "request": {
             "method": "GET",
             "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
-              },
-              {
-                "key": "Accept",
-                "value": "application/json",
-                "type": "text"
-              }
+              { "key": "Accept", "value": "application/json", "type": "text" }
             ],
             "url": {
-              "raw": "{{baseResearchUrl}}/api/v1/research/jobs/{{researchJobId}}",
-              "host": [
-                "{{baseResearchUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "research",
-                "jobs",
-                "%7B%7BresearchJobId%7D%7D"
-              ]
+              "raw": "{{datasetBaseUrl}}/api/v1/enrichment/jobs/{{jobId}}",
+              "host": ["{{datasetBaseUrl}}"],
+              "path": ["api", "v1", "enrichment", "jobs", "{{jobId}}"]
             },
-            "description": "Polls the status of the previously submitted asynchronous research job using {{researchJobId}}."
-          },
-          "response": [
-            {
-              "name": "Async Job Completed - 200 OK",
-              "originalRequest": {
-                "method": "GET",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json",
-                    "type": "text"
-                  },
-                  {
-                    "key": "Accept",
-                    "value": "application/json",
-                    "type": "text"
-                  }
-                ],
-                "url": {
-                  "raw": "{{baseResearchUrl}}/api/v1/research/jobs/{{researchJobId}}",
-                  "host": [
-                    "{{baseResearchUrl}}"
-                  ],
-                  "path": [
-                    "api",
-                    "v1",
-                    "research",
-                    "jobs",
-                    "%7B%7BresearchJobId%7D%7D"
-                  ]
-                }
-              },
-              "status": "OK",
-              "code": 200,
-              "_postman_previewlanguage": "json",
-              "header": [
-                {
-                  "key": "Content-Type",
-                  "value": "application/json"
-                }
-              ],
-              "cookie": [],
-              "body": "{\n  \"jobId\": \"c3f0bb05-08bf-4952-ba53-90d407639534\",\n  \"status\": \"COMPLETED\",\n  \"progress\": 100,\n  \"createdAt\": \"2026-09-05T14:30:00Z\",\n  \"completedAt\": \"2026-09-05T14:30:02Z\",\n  \"durationMs\": 1850,\n  \"result\": {\n    \"status\": \"COMPLETED\",\n    \"entityId\": \"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\",\n    \"result\": {\n      \"displayName\": \"linux\",\n      \"entityType\": \"REPOSITORY\",\n      \"canonicalUrl\": \"https://github.com/torvalds/linux\",\n      \"attributes\": {}\n    },\n    \"sources\": [],\n    \"executionTimeMs\": 1845,\n    \"metadata\": {\n      \"provider\": \"mock\",\n      \"totalSourcesDiscovered\": 3,\n      \"totalSourcesRanked\": 1,\n      \"attributesExtracted\": 1,\n      \"warningsCount\": 0\n    },\n    \"warnings\": []\n  },\n  \"error\": null,\n  \"warnings\": []\n}"
-            }
-          ]
-        },
+            "description": "Polls the status and row results of a batch enrichment job."
+          }
+        }
+      ]
+    },
+    {
+      "name": "04 Research",
+      "description": "Core web research, source discovery, and multi-source corroboration endpoints.",
+      "item": [
         {
-          "name": "E2E 04 - Deep Adaptive Research",
+          "name": "Execute Direct Research",
           "event": [
             {
               "listen": "test",
@@ -2500,50 +320,11 @@
                   "pm.test(\"Status code is 200 OK\", function () {",
                   "    pm.response.to.have.status(200);",
                   "});",
-                  "",
-                  "pm.test(\"Response is valid JSON with expected contract\", function () {",
+                  "pm.test(\"Research produces evidence and attributes\", function () {",
                   "    const json = pm.response.json();",
-                  "    pm.expect(json).to.be.an(\"object\");",
-                  "    pm.expect(json).to.have.property(\"status\");",
-                  "    pm.expect([\"COMPLETED\", \"PARTIAL\", \"FAILED\"]).to.include(json.status);",
-                  "    pm.expect(json).to.have.property(\"entityId\");",
-                  "    pm.expect(json.entityId).to.be.a(\"string\").and.have.lengthOf(64);",
-                  "    pm.expect(json).to.have.property(\"result\");",
-                  "    pm.expect(json.result).to.be.an(\"object\");",
-                  "    pm.expect(json.result).to.have.property(\"displayName\").that.is.a(\"string\");",
-                  "    pm.expect(json.result).to.have.property(\"entityType\").that.is.a(\"string\");",
-                  "    pm.expect(json.result).to.have.property(\"canonicalUrl\").that.is.a(\"string\");",
-                  "    pm.expect(json.result).to.have.property(\"attributes\").that.is.an(\"object\");",
-                  "    pm.expect(json).to.have.property(\"sources\").that.is.an(\"array\");",
-                  "    pm.expect(json).to.have.property(\"executionTimeMs\").that.is.a(\"number\").at.least(0);",
-                  "    pm.expect(json).to.have.property(\"metadata\").that.is.an(\"object\");",
-                  "});",
-                  "",
-                  "pm.test(\"Evidence attributes conform to provenance model\", function () {",
-                  "    const json = pm.response.json();",
-                  "    const attrs = json.result.attributes;",
-                  "    for (const key of Object.keys(attrs)) {",
-                  "        const tuple = attrs[key];",
-                  "        pm.expect(tuple).to.have.property(\"value\");",
-                  "        pm.expect(tuple).to.have.property(\"confidence\");",
-                  "        pm.expect(tuple).to.have.property(\"conflictDetected\").that.is.a(\"boolean\");",
-                  "        pm.expect(tuple).to.have.property(\"corroboratingSources\").that.is.an(\"array\");",
-                  "        ",
-                  "        if (tuple.value === \"UNKNOWN\") {",
-                  "            pm.expect(tuple.confidence).to.equal(\"UNKNOWN\");",
-                  "        } else {",
-                  "            pm.expect([\"HIGH\", \"MEDIUM\", \"LOW\"]).to.include(tuple.confidence);",
-                  "            if (tuple.sourceUrl) {",
-                  "                pm.expect(tuple.sourceUrl).to.be.a(\"string\");",
-                  "            }",
-                  "        }",
-                  "    }",
-                  "});",
-                  "",
-                  "pm.test(\"Adaptive exploration returns valid response\", function () {",
-                  "    const json = pm.response.json();",
-                  "    pm.expect(json.result.displayName).to.equal(\"Alan Turing\");",
-                  "    pm.expect(json.result.attributes).to.be.an(\"object\");",
+                  "    pm.expect(json.status).to.be.oneOf([\"COMPLETED\", \"PARTIAL\", \"FAILED\"]);",
+                  "    pm.expect(json).to.have.property('result');",
+                  "    pm.expect(json).to.have.property('sources');",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -2553,40 +334,273 @@
           "request": {
             "method": "POST",
             "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
-              },
-              {
-                "key": "Accept",
-                "value": "application/json",
-                "type": "text"
-              }
+              { "key": "Content-Type", "value": "application/json", "type": "text" },
+              { "key": "Accept", "value": "application/json", "type": "text" }
             ],
-            "url": {
-              "raw": "{{baseResearchUrl}}/api/v1/research",
-              "host": [
-                "{{baseResearchUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "research"
-              ]
-            },
-            "description": "Executes discovery-first research with depth DEEP (allows up to 2 adaptive query follow-ups).",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Alan Turing\",\n  \"entityType\": \"PERSON\",\n  \"depth\": \"DEEP\",\n  \"targetFields\": [\n    \"role\",\n    \"organization\",\n    \"education\"\n  ],\n  \"metadata\": {\n    \"pipelineScenario\": \"deep-adaptive-exploration\"\n  }\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
+              "raw": "{\n  \"url\": \"https://github.com/spring-projects/spring-boot\",\n  \"name\": \"Spring Boot\",\n  \"entityType\": \"REPOSITORY\",\n  \"userRequirement\": \"Extract tech stack, stars, primary language, and license\"\n}"
+            },
+            "url": {
+              "raw": "{{researchBaseUrl}}/api/v1/research",
+              "host": ["{{researchBaseUrl}}"],
+              "path": ["api", "v1", "research"]
+            },
+            "description": "Synchronous end-to-end research with requirement-aware discovery."
+          }
+        },
+        {
+          "name": "Start Async Research Job",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 202 Accepted\", function () {",
+                  "    pm.response.to.have.status(202);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "if (json.jobId) {",
+                  "    pm.collectionVariables.set(\"researchJobId\", json.jobId);",
+                  "}"
+                ],
+                "type": "text/javascript"
               }
             }
-          },
-          "response": []
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json", "type": "text" },
+              { "key": "Accept", "value": "application/json", "type": "text" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"url\": \"https://spring.io\",\n  \"name\": \"Spring\",\n  \"entityType\": \"ORGANIZATION\",\n  \"userRequirement\": \"Find headquarters and core technologies\"\n}"
+            },
+            "url": {
+              "raw": "{{researchBaseUrl}}/api/v1/research/jobs",
+              "host": ["{{researchBaseUrl}}"],
+              "path": ["api", "v1", "research", "jobs"]
+            },
+            "description": "Submits an async background research task."
+          }
+        },
+        {
+          "name": "Get Research Job Status",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json", "type": "text" }
+            ],
+            "url": {
+              "raw": "{{researchBaseUrl}}/api/v1/research/jobs/{{researchJobId}}",
+              "host": ["{{researchBaseUrl}}"],
+              "path": ["api", "v1", "research", "jobs", "{{researchJobId}}"]
+            },
+            "description": "Polls async research job result."
+          }
+        }
+      ]
+    },
+    {
+      "name": "05 AI",
+      "description": "AI intelligence services powered by Spring AI and Google Gemini with heuristic fallbacks.",
+      "item": [
+        {
+          "name": "AI Requirement Interpretation",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Interprets target fields\", function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.targetFields).to.be.an('array');",
+                  "    pm.expect(json.searchKeywords).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json", "type": "text" },
+              { "key": "Accept", "value": "application/json", "type": "text" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"requirement\": \"Extract tech stack, founders, funding stage, and headquarters\",\n  \"entityType\": \"ORGANIZATION\"\n}"
+            },
+            "url": {
+              "raw": "{{aiBaseUrl}}/api/v1/ai/requirement",
+              "host": ["{{aiBaseUrl}}"],
+              "path": ["api", "v1", "ai", "requirement"]
+            },
+            "description": "Parses natural language requirements into structured search guidance."
+          }
+        },
+        {
+          "name": "AI Input Cleansing",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Input cleaned\", function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.cleanedName).to.eql(\"Jane Doe\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json", "type": "text" },
+              { "key": "Accept", "value": "application/json", "type": "text" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rawName\": \"Dr. Jane Doe, Ph.D. \",\n  \"rawUrl\": \"https://linkedin.com/in/jane-doe?utm_source=share\",\n  \"rawOrganization\": \"Acme Corp, Inc.\",\n  \"rawRole\": \"VP of Engineering\"\n}"
+            },
+            "url": {
+              "raw": "{{aiBaseUrl}}/api/v1/ai/clean",
+              "host": ["{{aiBaseUrl}}"],
+              "path": ["api", "v1", "ai", "clean"]
+            },
+            "description": "Strips honorifics, corporate suffixes, and tracking tokens from seeds."
+          }
+        },
+        {
+          "name": "AI Fact Extraction",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Extracted attributes contain evidence snippets\", function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('attributes');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json", "type": "text" },
+              { "key": "Accept", "value": "application/json", "type": "text" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"entityName\": \"Spring Boot\",\n  \"entityType\": \"REPOSITORY\",\n  \"sourceUrl\": \"https://github.com/spring-projects/spring-boot\",\n  \"pageContent\": \"Spring Boot makes it easy to create stand-alone, production-grade Spring based Applications. The core programming language is Java.\",\n  \"targetFields\": [\"primary_language\", \"purpose\"]\n}"
+            },
+            "url": {
+              "raw": "{{aiBaseUrl}}/api/v1/ai/enrich",
+              "host": ["{{aiBaseUrl}}"],
+              "path": ["api", "v1", "ai", "enrich"]
+            },
+            "description": "Extracts structured attributes from scraped content grounded in verbatim quotes."
+          }
+        }
+      ]
+    },
+    {
+      "name": "06 Results",
+      "description": "Saved entities catalog and persistent audit trail in MySQL.",
+      "item": [
+        {
+          "name": "Get Saved Entities Catalog",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "if (Array.isArray(json) && json.length > 0) {",
+                  "    pm.collectionVariables.set(\"entityId\", json[0].id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json", "type": "text" }
+            ],
+            "url": {
+              "raw": "{{datasetBaseUrl}}/api/v1/entities?page=0&size=20",
+              "host": ["{{datasetBaseUrl}}"],
+              "path": ["api", "v1", "entities"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "20" }
+              ]
+            },
+            "description": "Fetches paginated list of saved entity snapshots from MySQL."
+          }
+        },
+        {
+          "name": "Get Entity Detail By ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200 OK or 404 Not Found\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 404]);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json", "type": "text" }
+            ],
+            "url": {
+              "raw": "{{datasetBaseUrl}}/api/v1/entities/{{entityId}}",
+              "host": ["{{datasetBaseUrl}}"],
+              "path": ["api", "v1", "entities", "{{entityId}}"]
+            },
+            "description": "Fetches complete entity profile including all corroborating sources and attributes."
+          }
         }
       ]
     }

@@ -68,6 +68,13 @@ export const EnrichedDatasetTable: React.FC<EnrichedDatasetTableProps> = ({
     }
   };
 
+  const getConfidenceDot = (tier?: string) => {
+    const t = (tier || 'LOW').toUpperCase();
+    if (t === 'HIGH') return 'bg-emerald-500';
+    if (t === 'MEDIUM') return 'bg-amber-500';
+    return 'bg-rose-400';
+  };
+
   return (
     <div className="space-y-4">
       {/* Header & Filter Controls */}
@@ -203,13 +210,17 @@ export const EnrichedDatasetTable: React.FC<EnrichedDatasetTableProps> = ({
                             {attrEntries.slice(0, 3).map(([key, tuple]) => (
                               <span
                                 key={key}
-                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-[11px] text-zinc-700 dark:text-zinc-300"
-                                title={`${key}: ${tuple.value} (${tuple.confidence})`}
+                                className="inline-flex items-center gap-1.5 px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-[11px] text-zinc-700 dark:text-zinc-300 border border-zinc-200/50 dark:border-zinc-700/50"
+                                title={`${key}: ${tuple.value} [Confidence: ${tuple.confidence}${tuple.conflictDetected ? ' | CONFLICT' : ''}]`}
                               >
+                                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${getConfidenceDot(tuple.confidence)}`} />
                                 <span className="font-semibold text-zinc-500 capitalize">
                                   {key}:
                                 </span>
                                 <span className="truncate max-w-[100px]">{tuple.value}</span>
+                                {tuple.conflictDetected && (
+                                  <span className="text-[10px] text-rose-500 font-bold" title="Conflict detected across sources">!</span>
+                                )}
                               </span>
                             ))}
                             {attrEntries.length > 3 && (

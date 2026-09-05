@@ -102,6 +102,8 @@ services:
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-enrichment_db}?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
       SPRING_DATASOURCE_USERNAME: ${MYSQL_USER:-enrichment_user}
       SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:-enrichment_password}
+      RESEARCH_SERVICE_URL: http://research-service:9741
+      AI_INTELLIGENT_SERVICE_URL: http://ai-intelligent-service:9742
     depends_on:
       mysql:
         condition: service_healthy

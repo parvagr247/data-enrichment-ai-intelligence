@@ -54,6 +54,7 @@ public class RestAiExtractionClient implements AiExtractionClient {
             AiExtractionResponse response = restClient.post()
                     .uri("/api/v1/ai/extract")
                     .contentType(MediaType.APPLICATION_JSON)
+                    .accept(MediaType.APPLICATION_JSON)
                     .body(request)
                     .retrieve()
                     .body(AiExtractionResponse.class);

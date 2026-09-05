@@ -97,6 +97,13 @@ public class QueryBuilder {
         if (target.seedRole() != null && !target.seedRole().isBlank()) {
             queries.add("\"" + name + "\" \"" + target.seedRole().trim() + "\"");
         }
+        if (target.targetFields() != null && !target.targetFields().isEmpty()) {
+            String fieldsToken = target.targetFields().stream()
+                    .limit(4)
+                    .map(this::normalizeFieldForQuery)
+                    .collect(java.util.stream.Collectors.joining(" "));
+            queries.add("\"" + name + "\" " + fieldsToken);
+        }
     }
 
     private String constructAdaptiveQuery(ResearchTarget target, String fieldTerm) {

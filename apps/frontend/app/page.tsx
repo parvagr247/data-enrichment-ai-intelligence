@@ -47,6 +47,7 @@ export default function Home() {
   const [columns, setColumns] = useState<string[]>([]);
   const [mapping, setMapping] = useState<ColumnMapping>({});
   const [datasetEntityType, setDatasetEntityType] = useState<EntityType>('PERSON');
+  const [userRequirement, setUserRequirement] = useState('');
   const [isParsing, setIsParsing] = useState(false);
   const [records, setRecords] = useState<EnrichedRecord[]>([]);
   const [progress, setProgress] = useState<EnrichmentProgressState>({
@@ -160,7 +161,8 @@ export default function Home() {
         const response = await enrichSingleRecord(
           currentRecords[i].originalData,
           mapping,
-          datasetEntityType
+          datasetEntityType,
+          userRequirement
         );
         if (abortController.signal.aborted) break;
 
@@ -233,6 +235,7 @@ export default function Home() {
     setColumns([]);
     setRecords([]);
     setMapping({});
+    setUserRequirement('');
     setSelectedRecordForModal(null);
     setWorkflowError(null);
   };
@@ -243,6 +246,7 @@ export default function Home() {
   const [url, setUrl] = useState('https://github.com/spring-projects/spring-boot');
   const [name, setName] = useState('Spring Boot');
   const [entityType, setEntityType] = useState<EntityType>('REPOSITORY');
+  const [singleRequirement, setSingleRequirement] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [singleErrorMessage, setSingleErrorMessage] = useState<string | null>(null);
   const [currentJob, setCurrentJob] = useState<ResearchJobResponse | null>(null);
@@ -329,6 +333,7 @@ export default function Home() {
       url: url.trim(),
       name: name.trim() || undefined,
       entityType: entityType,
+      userRequirement: singleRequirement.trim() || undefined,
     };
 
     try {
@@ -544,6 +549,8 @@ export default function Home() {
                 onMappingChange={setMapping}
                 entityType={datasetEntityType}
                 onEntityTypeChange={setDatasetEntityType}
+                userRequirement={userRequirement}
+                onUserRequirementChange={setUserRequirement}
                 onStartEnrichment={handleStartEnrichment}
                 onBack={() => setStep('PREVIEW')}
               />
@@ -639,6 +646,19 @@ export default function Home() {
                     <option value="WEBSITE">WEBSITE</option>
                     <option value="OTHER">OTHER</option>
                   </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-zinc-600 dark:text-zinc-400 mb-1">
+                    Custom Research Requirement (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={singleRequirement}
+                    onChange={(e) => setSingleRequirement(e.target.value)}
+                    placeholder="e.g. Find founders, tech stack, funding, and recent updates"
+                    className="w-full px-3 py-2 text-sm rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100"
+                  />
                 </div>
               </div>
 
