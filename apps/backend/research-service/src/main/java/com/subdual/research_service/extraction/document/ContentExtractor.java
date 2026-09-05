@@ -1,4 +1,4 @@
-package com.subdual.research_service.extraction;
+package com.subdual.research_service.extraction.document;
 
 import com.subdual.research_service.integration.web.FetchedContent;
 import org.jsoup.Jsoup;
@@ -8,6 +8,9 @@ import org.springframework.stereotype.Component;
 
 import java.time.Instant;
 
+/**
+ * Parses fetched HTML and web content into structured ExtractedDocument instances with cleaned body text.
+ */
 @Component
 public class ContentExtractor {
 

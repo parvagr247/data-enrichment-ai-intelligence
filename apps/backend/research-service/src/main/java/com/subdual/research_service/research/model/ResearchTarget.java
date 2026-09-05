@@ -44,6 +44,21 @@ public record ResearchTarget(
         return List.of();
     }
 
+    public ResearchDepth depth() {
+        if (metadata != null && metadata.containsKey("depth")) {
+            Object obj = metadata.get("depth");
+            if (obj instanceof ResearchDepth d) {
+                return d;
+            }
+            if (obj instanceof String s) {
+                try {
+                    return ResearchDepth.valueOf(s.toUpperCase(Locale.ROOT));
+                } catch (Exception ignored) {}
+            }
+        }
+        return ResearchDepth.NORMAL;
+    }
+
     public boolean isUrlAnchored() {
         return rawUrl != null && !rawUrl.isBlank() && (rawUrl.startsWith("http://") || rawUrl.startsWith("https://"));
     }

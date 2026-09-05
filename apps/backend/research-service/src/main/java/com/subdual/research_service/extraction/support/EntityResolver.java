@@ -1,5 +1,6 @@
-package com.subdual.research_service.extraction;
+package com.subdual.research_service.extraction.support;
 
+import com.subdual.research_service.extraction.document.ExtractedDocument;
 import com.subdual.research_service.research.model.ConfidenceTier;
 import com.subdual.research_service.research.model.EntityType;
 import com.subdual.research_service.research.model.ResearchTarget;
@@ -11,6 +12,10 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
+/**
+ * Resolves whether an extracted document matches the intended research target entity,
+ * filtering out homonyms, competing professionals, and uncorroborated sources.
+ */
 @Component
 @Slf4j
 public class EntityResolver {

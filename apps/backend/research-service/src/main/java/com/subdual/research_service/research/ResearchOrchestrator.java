@@ -23,8 +23,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
 import org.springframework.stereotype.Service;
 
+import com.subdual.research_service.research.model.ConfidenceTier;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -56,10 +61,14 @@ public class ResearchOrchestrator implements ResearchService {
             List<DiscoveredSource> rawSources = discover(target);
             context.setRawDiscoveredSources(rawSources);
 
-            List<ResearchSource> rankedSources = processSources(rawSources, target);
+            List<ResearchSource> rankedSources = new ArrayList<>(processSources(rawSources, target));
             context.setRankedSources(rankedSources);
 
-            Map<String, EvidenceTuple> attributes = extractEvidence(target, rankedSources, context.diagnostics());
+            Map<String, EvidenceTuple> attributes = new LinkedHashMap<>(extractEvidence(target, rankedSources, context.diagnostics()));
+
+            executeAdaptiveResearchIfRequired(target, rankedSources, attributes, context.diagnostics());
+
+            sourceEvidenceService.applyTargetFields(target, attributes);
             context.setAttributes(attributes);
 
             persistSnapshot(target, rankedSources, attributes, context.diagnostics());
@@ -68,6 +77,113 @@ public class ResearchOrchestrator implements ResearchService {
         } finally {
             MDC.remove("entityId");
         }
+    }
+
+    private void executeAdaptiveResearchIfRequired(
+            ResearchTarget target,
+            List<ResearchSource> currentSources,
+            Map<String, EvidenceTuple> attributes,
+            ResearchDiagnostics diagnostics
+    ) {
+        if (target == null || target.targetFields() == null || target.targetFields().isEmpty()) {
+            return;
+        }
+
+        int maxAdaptive = target.depth() != null ? target.depth().maxAdaptiveQueries() : 1;
+        if (maxAdaptive <= 0) {
+            log.info("[Pipeline: ADAPTIVE_STOP] Depth '{}' allows 0 adaptive queries. Skipping follow-up search.", target.depth());
+            return;
+        }
+
+        int adaptiveQueriesRun = 0;
+        while (adaptiveQueriesRun < maxAdaptive) {
+            List<String> missingFields = identifyMissingTargetFields(target, attributes);
+            if (missingFields.isEmpty()) {
+                log.info("[Pipeline: ADAPTIVE_STOP] All requested target fields covered. Stopping early.");
+                break;
+            }
+
+            int currentCount = currentSources.size();
+            int maxTotal = target.depth() != null ? target.depth().maxSources() : 5;
+            int remainingAllowed = maxTotal - currentCount;
+            if (remainingAllowed <= 0) {
+                log.info("[Pipeline: ADAPTIVE_STOP] Source limit reached ({}). Stopping.", currentCount);
+                break;
+            }
+
+            List<DiscoveredSource> newDiscovered = discoveryService.discoverAdaptiveSources(target, missingFields, Math.min(3, remainingAllowed));
+            adaptiveQueriesRun++;
+
+            if (newDiscovered == null || newDiscovered.isEmpty()) {
+                log.info("[Pipeline: ADAPTIVE_STOP] No new sources discovered for missing fields {}. Stopping.", missingFields);
+                break;
+            }
+
+            List<ResearchSource> newRanked = filterUnseenSources(newDiscovered, currentSources, target);
+            if (newRanked.isEmpty()) {
+                log.info("[Pipeline: ADAPTIVE_STOP] Discovered candidates already seen or filtered. Stopping.");
+                break;
+            }
+
+            currentSources.addAll(newRanked);
+            Map<String, EvidenceTuple> additionalAttrs = extractEvidence(target, newRanked, diagnostics);
+            mergeAdditionalAttributes(attributes, additionalAttrs);
+        }
+    }
+
+    private List<String> identifyMissingTargetFields(ResearchTarget target, Map<String, EvidenceTuple> attributes) {
+        return target.targetFields().stream()
+                .filter(field -> !isFieldSatisfied(attributes, field))
+                .toList();
+    }
+
+    private boolean isFieldSatisfied(Map<String, EvidenceTuple> attributes, String field) {
+        if (attributes == null || field == null) return false;
+        EvidenceTuple tuple = attributes.get(field);
+        if (tuple == null) {
+            for (Map.Entry<String, EvidenceTuple> entry : attributes.entrySet()) {
+                if (entry.getKey().equalsIgnoreCase(field)) {
+                    tuple = entry.getValue();
+                    break;
+                }
+            }
+        }
+        return tuple != null && tuple.value() != null
+                && !"UNKNOWN".equalsIgnoreCase(tuple.value().trim())
+                && tuple.confidence() != ConfidenceTier.UNKNOWN;
+    }
+
+    private List<ResearchSource> filterUnseenSources(
+            List<DiscoveredSource> candidates,
+            List<ResearchSource> existingSources,
+            ResearchTarget target
+    ) {
+        Set<String> existingUrls = existingSources.stream()
+                .map(ResearchSource::url)
+                .filter(u -> u != null && !u.isBlank())
+                .map(String::toLowerCase)
+                .collect(Collectors.toSet());
+
+        List<DiscoveredSource> fresh = candidates.stream()
+                .filter(c -> c != null && c.url() != null && !existingUrls.contains(c.url().toLowerCase()))
+                .toList();
+
+        if (fresh.isEmpty()) {
+            return List.of();
+        }
+
+        int maxRemaining = Math.max(1, (target.depth() != null ? target.depth().maxSources() : 5) - existingSources.size());
+        String provider = discoveryProperties != null ? discoveryProperties.provider() : "mock";
+        return sourceProcessor.processSources(fresh, target, maxRemaining, provider);
+    }
+
+    private void mergeAdditionalAttributes(Map<String, EvidenceTuple> target, Map<String, EvidenceTuple> incoming) {
+        if (incoming == null || target == null) return;
+        incoming.forEach((key, val) -> {
+            if (val != null && val.value() != null && !"UNKNOWN".equalsIgnoreCase(val.value().trim())) {
+                target.put(key, val);
+            }
+        });
     }
 
     public void validate(ResearchRequest request) {

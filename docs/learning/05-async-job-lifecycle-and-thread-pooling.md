@@ -39,7 +39,7 @@ stateDiagram-v2
     FAILED --> [*]
 ```
 
-1. **Submission**: [`InMemoryResearchJobService.submitJob`](file:///P:/Agentic%20AI/Enrichment%20Platform/data-enrichment-ai-intelligence/apps/backend/research-service/src/main/java/com/subdual/research_service/service/InMemoryResearchJobService.java#L66-L76) generates a UUID `jobId`, saves a `ResearchJob` with `status: SUBMITTED` in a thread-safe `ConcurrentHashMap`, and returns `202 Accepted` to the client.
+1. **Submission**: [`InMemoryResearchJobService.submitJob`](file:///P:/Agentic%20AI/Enrichment%20Platform/data-enrichment-ai-intelligence/apps/backend/research-service/src/main/java/com/subdual/research_service/research/job/InMemoryResearchJobService.java#L66-L76) generates a UUID `jobId`, saves a `ResearchJob` with `status: SUBMITTED` in a thread-safe `ConcurrentHashMap`, and returns `202 Accepted` to the client.
 2. **Execution**: The task is enqueued to a custom `ThreadPoolExecutor`.
 3. **MDC Logging**: The worker thread sets SLF4J MDC (`jobId`) so all log lines across the pipeline are correlated to that job.
 4. **Polling**: The frontend polls `GET /api/v1/research/jobs/{jobId}` every second to update its progress bar until the job reaches `COMPLETED` or `FAILED`.
@@ -48,7 +48,7 @@ stateDiagram-v2
 
 ## 4. Relevant Architecture & Code
 
-### A. Bounded Thread Pool Configuration in [`InMemoryResearchJobService.java`](file:///P:/Agentic%20AI/Enrichment%20Platform/data-enrichment-ai-intelligence/apps/backend/research-service/src/main/java/com/subdual/research_service/service/InMemoryResearchJobService.java#L48-L58)
+### A. Bounded Thread Pool Configuration in [`InMemoryResearchJobService.java`](file:///P:/Agentic%20AI/Enrichment%20Platform/data-enrichment-ai-intelligence/apps/backend/research-service/src/main/java/com/subdual/research_service/research/job/InMemoryResearchJobService.java#L48-L58)
 
 ```java
 // Bounded executor to prevent uncontrolled thread explosion and OutOfMemoryError
@@ -67,7 +67,7 @@ this.executor = new ThreadPoolExecutor(
 * `CallerRunsPolicy` does something clever: **if the 500-task queue is full, the thread that called `submitJob` (the HTTP request thread) executes the research task itself**.
 * This naturally throttles incoming traffic: the client's HTTP request blocks until execution finishes, preventing more requests from flooding the server.
 
-### C. MDC Log Correlation in [`InMemoryResearchJobService.java`](file:///P:/Agentic%20AI/Enrichment%20Platform/data-enrichment-ai-intelligence/apps/backend/research-service/src/main/java/com/subdual/research_service/service/InMemoryResearchJobService.java#L84-L100)
+### C. MDC Log Correlation in [`InMemoryResearchJobService.java`](file:///P:/Agentic%20AI/Enrichment%20Platform/data-enrichment-ai-intelligence/apps/backend/research-service/src/main/java/com/subdual/research_service/research/job/InMemoryResearchJobService.java#L84-L100)
 
 ```java
 private void processJob(String jobId, ResearchRequest request) {

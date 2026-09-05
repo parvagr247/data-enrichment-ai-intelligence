@@ -1,10 +1,18 @@
-package com.subdual.research_service.extraction;
+package com.subdual.research_service.extraction.document;
 
 import java.time.Instant;
 
+/**
+ * Immutable representation of a parsed and cleaned document retrieved during research discovery.
+ */
 public record ExtractedDocument(
-        String url, String title, String metaDescription,
-        String siteName, String cleanText, Instant extractedAt ) {
+        String url,
+        String title,
+        String metaDescription,
+        String siteName,
+        String cleanText,
+        Instant extractedAt
+) {
 
     public ExtractedDocument(String url, String title, String cleanText, String metaDescription, String siteName) {
         this(url, title, metaDescription, siteName, cleanText, Instant.now());

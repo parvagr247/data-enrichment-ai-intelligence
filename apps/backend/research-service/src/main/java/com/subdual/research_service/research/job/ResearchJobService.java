@@ -1,4 +1,4 @@
-package com.subdual.research_service.research;
+package com.subdual.research_service.research.job;
 
 import com.subdual.research_service.api.dto.ResearchJobResponse;
 import com.subdual.research_service.api.dto.ResearchRequest;

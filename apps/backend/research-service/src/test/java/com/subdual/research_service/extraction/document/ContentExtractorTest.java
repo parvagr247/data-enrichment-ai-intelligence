@@ -1,4 +1,4 @@
-package com.subdual.research_service.extraction;
+package com.subdual.research_service.extraction.document;
 
 import com.subdual.research_service.integration.web.FetchedContent;
 import org.junit.jupiter.api.BeforeEach;

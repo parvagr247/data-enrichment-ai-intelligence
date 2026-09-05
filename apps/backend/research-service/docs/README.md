@@ -28,10 +28,9 @@ com.subdual.research_service/
 ├── research/             # Core business boundary & lifecycle orchestration
 │   ├── ResearchService.java
 │   ├── ResearchOrchestrator.java
-│   ├── ResearchJobService.java
-│   ├── InMemoryResearchJobService.java
 │   ├── model/            # Immutable domain representations (records & enums)
-│   └── pipeline/         # Intention-revealing pipeline steps, diagnostics & timer
+│   ├── pipeline/         # Intention-revealing pipeline steps, diagnostics & timer
+│   └── job/              # Asynchronous job lifecycle management & execution
 ├── discovery/            # Strategy-based search query builder and provider clients
 │   ├── service/          # Discovery service contract and orchestration
 │   │   ├── ResearchDiscoveryService.java

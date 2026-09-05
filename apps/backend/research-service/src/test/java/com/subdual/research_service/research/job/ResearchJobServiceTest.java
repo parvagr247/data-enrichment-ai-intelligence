@@ -1,9 +1,10 @@
-package com.subdual.research_service.research;
+package com.subdual.research_service.research.job;
 
 import com.subdual.research_service.api.dto.ResearchJobResponse;
 import com.subdual.research_service.api.dto.ResearchRequest;
 import com.subdual.research_service.api.dto.ResearchResponse;
 import com.subdual.research_service.api.dto.ResearchResult;
+import com.subdual.research_service.research.ResearchService;
 import com.subdual.research_service.research.model.EntityType;
 import com.subdual.research_service.research.model.ResearchJobStatus;
 import com.subdual.research_service.research.model.ResearchStatus;

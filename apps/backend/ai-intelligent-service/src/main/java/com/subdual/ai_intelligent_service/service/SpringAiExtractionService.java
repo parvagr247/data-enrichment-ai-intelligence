@@ -36,6 +36,15 @@ public class SpringAiExtractionService implements ExtractionService {
     private static final Pattern LICENSE_PATTERN = Pattern.compile(
             "(?i)\\b(Apache[-\\s]?2\\.0|MIT|GPL|BSD|Mozilla Public License)\\b"
     );
+    private static final Pattern EDUCATION_PATTERN = Pattern.compile(
+            "(?i)\\b(?:graduated from|degree from|studied at)\\s+([A-Z][a-zA-Z0-9&\\s]{2,35})\\b"
+    );
+    private static final Pattern LOCATION_PATTERN = Pattern.compile(
+            "(?i)\\b(?:based in|located in|headquartered in)\\s+([A-Z][a-zA-Z0-9,\\s]{2,35})\\b"
+    );
+    private static final Pattern SKILLS_PATTERN = Pattern.compile(
+            "(?i)\\b(?:skills:|expertise in|proficient in)\\s+([a-zA-Z0-9,\\s/+-]{2,50})\\b"
+    );
 
     private final ChatModel chatModel;
     private final AiProperties properties;
@@ -195,6 +204,9 @@ public class SpringAiExtractionService implements ExtractionService {
         tryExtractDescription(sentence, lowerSentence, lowerName, facts);
         tryExtractRole(sentence, lowerSentence, lowerName, facts);
         tryExtractOrganization(sentence, lowerSentence, lowerName, facts);
+        tryExtractEducation(sentence, lowerSentence, lowerName, facts);
+        tryExtractLocation(sentence, lowerSentence, lowerName, facts);
+        tryExtractSkills(sentence, lowerSentence, facts);
         tryExtractLicense(sentence, lowerSentence, facts);
     }
 
@@ -228,6 +240,39 @@ public class SpringAiExtractionService implements ExtractionService {
         if (m.find()) {
             String org = m.group(1).trim();
             facts.put("organization", new ExtractedFact(org, sentence, 0.85));
+        }
+    }
+
+    private void tryExtractEducation(String sentence, String lowerSentence, String lowerName, Map<String, ExtractedFact> facts) {
+        if (facts.containsKey("education")) {
+            return;
+        }
+        Matcher m = EDUCATION_PATTERN.matcher(sentence);
+        if (m.find()) {
+            String edu = m.group(1).trim();
+            facts.put("education", new ExtractedFact(edu, sentence, 0.88));
+        }
+    }
+
+    private void tryExtractLocation(String sentence, String lowerSentence, String lowerName, Map<String, ExtractedFact> facts) {
+        if (facts.containsKey("location")) {
+            return;
+        }
+        Matcher m = LOCATION_PATTERN.matcher(sentence);
+        if (m.find()) {
+            String loc = m.group(1).trim();
+            facts.put("location", new ExtractedFact(loc, sentence, 0.85));
+        }
+    }
+
+    private void tryExtractSkills(String sentence, String lowerSentence, Map<String, ExtractedFact> facts) {
+        if (facts.containsKey("skills")) {
+            return;
+        }
+        Matcher m = SKILLS_PATTERN.matcher(sentence);
+        if (m.find()) {
+            String skills = m.group(1).trim();
+            facts.put("skills", new ExtractedFact(skills, sentence, 0.85));
         }
     }
 

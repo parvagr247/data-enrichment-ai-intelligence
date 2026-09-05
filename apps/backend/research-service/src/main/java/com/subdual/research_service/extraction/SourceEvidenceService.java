@@ -14,5 +14,6 @@ public interface SourceEvidenceService {
             ResearchTarget target,
             List<ResearchSource> rankedSources,
             ResearchDiagnostics diagnostics );
-            
+
+    default void applyTargetFields(ResearchTarget target, Map<String, EvidenceTuple> attributes) {}
 }

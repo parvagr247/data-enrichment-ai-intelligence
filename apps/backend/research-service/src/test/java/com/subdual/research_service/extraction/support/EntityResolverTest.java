@@ -1,5 +1,6 @@
-package com.subdual.research_service.extraction;
+package com.subdual.research_service.extraction.support;
 
+import com.subdual.research_service.extraction.document.ExtractedDocument;
 import com.subdual.research_service.research.model.ConfidenceTier;
 import com.subdual.research_service.research.model.EntityType;
 import com.subdual.research_service.research.model.ResearchTarget;

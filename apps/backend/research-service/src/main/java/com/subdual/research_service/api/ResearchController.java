@@ -3,7 +3,7 @@ package com.subdual.research_service.api;
 import com.subdual.research_service.api.dto.ResearchJobResponse;
 import com.subdual.research_service.api.dto.ResearchRequest;
 import com.subdual.research_service.api.dto.ResearchResponse;
-import com.subdual.research_service.research.ResearchJobService;
+import com.subdual.research_service.research.job.ResearchJobService;
 import com.subdual.research_service.research.ResearchService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;

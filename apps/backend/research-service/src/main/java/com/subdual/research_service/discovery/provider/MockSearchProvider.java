@@ -66,7 +66,7 @@ public class MockSearchProvider implements SearchProvider {
             return mockJaneDoeSources(now);
         }
         if (lowerQuery.contains("parv-agrawal") || lowerQuery.contains("parv agrawal")) {
-            return mockParvAgrawalSources(now);
+            return mockParvAgrawalSources(lowerQuery, now);
         }
         if (lowerQuery.contains("linkedin") || lowerQuery.contains("example")) {
             return mockLinkedInSources(now);
@@ -75,7 +75,19 @@ public class MockSearchProvider implements SearchProvider {
         return mockFallbackSources(rawQuery, lowerQuery, now);
     }
 
-    private List<DiscoveredSource> mockParvAgrawalSources(Instant now) {
+    private List<DiscoveredSource> mockParvAgrawalSources(String lowerQuery, Instant now) {
+        if (lowerQuery.contains("education") || lowerQuery.contains("college") || lowerQuery.contains("university")) {
+            return List.of(
+                    new DiscoveredSource(
+                            "https://mnit.ac.in/academics/parv-agrawal",
+                            "[MOCK] Parv Agrawal - Academic Profile - MNIT Jaipur",
+                            "OFFICIAL_WEBSITE",
+                            now,
+                            0.95,
+                            "Parv Agrawal is a student at MNIT Jaipur. Education: B.Tech in Chemical Engineering. Graduated from MNIT Jaipur."
+                    )
+            );
+        }
         return List.of(
                 new DiscoveredSource(
                         "https://www.linkedin.com/in/parv-agrawal-170174308",

@@ -1,6 +1,7 @@
 package com.subdual.research_service.api.dto;
 
 import com.subdual.research_service.research.model.EntityType;
+import com.subdual.research_service.research.model.ResearchDepth;
 import jakarta.validation.constraints.AssertTrue;
 
 import java.util.List;
@@ -19,18 +20,24 @@ public record ResearchRequest(
 
         List<String> targetFields,
 
+        ResearchDepth depth,
+
         Map<String, Object> metadata
 ) {
+    public ResearchRequest(String url, EntityType entityType, String name, String organization, String role, List<String> targetFields, Map<String, Object> metadata) {
+        this(url, entityType, name, organization, role, targetFields, ResearchDepth.NORMAL, metadata);
+    }
+
     public ResearchRequest(String url, EntityType entityType, String name, Map<String, Object> metadata) {
-        this(url, entityType, name, null, null, null, metadata);
+        this(url, entityType, name, null, null, null, ResearchDepth.NORMAL, metadata);
     }
 
     public ResearchRequest(String url, EntityType entityType, String name) {
-        this(url, entityType, name, null, null, null, null);
+        this(url, entityType, name, null, null, null, ResearchDepth.NORMAL, null);
     }
 
     public ResearchRequest(String url) {
-        this(url, EntityType.OTHER, null, null, null, null, null);
+        this(url, EntityType.OTHER, null, null, null, null, ResearchDepth.NORMAL, null);
     }
 
     public ResearchRequest {
@@ -39,6 +46,9 @@ public record ResearchRequest(
         }
         if (targetFields == null) {
             targetFields = List.of();
+        }
+        if (depth == null) {
+            depth = ResearchDepth.NORMAL;
         }
         if (metadata == null) {
             metadata = Map.of();

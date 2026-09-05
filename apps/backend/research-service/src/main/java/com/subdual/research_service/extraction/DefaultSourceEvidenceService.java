@@ -7,6 +7,9 @@ import com.subdual.research_service.research.pipeline.ResearchDiagnostics;
 import com.subdual.research_service.research.model.ResearchSource;
 import com.subdual.research_service.research.model.ResearchTarget;
 import com.subdual.research_service.api.dto.EvidenceTuple;
+import com.subdual.research_service.extraction.document.ContentExtractor;
+import com.subdual.research_service.extraction.document.ExtractedDocument;
+import com.subdual.research_service.extraction.support.EntityResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -59,13 +62,20 @@ public class DefaultSourceEvidenceService implements SourceEvidenceService {
             ResearchDiagnostics diagnostics
     ) {
         FetchedContent fetched = webContentFetcher.fetch(source.url());
+        ExtractedDocument doc;
         if (fetched == null || !fetched.success()) {
             handleInaccessibleSource(target, source, fetched, diagnostics);
-            return;
+            if (source.snippet() != null && source.snippet().trim().length() > 50) {
+                log.info("Using search provider snippet fallback for blocked source '{}'", source.url());
+                doc = new ExtractedDocument(source.url(), source.title(), source.snippet(), null, source.domain());
+            } else {
+                return;
+            }
+        } else {
+            int maxLength = pipelineProperties != null ? pipelineProperties.maxContentLength() : 50000;
+            doc = contentExtractor.extract(fetched, maxLength);
         }
 
-        int maxLength = pipelineProperties != null ? pipelineProperties.maxContentLength() : 50000;
-        ExtractedDocument doc = contentExtractor.extract(fetched, maxLength);
         EntityResolver.ResolutionResult resolution = entityResolver.resolve(target, doc);
 
         resolutions.put(source.url(), resolution);
@@ -73,10 +83,11 @@ public class DefaultSourceEvidenceService implements SourceEvidenceService {
             resolutions.put(doc.url(), resolution);
         }
 
-        if (resolution.matched()) {
+        if (resolution != null && resolution.matched()) {
             extractedDocuments.add(doc);
         } else {
-            log.info("Document '{}' rejected by entity resolution: {}", source.url(), resolution.reason());
+            String reason = resolution != null ? resolution.reason() : "resolution failed";
+            log.info("Document '{}' rejected by entity resolution: {}", source.url(), reason);
         }
     }
 
@@ -127,5 +138,10 @@ public class DefaultSourceEvidenceService implements SourceEvidenceService {
         String s1 = u1.trim().replaceFirst("^https?://(www\\.)?", "").replaceFirst("/+$", "");
         String s2 = u2.trim().replaceFirst("^https?://(www\\.)?", "").replaceFirst("/+$", "");
         return s1.equalsIgnoreCase(s2);
+    }
+
+    @Override
+    public void applyTargetFields(ResearchTarget target, Map<String, EvidenceTuple> attributes) {
+        evidenceExtractor.applyTargetFields(target, attributes);
     }
 }

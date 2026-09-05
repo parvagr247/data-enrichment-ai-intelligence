@@ -37,6 +37,39 @@ public class QueryBuilder {
         return queries.stream().distinct().limit(3).toList();
     }
 
+    public String buildAdaptiveQuery(ResearchTarget target, List<String> missingFields) {
+        if (target == null || missingFields == null || missingFields.isEmpty()) {
+            return buildDiscoveryQuery(target);
+        }
+
+        String name = hasDistinctDisplayName(target) ? target.displayName().trim() : "";
+        String fieldTerm = normalizeFieldForQuery(missingFields.get(0));
+
+        if (!name.isBlank()) {
+            if (target.seedOrganization() != null && !target.seedOrganization().isBlank()) {
+                return "\"" + name + "\" " + fieldTerm + " \"" + target.seedOrganization().trim() + "\"";
+            }
+            return "\"" + name + "\" " + fieldTerm;
+        }
+
+        return fieldTerm + " " + buildDiscoveryQuery(target);
+    }
+
+    private String normalizeFieldForQuery(String field) {
+        if (field == null) return "overview";
+        String lower = field.toLowerCase(Locale.ROOT).trim();
+        return switch (lower) {
+            case "currentrole", "role" -> "role position";
+            case "organization", "current_organization", "company" -> "organization company";
+            case "education", "degree", "alumni" -> "education university college";
+            case "location", "headquarters", "based_in" -> "location headquarters";
+            case "skills", "technologies" -> "skills technologies";
+            case "industry" -> "industry sector";
+            case "products", "services" -> "products services";
+            default -> lower;
+        };
+    }
+
     public String buildDiscoveryQuery(ResearchTarget target) {
         if (target == null) {
             return "";
