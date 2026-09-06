@@ -85,6 +85,8 @@ services:
     restart: unless-stopped
     environment:
       SERVER_PORT: 9737
+      SPRING_APPLICATION_NAME: discovery-server
+      CONFIG_SERVER_URL: http://config-server:9736
       EUREKA_INSTANCE_HOSTNAME: discovery-server
     depends_on:
       config-server:
@@ -159,6 +161,8 @@ services:
       GEMINI_API_KEY: ${GEMINI_API_KEY}
       AI_MODEL: ${AI_MODEL:-gemini-2.0-flash}
     depends_on:
+      config-server:
+        condition: service_healthy
       discovery-server:
         condition: service_healthy
     networks:
@@ -201,6 +205,8 @@ services:
       RESEARCH_MAX_SOURCES: ${RESEARCH_MAX_SOURCES:-5}
       RESEARCH_MAX_CONTENT_LENGTH: ${RESEARCH_MAX_CONTENT_LENGTH:-50000}
     depends_on:
+      config-server:
+        condition: service_healthy
       discovery-server:
         condition: service_healthy
     networks:
@@ -284,6 +290,8 @@ services:
       GATEWAY_API_KEY: ${GATEWAY_API_KEY:-}
       GATEWAY_CORS_ALLOWED_ORIGINS: ${GATEWAY_CORS_ALLOWED_ORIGINS:-http://${VM_IP}:3000,http://localhost:3000}
     depends_on:
+      config-server:
+        condition: service_healthy
       discovery-server:
         condition: service_healthy
       auth-service:
