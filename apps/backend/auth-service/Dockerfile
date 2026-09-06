@@ -18,6 +18,9 @@ RUN ./mvnw dependency:resolve -B
 # 3. Copy application source tree
 COPY src ./src
 
+# 4. Pre-compile application and cache build plugins during image build
+RUN ./mvnw package -DskipTests -B
+
 EXPOSE 9739
 
 CMD ["./mvnw", "spring-boot:run"]

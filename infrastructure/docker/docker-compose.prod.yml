@@ -65,8 +65,8 @@ services:
       test: ["CMD-SHELL", "curl -f http://localhost:9736/actuator/health || exit 1"]
       interval: 10s
       timeout: 5s
-      retries: 5
-      start_period: 25s
+      retries: 10
+      start_period: 45s
 
   # ----------------------------------------------------------------------------
   # 3. Service Discovery Server / Eureka (Internal Only :9737)
@@ -93,8 +93,8 @@ services:
       test: ["CMD-SHELL", "curl -f http://localhost:9737/actuator/health || exit 1"]
       interval: 10s
       timeout: 5s
-      retries: 5
-      start_period: 25s
+      retries: 10
+      start_period: 45s
 
   # ----------------------------------------------------------------------------
   # 4. Authentication Service (Internal Only :9739)
@@ -130,8 +130,8 @@ services:
       test: ["CMD-SHELL", "curl -f http://localhost:9739/actuator/health || exit 1"]
       interval: 10s
       timeout: 5s
-      retries: 5
-      start_period: 25s
+      retries: 10
+      start_period: 60s
 
   # ----------------------------------------------------------------------------
   # 5. AI Intelligent Service (Internal Only :9742)
@@ -163,8 +163,8 @@ services:
       test: ["CMD-SHELL", "curl -f http://localhost:9742/actuator/health || exit 1"]
       interval: 10s
       timeout: 5s
-      retries: 5
-      start_period: 30s
+      retries: 10
+      start_period: 60s
 
   # ----------------------------------------------------------------------------
   # 6. Research Service (Internal Only :9741)
@@ -205,8 +205,8 @@ services:
       test: ["CMD-SHELL", "curl -f http://localhost:9741/actuator/health || exit 1"]
       interval: 10s
       timeout: 5s
-      retries: 5
-      start_period: 30s
+      retries: 10
+      start_period: 60s
 
   # ----------------------------------------------------------------------------
   # 7. Dataset Service (Internal Only :9743)
@@ -247,8 +247,8 @@ services:
       test: ["CMD-SHELL", "curl -f http://localhost:9743/actuator/health || exit 1"]
       interval: 10s
       timeout: 5s
-      retries: 5
-      start_period: 30s
+      retries: 10
+      start_period: 60s
 
   # ----------------------------------------------------------------------------
   # 8. API Gateway (Primary External Entrypoint :9738)
@@ -286,8 +286,8 @@ services:
       test: ["CMD-SHELL", "curl -f http://localhost:9738/actuator/health || exit 1"]
       interval: 10s
       timeout: 5s
-      retries: 5
-      start_period: 25s
+      retries: 10
+      start_period: 60s
 
   # ----------------------------------------------------------------------------
   # 9. Frontend Dashboard (External Entrypoint :3000)
