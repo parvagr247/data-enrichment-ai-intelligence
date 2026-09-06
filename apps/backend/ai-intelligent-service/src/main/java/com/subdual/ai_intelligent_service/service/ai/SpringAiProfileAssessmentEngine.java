@@ -78,19 +78,25 @@ public class SpringAiProfileAssessmentEngine implements ProfileAssessmentEngine 
                 vars.put("sourceSnippetsJson", toJsonSafe(request.sourceSnippets()));
 
                 String promptText = promptTemplateService.render("research-profile-assessment", vars);
+                log.info("[AI_MODEL_CALL] model='{}' provider='google-genai' stage='PROFILE_ASSESSMENT' entity='{}' attempt={}/{}",
+                        properties.model(), request.displayName(), retries + 1, MAX_RETRIES + 1);
                 String responseText = chatModel.call(new Prompt(promptText)).getResult().getOutput().getText();
 
                 ProfileAssessmentResponse parsed = parseProfileResponse(responseText, request, startMs);
                 if (parsed != null) {
+                    log.info("[AI_MODEL_SUCCESS] model='{}' provider='google-genai' stage='PROFILE_ASSESSMENT' entity='{}' durationMs={}",
+                            properties.model(), request.displayName(), System.currentTimeMillis() - startMs);
                     return parsed;
                 }
             } catch (Exception ex) {
-                log.warn("Spring AI profile assessment attempt {} failed: {}", retries + 1, ex.getMessage());
+                log.warn("[AI_MODEL_RETRY] model='{}' provider='google-genai' stage='PROFILE_ASSESSMENT' entity='{}' attempt={}/{} error='{}'",
+                        properties.model(), request.displayName(), retries + 1, MAX_RETRIES + 1, ex.getMessage());
             }
             retries++;
         }
 
-        log.info("Spring AI profile assessment falling back to deterministic engine for entity '{}'", request.displayName());
+        log.warn("[AI_MODEL_DEGRADED] model='{}' provider='google-genai' stage='PROFILE_ASSESSMENT' entity='{}' falling back to deterministic assessment",
+                properties.model(), request.displayName());
         return deterministicFallback.assessProfile(request);
     }
 

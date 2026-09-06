@@ -18,7 +18,8 @@ import com.subdual.dataset_service.profile.model.ResearchObjective;
 import com.subdual.dataset_service.profile.model.ResearchProfile;
 import com.subdual.dataset_service.integration.client.AiServiceClient;
 import com.subdual.dataset_service.integration.client.ResearchServiceClient;
-import lombok.RequiredArgsConstructor;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -37,7 +38,6 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService {
 
@@ -46,6 +46,35 @@ public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService
     private final EntityPersistenceService persistenceService;
     private final ExecutorService enrichmentJobExecutor;
     private final com.subdual.dataset_service.service.executor.EnrichmentTaskExecutor enrichmentTaskExecutor;
+    private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
+
+    public DefaultDatasetEnrichmentService(
+            ResearchServiceClient researchServiceClient,
+            AiServiceClient aiServiceClient,
+            EntityPersistenceService persistenceService,
+            ExecutorService enrichmentJobExecutor,
+            com.subdual.dataset_service.service.executor.EnrichmentTaskExecutor enrichmentTaskExecutor
+    ) {
+        this(researchServiceClient, aiServiceClient, persistenceService, enrichmentJobExecutor, enrichmentTaskExecutor,
+                new com.fasterxml.jackson.databind.ObjectMapper().registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule()));
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public DefaultDatasetEnrichmentService(
+            ResearchServiceClient researchServiceClient,
+            AiServiceClient aiServiceClient,
+            EntityPersistenceService persistenceService,
+            ExecutorService enrichmentJobExecutor,
+            com.subdual.dataset_service.service.executor.EnrichmentTaskExecutor enrichmentTaskExecutor,
+            @org.springframework.lang.Nullable com.fasterxml.jackson.databind.ObjectMapper objectMapper
+    ) {
+        this.researchServiceClient = researchServiceClient;
+        this.aiServiceClient = aiServiceClient;
+        this.persistenceService = persistenceService;
+        this.enrichmentJobExecutor = enrichmentJobExecutor;
+        this.enrichmentTaskExecutor = enrichmentTaskExecutor;
+        this.objectMapper = objectMapper != null ? objectMapper : new com.fasterxml.jackson.databind.ObjectMapper().registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule());
+    }
 
     private final Map<String, JobState> activeJobs = new ConcurrentHashMap<>();
     private final Map<String, List<SseEmitter>> jobEmitters = new ConcurrentHashMap<>();
@@ -60,6 +89,8 @@ public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService
         java.util.concurrent.atomic.AtomicInteger completedRows = new java.util.concurrent.atomic.AtomicInteger(0);
         java.util.concurrent.atomic.AtomicInteger failedRows = new java.util.concurrent.atomic.AtomicInteger(0);
         java.util.concurrent.atomic.AtomicInteger partialRows = new java.util.concurrent.atomic.AtomicInteger(0);
+        java.util.concurrent.atomic.AtomicInteger degradedRows = new java.util.concurrent.atomic.AtomicInteger(0);
+        java.util.concurrent.atomic.AtomicInteger insufficientEvidenceRows = new java.util.concurrent.atomic.AtomicInteger(0);
         java.util.concurrent.atomic.AtomicInteger processingRows = new java.util.concurrent.atomic.AtomicInteger(0);
         volatile int progress;
         Instant createdAt;
@@ -365,9 +396,9 @@ public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService
                             0.0,
                             List.of(),
                             null,
-                            "RESEARCHING_IDENTITY",
+                            "DISCOVERING",
                             workerId,
-                            "Resolving entity identity & canonical anchors...",
+                            "Resolving entity identity & discovering sources...",
                             startedAtMs,
                             null
                     ));
@@ -378,9 +409,9 @@ public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService
                             rowIndex,
                             entityName,
                             "PROCESSING",
-                            "RESEARCHING_IDENTITY",
+                            "DISCOVERING",
                             workerId,
-                            "Resolving entity identity & canonical anchors...",
+                            "Resolving entity identity & discovering sources...",
                             Map.of("originalData", row)
                     );
 
@@ -416,6 +447,10 @@ public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService
                             state.completedRows.incrementAndGet();
                             if ("PARTIAL".equalsIgnoreCase(result.status())) {
                                 state.partialRows.incrementAndGet();
+                            } else if ("AI_DEGRADED".equalsIgnoreCase(result.status())) {
+                                state.degradedRows.incrementAndGet();
+                            } else if ("INSUFFICIENT_EVIDENCE".equalsIgnoreCase(result.status())) {
+                                state.insufficientEvidenceRows.incrementAndGet();
                             }
                             emitExecutionEvent(
                                     state.jobId,
@@ -423,7 +458,7 @@ public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService
                                     rowIndex,
                                     result.displayName(),
                                     result.status(),
-                                    "COMPLETED",
+                                    result.status(),
                                     workerId,
                                     result.message() != null ? result.message() : "Enrichment completed",
                                     Map.of(
@@ -560,7 +595,7 @@ public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService
                 rowIndex,
                 displayName,
                 "PROCESSING",
-                "DISCOVERING_SOURCES",
+                "DISCOVERING",
                 workerId,
                 "Querying verified web sources & search indexes...",
                 Map.of("name", displayName, "url", canonicalUrl)
@@ -674,39 +709,37 @@ public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService
                 rowIndex,
                 displayName,
                 "PROCESSING",
+                "COLLECTING_SOURCES",
+                workerId,
+                "Collected and deduplicated " + sourceUrls.size() + " candidate sources...",
+                Map.of("sourcesCount", sourceUrls.size())
+        );
+
+        emitExecutionEvent(
+                jobId,
+                rowId,
+                rowIndex,
+                displayName,
+                "PROCESSING",
                 "EXTRACTING_EVIDENCE",
                 workerId,
                 "Extracting grounded evidence from " + sourceUrls.size() + " discovered sources...",
                 Map.of("sourcesCount", sourceUrls.size(), "evidenceCount", evidenceMap.size())
         );
 
-        // 3. Analyze Activity & Background
+        // 3. AI Enrichment
         emitExecutionEvent(
                 jobId,
                 rowId,
                 rowIndex,
                 displayName,
                 "PROCESSING",
-                "ANALYZING_ACTIVITY",
+                "AI_ENRICHMENT",
                 workerId,
-                "Analyzing public activity, posts, and professional background...",
-                Map.of("sourcesCount", sourceUrls.size())
+                "Synthesizing grounded attributes with AI intelligence...",
+                Map.of("evidenceCount", evidenceMap.size(), "targetFields", targetFields)
         );
 
-        // 4. Assess Objective
-        emitExecutionEvent(
-                jobId,
-                rowId,
-                rowIndex,
-                displayName,
-                "PROCESSING",
-                "ASSESSING_OBJECTIVE",
-                workerId,
-                "Evaluating relevance against user research objective...",
-                Map.of("objective", requirement != null ? requirement : "")
-        );
-
-        // 5. Dispatch to AI Service for grounded attribute synthesis
         AiServiceClient.SynthesisCallResponse aiResp = null;
         try {
             aiResp = aiServiceClient.synthesizeEnrichment(new AiServiceClient.SynthesisCallRequest(
@@ -760,17 +793,17 @@ public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService
             }
         }
 
-        // 6. Generate Deep Research Profile & Objective Assessment
+        // 4. Assess Objective
         emitExecutionEvent(
                 jobId,
                 rowId,
                 rowIndex,
                 displayName,
                 "PROCESSING",
-                "GENERATING_PROFILE",
+                "ASSESSING",
                 workerId,
-                "Synthesizing research profile, priority tier, and talking points...",
-                Map.of()
+                "Evaluating profile relevance against research objective...",
+                Map.of("objective", requirement != null ? requirement : "")
         );
 
         ResearchObjective objectiveObj = ResearchObjective.from(requirement);
@@ -839,7 +872,7 @@ public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService
             findings = List.of();
         }
 
-        // 7. Persist canonical entity
+        // 5. Persist canonical entity
         String entityId = (researchResp != null && researchResp.entityId() != null)
                 ? researchResp.entityId()
                 : UUID.randomUUID().toString();
@@ -850,11 +883,50 @@ public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService
                 rowIndex,
                 displayName,
                 "PROCESSING",
-                "PERSISTENCE",
+                "PERSISTING",
                 workerId,
                 "Persisting canonical profile (" + finalAttributes.size() + " attributes) to catalog...",
                 Map.of("attributesCount", finalAttributes.size())
         );
+
+        boolean insufficientEvidence = "INSUFFICIENT_EVIDENCE".equalsIgnoreCase(researchResp.status())
+                || "NO_SOURCES".equalsIgnoreCase(researchResp.status())
+                || "NO_RESULTS".equalsIgnoreCase(researchResp.status())
+                || (sourceUrls.isEmpty() && finalAttributes.isEmpty() && !"COMPLETED".equalsIgnoreCase(researchResp.status()));
+
+        boolean aiDegraded = (aiResp == null && profileAssessment == null && !evidenceMap.isEmpty() && (requirement != null && !requirement.isBlank()));
+
+        String status;
+        String statusMessage;
+        if ("FAILED".equalsIgnoreCase(researchResp.status())) {
+            status = "FAILED";
+            statusMessage = "Research service failed to locate or resolve entity";
+        } else if (insufficientEvidence) {
+            status = "INSUFFICIENT_EVIDENCE";
+            statusMessage = "Sources returned insufficient grounded evidence";
+        } else if (aiDegraded) {
+            status = "AI_DEGRADED";
+            statusMessage = "Deterministic fallback used; AI intelligence service unavailable or degraded";
+        } else if ("PARTIAL".equalsIgnoreCase(researchResp.status()) || !unresolvedFields.isEmpty()) {
+            status = "PARTIAL";
+            statusMessage = "Enrichment partially completed (" + unresolvedFields.size() + " unresolved fields)";
+        } else {
+            status = "COMPLETED";
+            statusMessage = "Enrichment completed (" + finalAttributes.size() + " attributes, tier: " + assessment.priorityTier() + ")";
+        }
+
+        String profileJson = null;
+        String assessmentJson = null;
+        String recommendationJson = null;
+        String findingsJson = null;
+        try {
+            if (profile != null) profileJson = objectMapper.writeValueAsString(profile);
+            if (assessment != null) assessmentJson = objectMapper.writeValueAsString(assessment);
+            if (recommendation != null) recommendationJson = objectMapper.writeValueAsString(recommendation);
+            if (findings != null) findingsJson = objectMapper.writeValueAsString(findings);
+        } catch (Exception ex) {
+            log.warn("Failed serializing rich profile JSON for entity {}: {}", entityId, ex.getMessage());
+        }
 
         try {
             persistenceService.persistOrUpdate(new PersistEntityRequest(
@@ -863,19 +935,18 @@ public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService
                     entityType,
                     canonicalUrl,
                     entitySources,
-                    finalAttributes
+                    finalAttributes,
+                    status,
+                    statusMessage,
+                    assessment.priorityTier() != null ? assessment.priorityTier().name() : "NONE",
+                    assessment.overallScore(),
+                    profileJson,
+                    assessmentJson,
+                    recommendationJson,
+                    findingsJson
             ));
         } catch (Exception ex) {
             log.warn("Failed persisting entity {} in database: {}", entityId, ex.getMessage());
-        }
-
-        String status;
-        if ("FAILED".equalsIgnoreCase(researchResp.status())) {
-            status = "FAILED";
-        } else if ("PARTIAL".equalsIgnoreCase(researchResp.status()) || !unresolvedFields.isEmpty()) {
-            status = "PARTIAL";
-        } else {
-            status = "COMPLETED";
         }
 
         long completedAtMs = System.currentTimeMillis();
@@ -894,9 +965,9 @@ public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService
                 confidence,
                 entitySources,
                 null,
-                "COMPLETED",
+                status,
                 workerId,
-                "Enrichment completed (" + finalAttributes.size() + " attributes, tier: " + assessment.priorityTier() + ")",
+                statusMessage,
                 startedAtMs,
                 completedAtMs,
                 profile,
@@ -934,7 +1005,9 @@ public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService
                 s.durationMs,
                 sortedResults,
                 s.errorMessage,
-                enrichmentTaskExecutor.getConcurrency()
+                enrichmentTaskExecutor.getConcurrency(),
+                s.degradedRows.get(),
+                s.partialRows.get()
         );
     }
 

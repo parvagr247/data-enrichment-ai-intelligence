@@ -10,7 +10,7 @@ public record AiProperties(
 ) {
     public AiProperties {
         if (model == null || model.isBlank()) {
-            model = "gemini-2.5-flash";
+            model = "gemini-2.0-flash";
         }
         if (temperature < 0.0 || temperature > 2.0) {
             temperature = 0.1;

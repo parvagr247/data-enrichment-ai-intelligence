@@ -18,7 +18,7 @@ public record ResearchDiscoveryProperties(
             baseUrl = "https://api.tavily.com";
         }
         if (maxResults <= 0) {
-            maxResults = 5;
+            maxResults = 15;
         }
         if (timeoutMs <= 0) {
             timeoutMs = 4000;

@@ -75,18 +75,20 @@ export function LiveExecutionDashboard({
   const renderStageBadge = (stage?: string) => {
     switch (stage?.toUpperCase()) {
       case "RESEARCHING_IDENTITY":
+      case "DISCOVERING":
         return (
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/40">
             <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
-            IDENTITY RESOLUTION
+            DISCOVERING
           </span>
         );
+      case "COLLECTING_SOURCES":
       case "DISCOVERING_SOURCES":
       case "RESEARCH":
         return (
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200/60 dark:border-blue-800/40">
             <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
-            DISCOVERING SOURCES
+            COLLECTING SOURCES
           </span>
         );
       case "EXTRACTING_EVIDENCE":
@@ -97,38 +99,47 @@ export function LiveExecutionDashboard({
             EXTRACTING EVIDENCE
           </span>
         );
+      case "AI_ENRICHMENT":
       case "ANALYZING_ACTIVITY":
         return (
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200/60 dark:border-purple-800/40">
             <span className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse" />
-            ANALYZING ACTIVITY
+            AI ENRICHMENT
           </span>
         );
+      case "ASSESSING":
       case "ASSESSING_OBJECTIVE":
+      case "GENERATING_PROFILE":
         return (
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-violet-50 text-violet-700 dark:bg-violet-950/60 dark:text-violet-300 border border-violet-200/60 dark:border-violet-800/40">
             <span className="w-1.5 h-1.5 rounded-full bg-violet-500 animate-pulse" />
             ASSESSING OBJECTIVE
           </span>
         );
-      case "GENERATING_PROFILE":
-        return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200/60 dark:border-amber-800/40">
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-            GENERATING PROFILE
-          </span>
-        );
+      case "PERSISTING":
       case "PERSISTENCE":
         return (
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-orange-50 text-orange-700 dark:bg-orange-950/60 dark:text-orange-300 border border-orange-200/60 dark:border-orange-800/40">
             <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
-            PERSISTENCE
+            PERSISTING
           </span>
         );
       case "COMPLETED":
         return (
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
             ✓ COMPLETED
+          </span>
+        );
+      case "AI_DEGRADED":
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-50 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-300">
+            ⚠ AI DEGRADED
+          </span>
+        );
+      case "INSUFFICIENT_EVIDENCE":
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 border border-zinc-300">
+            ∅ INSUFFICIENT EVIDENCE
           </span>
         );
       case "FAILED":

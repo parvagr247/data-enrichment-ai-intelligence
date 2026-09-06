@@ -18,11 +18,39 @@ public record PersistEntityRequest(
 
         List<EntitySourceDto> sources,
 
-        Map<String, EntityAttributeDto> attributes
+        Map<String, EntityAttributeDto> attributes,
+
+        String executionStatus,
+
+        String executionMessage,
+
+        String priorityTier,
+
+        Integer relevanceScore,
+
+        String profileJson,
+
+        String assessmentJson,
+
+        String recommendationJson,
+
+        String findingsJson
 ) {
     public PersistEntityRequest {
         if (sources == null) sources = List.of();
         if (attributes == null) attributes = Map.of();
         if (entityType == null || entityType.isBlank()) entityType = "OTHER";
+    }
+
+    public PersistEntityRequest(
+            String entityId,
+            String displayName,
+            String entityType,
+            String canonicalUrl,
+            List<EntitySourceDto> sources,
+            Map<String, EntityAttributeDto> attributes
+    ) {
+        this(entityId, displayName, entityType, canonicalUrl, sources, attributes,
+                null, null, null, null, null, null, null, null);
     }
 }

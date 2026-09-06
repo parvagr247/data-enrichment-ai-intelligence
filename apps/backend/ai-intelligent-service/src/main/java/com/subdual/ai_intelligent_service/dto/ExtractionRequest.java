@@ -12,12 +12,14 @@ public record ExtractionRequest(
         @NotBlank(message = "Field 'sourceUrl' must not be blank")
         String sourceUrl,
 
-        @NotBlank(message = "Field 'textContent' must not be blank")
         String textContent,
 
         List<String> targetFields
 ) {
     public ExtractionRequest {
+        if (textContent == null) {
+            textContent = "";
+        }
         if (targetFields == null || targetFields.isEmpty()) {
             targetFields = List.of("role", "organization", "description", "summary", "headquarters", "technologies");
         }

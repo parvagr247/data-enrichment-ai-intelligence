@@ -127,6 +127,24 @@ export function EnrichedDatasetTable({
             COMPLETED
           </span>
         );
+      case "AI_DEGRADED":
+        return (
+          <span
+            className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-300 border border-amber-300 dark:border-amber-800"
+            title="Deterministic fallback used; AI intelligence service unavailable or degraded"
+          >
+            AI DEGRADED
+          </span>
+        );
+      case "INSUFFICIENT_EVIDENCE":
+        return (
+          <span
+            className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-400 border border-zinc-300 dark:border-zinc-700"
+            title="Sources returned insufficient grounded evidence"
+          >
+            INSUFFICIENT EVIDENCE
+          </span>
+        );
       case "PARTIAL":
         return (
           <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300">

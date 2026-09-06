@@ -59,7 +59,36 @@ public class QueryBuilder {
             ));
         }
 
-        // Strategy B: NAME_AND_FIELD
+        // Strategy B: TECH_STACK & ENGINEERING (or objective-driven)
+        if (!name.isBlank()) {
+            String req = target.userRequirement();
+            String techTerms = (req != null && !req.isBlank()) ? extractTechKeywords(req) : "Java OR \"Spring Boot\" OR backend OR architecture";
+            queries.add(new ResearchQuery(
+                    "\"" + name + "\" (" + techTerms + ")",
+                    QueryIntent.TECHNOLOGY,
+                    QueryStrategy.NAME_AND_INTENT
+            ));
+        }
+
+        // Strategy C: HIRING & LEADERSHIP SIGNALS
+        if (!name.isBlank()) {
+            queries.add(new ResearchQuery(
+                    "\"" + name + "\" (hiring OR recruiter OR \"talent acquisition\" OR team OR referral OR mentor)",
+                    QueryIntent.ROLE,
+                    QueryStrategy.NAME_AND_INTENT
+            ));
+        }
+
+        // Strategy D: PUBLIC ACTIVITY & PORTFOLIO
+        if (!name.isBlank()) {
+            queries.add(new ResearchQuery(
+                    "\"" + name + "\" (github OR medium OR substack OR conference OR speaker OR blog)",
+                    QueryIntent.GENERAL_PROFILE,
+                    QueryStrategy.NAME_AND_INTENT
+            ));
+        }
+
+        // Strategy E: NAME_AND_FIELD
         if (!name.isBlank() && target.targetFields() != null) {
             for (String field : target.targetFields()) {
                 QueryIntent intent = mapFieldToIntent(field);
@@ -72,7 +101,7 @@ public class QueryBuilder {
             }
         }
 
-        // Strategy C: CANONICAL_DOMAIN
+        // Strategy F: CANONICAL_DOMAIN
         if (hasValidHttpUrl(target)) {
             queries.add(new ResearchQuery(
                     buildUrlOnlyQuery(target),
@@ -84,7 +113,7 @@ public class QueryBuilder {
         return queries.stream()
                 .filter(q -> q.queryText() != null && !q.queryText().isBlank())
                 .distinct()
-                .limit(6)
+                .limit(8)
                 .toList();
     }
 
@@ -323,5 +352,26 @@ public class QueryBuilder {
             case WEBSITE -> "official";
             case OTHER -> "overview";
         };
+    }
+
+    private String extractTechKeywords(String requirement) {
+        if (requirement == null || requirement.isBlank()) {
+            return "Java OR \"Spring Boot\" OR backend OR architecture";
+        }
+        String lower = requirement.toLowerCase(Locale.ROOT);
+        List<String> keywords = new ArrayList<>();
+        if (lower.contains("java")) keywords.add("Java");
+        if (lower.contains("spring")) keywords.add("\"Spring Boot\"");
+        if (lower.contains("backend")) keywords.add("backend");
+        if (lower.contains("intern") || lower.contains("internship")) keywords.add("intern");
+        if (lower.contains("architect")) keywords.add("architecture");
+        if (lower.contains("cloud") || lower.contains("aws")) keywords.add("cloud");
+        if (lower.contains("python")) keywords.add("Python");
+        if (lower.contains("microservice")) keywords.add("microservices");
+
+        if (keywords.isEmpty()) {
+            return "Java OR \"Spring Boot\" OR backend OR architecture";
+        }
+        return String.join(" OR ", keywords);
     }
 }

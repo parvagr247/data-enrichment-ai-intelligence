@@ -8,6 +8,15 @@ spring:
     google:
       genai:
         api-key: ${GEMINI_API_KEY:mock-key}
+        chat:
+          options:
+            model: ${AI_MODEL:gemini-2.0-flash}
+
+ai:
+  extraction:
+    model: ${AI_MODEL:gemini-2.0-flash}
+    temperature: 0.1
+    mock-mode: ${AI_MOCK_MODE:false}
 
 management:
   endpoints:

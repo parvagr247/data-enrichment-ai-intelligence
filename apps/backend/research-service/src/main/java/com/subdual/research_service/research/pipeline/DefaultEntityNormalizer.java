@@ -72,6 +72,9 @@ public class DefaultEntityNormalizer implements EntityNormalizer {
         if (request.depth() != null) {
             metadata.put("depth", request.depth());
         }
+        if (request.userRequirement() != null && !request.userRequirement().isBlank()) {
+            metadata.put("userRequirement", request.userRequirement().trim());
+        }
         return Map.copyOf(metadata);
     }
 

@@ -136,12 +136,44 @@ export function ResearchProfileModal({ record, onClose }: ResearchProfileModalPr
                   {record.displayName || "Research Profile"}
                 </h3>
                 {renderTierBadge(assessment.priorityTier)}
+                {record.status && record.status !== "COMPLETED" && (
+                  <span
+                    className={`px-2.5 py-0.5 text-xs font-semibold rounded-full ${
+                      record.status === "AI_DEGRADED"
+                        ? "bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-300 border border-amber-300"
+                        : record.status === "INSUFFICIENT_EVIDENCE"
+                        ? "bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-400 border border-zinc-300"
+                        : record.status === "PARTIAL"
+                        ? "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+                        : "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300"
+                    }`}
+                  >
+                    {record.status}
+                  </span>
+                )}
                 <div className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300 font-mono text-xs font-semibold border border-blue-200 dark:border-blue-800">
                   <span>Score:</span>
                   <span className="text-sm font-bold">{assessment.overallScore}</span>
                   <span className="text-[10px] text-blue-400">/100</span>
                 </div>
               </div>
+
+              {record.status === "AI_DEGRADED" && (
+                <div className="mt-2 p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-xs text-amber-800 dark:text-amber-300 flex items-start gap-2">
+                  <span className="font-bold text-amber-600">⚠️</span>
+                  <div>
+                    <span className="font-semibold">AI Intelligence Degraded:</span> The AI service was unavailable or degraded. Results were deterministically synthesized from grounded research evidence.
+                  </div>
+                </div>
+              )}
+              {record.status === "INSUFFICIENT_EVIDENCE" && (
+                <div className="mt-2 p-2.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-xs text-zinc-700 dark:text-zinc-300 flex items-start gap-2">
+                  <span className="font-bold text-zinc-500">ℹ️</span>
+                  <div>
+                    <span className="font-semibold">Insufficient Evidence:</span> Discovered public sources contained insufficient grounded evidence to extract verifiable attributes without hallucination.
+                  </div>
+                </div>
+              )}
 
               <div className="flex items-center gap-3 text-xs text-zinc-600 dark:text-zinc-400 flex-wrap">
                 {profile.currentRole !== "UNKNOWN" && (
@@ -629,10 +661,24 @@ export function ResearchProfileModal({ record, onClose }: ResearchProfileModalPr
                         {s.snippet && (
                           <p className="text-[11px] text-zinc-500 line-clamp-2">{s.snippet}</p>
                         )}
-                        <div className="flex items-center gap-2 text-[10px] text-zinc-400 font-mono">
+                        <div className="flex items-center gap-2 text-[10px] text-zinc-400 font-mono flex-wrap">
                           <span>{s.domain || "web"}</span>
                           <span>•</span>
                           <span>Type: {s.sourceType}</span>
+                          {s.extractionMethod && (
+                            <>
+                              <span>•</span>
+                              <span
+                                className={`px-1.5 py-0.5 rounded font-semibold ${
+                                  s.extractionMethod === "FULL_PAGE"
+                                    ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                                    : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+                                }`}
+                              >
+                                {s.extractionMethod === "FULL_PAGE" ? "FULL PAGE" : "SEARCH SNIPPET"}
+                              </span>
+                            </>
+                          )}
                           {s.relevance != null && (
                             <>
                               <span>•</span>

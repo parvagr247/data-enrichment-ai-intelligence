@@ -82,6 +82,15 @@ public class MockSearchProvider implements SearchProvider {
         if (lowerQuery.contains("marcus-vance") || lowerQuery.contains("marcus vance")) {
             return mockMarcusVanceSources(now);
         }
+        if (lowerQuery.contains("saloni-sharma") || lowerQuery.contains("saloni sharma") || lowerQuery.contains("saloni")) {
+            return mockSaloniSharmaSources(lowerQuery, now);
+        }
+        if (lowerQuery.contains("monika") || lowerQuery.contains("monika-verma")) {
+            return mockMonikaSources(lowerQuery, now);
+        }
+        if (lowerQuery.contains("shyam") || lowerQuery.contains("shyam-sundar")) {
+            return mockShyamSources(lowerQuery, now);
+        }
         if (lowerQuery.contains("linkedin") || lowerQuery.contains("example")) {
             return mockLinkedInSources(now);
         }
@@ -334,6 +343,93 @@ public class MockSearchProvider implements SearchProvider {
                         now,
                         0.95,
                         "Founder & CEO at DevScale AI. Activity: [AUTHORED] Building scalable engineering teams and scaling our distributed data infrastructure. Always open to mentorship and hiring talented engineers."
+                )
+        );
+    }
+
+    private List<DiscoveredSource> mockSaloniSharmaSources(String lowerQuery, Instant now) {
+        return List.of(
+                new DiscoveredSource(
+                        "https://www.linkedin.com/in/saloni-sharma-872379180",
+                        "[MOCK] Saloni Sharma - Senior Java Backend Engineer | TechScale Systems | LinkedIn",
+                        "SOCIAL_PROFILE",
+                        now,
+                        1.00,
+                        "Saloni Sharma is a Senior Java Backend Engineer at TechScale Systems. Specializing in Java 17+, Spring Boot, Microservices, and Distributed Systems. Activity: [AUTHORED] We are actively hiring Java / Spring Boot interns and backend engineers at TechScale Systems! Looking for candidates with strong core Java, REST APIs, and database fundamentals. Reach out with your CV."
+                ),
+                new DiscoveredSource(
+                        "https://github.com/salonisharma/spring-boot-microservices-template",
+                        "[MOCK] salonisharma/spring-boot-microservices-template · GitHub",
+                        "GITHUB",
+                        now,
+                        0.95,
+                        "Production-ready template for Spring Boot 3 microservices by Saloni Sharma. Includes Spring Cloud, Docker, Kafka, PostgreSQL, and JUnit 5 tests."
+                ),
+                new DiscoveredSource(
+                        "https://medium.com/@salonisharma/mastering-spring-boot-virtual-threads",
+                        "[MOCK] Mastering Spring Boot 3 with Java 21 Virtual Threads - Saloni Sharma",
+                        "ARTICLE",
+                        now,
+                        0.92,
+                        "Article by Saloni Sharma discussing high-throughput backend architecture using Spring Boot 3, Project Loom virtual threads, and reactive streams."
+                ),
+                new DiscoveredSource(
+                        "https://techscale.io/team/saloni-sharma",
+                        "[MOCK] Saloni Sharma - Backend Engineering Team - TechScale Systems",
+                        "OFFICIAL_WEBSITE",
+                        now,
+                        0.90,
+                        "Saloni Sharma is a Senior Java Backend Engineer at TechScale Systems in Bengaluru, India. Education: B.Tech in Computer Science."
+                )
+        );
+    }
+
+    private List<DiscoveredSource> mockMonikaSources(String lowerQuery, Instant now) {
+        return List.of(
+                new DiscoveredSource(
+                        "https://www.linkedin.com/in/monika-verma-lead",
+                        "[MOCK] Monika Verma - Engineering Lead & Hiring Manager | Cloud Platforms | LinkedIn",
+                        "SOCIAL_PROFILE",
+                        now,
+                        1.00,
+                        "Engineering Lead & Hiring Manager. Activity: [AUTHORED] Hiring Java/Spring Boot developers and summer software engineering interns. Open to mentoring students passionate about backend systems."
+                ),
+                new DiscoveredSource(
+                        "https://github.com/monikaverma",
+                        "[MOCK] monikaverma (Monika Verma) · GitHub",
+                        "GITHUB",
+                        now,
+                        0.95,
+                        "Monika Verma GitHub profile. Repositories: distributed-task-scheduler, spring-boot-security-jwt. Java, Spring Cloud, Docker, Kubernetes."
+                ),
+                new DiscoveredSource(
+                        "https://cloudplatforms.io/team/monika-verma",
+                        "[MOCK] Monika Verma - Engineering Leadership - Cloud Platforms",
+                        "OFFICIAL_WEBSITE",
+                        now,
+                        0.90,
+                        "Monika Verma is an Engineering Lead at Cloud Platforms. Focus areas include distributed architectures, Spring Boot, and team mentorship."
+                )
+        );
+    }
+
+    private List<DiscoveredSource> mockShyamSources(String lowerQuery, Instant now) {
+        return List.of(
+                new DiscoveredSource(
+                        "https://www.linkedin.com/in/shyam-sundar-recruiter",
+                        "[MOCK] Shyam Sundar - Senior Technical Recruiter & Talent Partner | LinkedIn",
+                        "SOCIAL_PROFILE",
+                        now,
+                        1.00,
+                        "Senior Technical Recruiter. Activity: [AUTHORED] Actively recruiting for Java, Spring Boot, and Backend engineering roles (including internships & junior engineers). DM me your resume!"
+                ),
+                new DiscoveredSource(
+                        "https://talentcraft.io/team/shyam-sundar",
+                        "[MOCK] Shyam Sundar - Talent Partner - TalentCraft",
+                        "OFFICIAL_WEBSITE",
+                        now,
+                        0.95,
+                        "Shyam Sundar is Senior Technical Talent Acquisition Specialist at TalentCraft. Hiring software engineers and backend interns for top tech companies."
                 )
         );
     }

@@ -25,17 +25,55 @@ public class DefaultResearchDiscoveryService implements ResearchDiscoveryService
     @Override
     public List<DiscoveredSource> discoverSources(ResearchTarget target) {
         long startTime = System.currentTimeMillis();
-        String query = queryBuilder.buildDiscoveryQuery(target);
-        List<DiscoveredSource> raw = searchWithProvider(query, discoveryProperties.maxResults());
+        List<com.subdual.research_service.discovery.model.ResearchQuery> queries = queryBuilder.buildRequirementQueries(target);
+        if (queries.isEmpty()) {
+            String primary = queryBuilder.buildDiscoveryQuery(target);
+            if (!primary.isBlank()) {
+                queries = List.of(new com.subdual.research_service.discovery.model.ResearchQuery(
+                        primary,
+                        com.subdual.research_service.discovery.model.QueryIntent.IDENTITY,
+                        com.subdual.research_service.discovery.model.QueryStrategy.CANONICAL_DOMAIN
+                ));
+            }
+        }
 
-        var dedupResult = com.subdual.research_service.discovery.ranking.SourceDeduplicator.deduplicate(raw);
+        int targetMaxSources = target.depth() != null ? target.depth().maxSources() : discoveryProperties.maxResults();
+        int maxBudget = Math.max(targetMaxSources, discoveryProperties.maxResults());
+
+        List<DiscoveredSource> allRaw = new java.util.ArrayList<>();
+        int executedQueries = 0;
+        Exception lastException = null;
+
+        for (var q : queries) {
+            try {
+                int queryLimit = queries.size() <= 1 ? discoveryProperties.maxResults() : Math.min(8, maxBudget);
+                List<DiscoveredSource> res = searchWithProvider(q.queryText(), queryLimit);
+                allRaw.addAll(res);
+                executedQueries++;
+            } catch (Exception ex) {
+                lastException = ex;
+                log.warn("[Pipeline: DISCOVERY_QUERY_FAILED] Query '{}' failed: {}", q.queryText(), ex.getMessage());
+            }
+        }
+
+        if (allRaw.isEmpty() && lastException != null) {
+            if (lastException instanceof BusinessRuleException bre) throw bre;
+            if (lastException instanceof ExternalServiceException ese) throw ese;
+            throw new ExternalServiceException("All discovery queries failed", lastException);
+        }
+
+        var dedupResult = com.subdual.research_service.discovery.ranking.SourceDeduplicator.deduplicate(allRaw);
         List<DiscoveredSource> ranked = com.subdual.research_service.discovery.ranking.SourceRanker.rankSources(
                 dedupResult.deduplicated(), target, com.subdual.research_service.discovery.model.QueryIntent.GENERAL_PROFILE
         );
 
+        if (ranked.size() > maxBudget) {
+            ranked = ranked.subList(0, maxBudget);
+        }
+
         long duration = System.currentTimeMillis() - startTime;
-        log.info("[Pipeline: DISCOVERY_METRICS] Provider: '{}', Queries: 1, Results: {}, DedupRemoved: {}, Selected: {}, Duration: {}ms",
-                searchProvider.providerName(), raw.size(), dedupResult.duplicatesRemovedCount(), ranked.size(), duration);
+        log.info("[Pipeline: DISCOVERY_METRICS] Provider: '{}', Queries: {}, RawResults: {}, DedupRemoved: {}, Selected: {}, Duration: {}ms",
+                searchProvider.providerName(), executedQueries, allRaw.size(), dedupResult.duplicatesRemovedCount(), ranked.size(), duration);
 
         return ranked;
     }

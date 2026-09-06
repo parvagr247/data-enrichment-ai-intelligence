@@ -9,5 +9,20 @@ public record EntitySummaryResponse(
         String canonicalUrl,
         int totalSources,
         int totalAttributes,
-        Instant updatedAt
-) {}
+        Instant updatedAt,
+        String priorityTier,
+        Integer relevanceScore,
+        String executionStatus
+) {
+    public EntitySummaryResponse(
+            String entityId,
+            String displayName,
+            String entityType,
+            String canonicalUrl,
+            int totalSources,
+            int totalAttributes,
+            Instant updatedAt
+    ) {
+        this(entityId, displayName, entityType, canonicalUrl, totalSources, totalAttributes, updatedAt, null, null, null);
+    }
+}

@@ -14,6 +14,7 @@ export interface EntitySourceDto {
   provider?: string;
   relevance?: number;
   retrievedAt?: string;
+  extractionMethod?: 'FULL_PAGE' | 'SEARCH_SNIPPET';
 }
 
 export type ColumnRole =
@@ -72,13 +73,14 @@ export interface ColumnMapping {
   [key: string]: string | undefined;
 }
 
-export type RowEnrichmentStatus = 'QUEUED' | 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'PARTIAL' | 'FAILED' | 'CANCELLED';
+export type RowEnrichmentStatus = 'QUEUED' | 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'AI_DEGRADED' | 'INSUFFICIENT_EVIDENCE' | 'PARTIAL' | 'FAILED' | 'CANCELLED';
 
 export interface EntityAttributeDto {
   value: string;
   sourceUrl?: string;
   evidenceSnippet?: string;
   confidence?: string;
+  extractionMethod?: 'FULL_PAGE' | 'SEARCH_SNIPPET';
 }
 
 export interface ExperienceItem {
@@ -214,6 +216,8 @@ export interface EnrichmentJobResponse {
   rowResults: RowEnrichmentResult[];
   errorMessage?: string;
   concurrency?: number;
+  degradedRows?: number;
+  partialRows?: number;
 }
 
 export interface SingleEnrichmentRequest {

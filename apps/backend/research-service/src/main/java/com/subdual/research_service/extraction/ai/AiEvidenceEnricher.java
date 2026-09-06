@@ -66,6 +66,9 @@ public class AiEvidenceEnricher {
             List<String> targetFields,
             Map<String, EvidenceTuple> attributes
     ) {
+        if (doc == null || doc.cleanText() == null || doc.cleanText().isBlank()) {
+            return;
+        }
         String entityType = target != null && target.entityType() != null ? target.entityType().name() : "OTHER";
         String displayName = target != null ? target.displayName() : "";
 
@@ -77,10 +80,14 @@ public class AiEvidenceEnricher {
                 targetFields
         );
 
-        mergeAiFacts(facts, doc.url(), doc.cleanText(), attributes);
+        mergeAiFacts(facts, doc.url(), doc.cleanText(), attributes, doc.extractionMethod());
     }
 
     public void mergeAiFacts(Map<String, AiExtractedFact> facts, String sourceUrl, String docText, Map<String, EvidenceTuple> attributes) {
+        mergeAiFacts(facts, sourceUrl, docText, attributes, "FULL_PAGE");
+    }
+
+    public void mergeAiFacts(Map<String, AiExtractedFact> facts, String sourceUrl, String docText, Map<String, EvidenceTuple> attributes, String extractionMethod) {
         if (facts == null) {
             return;
         }
@@ -92,7 +99,7 @@ public class AiEvidenceEnricher {
                 }
                 ConfidenceTier tier = resolveAiConfidenceTier(fact.confidenceScore());
                 String snippet = resolveAiSnippet(fact.exactQuote());
-                evidenceMerger.mergeAttribute(attributes, factKey, fact.value(), sourceUrl, snippet, tier);
+                evidenceMerger.mergeAttribute(attributes, factKey, fact.value(), sourceUrl, snippet, tier, "AI_EXTRACTION", extractionMethod != null ? extractionMethod : "FULL_PAGE");
             }
         });
     }

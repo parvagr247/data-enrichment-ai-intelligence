@@ -66,6 +66,14 @@ public record ResearchTarget(
         return ResearchDepth.NORMAL;
     }
 
+    public String userRequirement() {
+        if (metadata != null && metadata.containsKey("userRequirement")) {
+            Object val = metadata.get("userRequirement");
+            return val != null ? val.toString().trim() : null;
+        }
+        return null;
+    }
+
     public boolean isUrlAnchored() {
         return rawUrl != null && !rawUrl.isBlank() && (rawUrl.startsWith("http://") || rawUrl.startsWith("https://"));
     }

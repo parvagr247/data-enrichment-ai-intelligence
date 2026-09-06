@@ -53,6 +53,14 @@ public class DefaultEntityPersistenceService implements EntityPersistenceService
         entity.setDisplayName(request.displayName());
         entity.setEntityType(request.entityType());
         entity.setCanonicalUrl(request.canonicalUrl());
+        if (request.executionStatus() != null) entity.setExecutionStatus(request.executionStatus());
+        if (request.executionMessage() != null) entity.setExecutionMessage(request.executionMessage());
+        if (request.priorityTier() != null) entity.setPriorityTier(request.priorityTier());
+        if (request.relevanceScore() != null) entity.setRelevanceScore(request.relevanceScore());
+        if (request.profileJson() != null) entity.setProfileJson(request.profileJson());
+        if (request.assessmentJson() != null) entity.setAssessmentJson(request.assessmentJson());
+        if (request.recommendationJson() != null) entity.setRecommendationJson(request.recommendationJson());
+        if (request.findingsJson() != null) entity.setFindingsJson(request.findingsJson());
     }
 
     private void replaceSources(EnrichedEntity entity, List<EntitySourceDto> sourceDtos) {
@@ -145,7 +153,10 @@ public class DefaultEntityPersistenceService implements EntityPersistenceService
                 e.getCanonicalUrl(),
                 sourceCount,
                 attributeCount,
-                e.getUpdatedAt()
+                e.getUpdatedAt(),
+                e.getPriorityTier(),
+                e.getRelevanceScore(),
+                e.getExecutionStatus()
         );
     }
 
@@ -161,7 +172,15 @@ public class DefaultEntityPersistenceService implements EntityPersistenceService
                 sources,
                 attributes,
                 entity.getCreatedAt(),
-                entity.getUpdatedAt()
+                entity.getUpdatedAt(),
+                entity.getExecutionStatus(),
+                entity.getExecutionMessage(),
+                entity.getPriorityTier(),
+                entity.getRelevanceScore(),
+                entity.getProfileJson(),
+                entity.getAssessmentJson(),
+                entity.getRecommendationJson(),
+                entity.getFindingsJson()
         );
     }
 

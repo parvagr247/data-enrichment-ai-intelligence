@@ -132,7 +132,7 @@ public class DefaultSourceEvidenceService implements SourceEvidenceService {
     private ExtractedDocument resolveSnippetFallbackDocument(ResearchSource source) {
         if (source.snippet() != null && source.snippet().trim().length() > 20) {
             log.info("Using search provider snippet fallback for blocked source '{}'", source.url());
-            return new ExtractedDocument(source.url(), source.title(), source.snippet(), null, source.domain());
+            return new ExtractedDocument(source.url(), source.title(), source.snippet(), null, source.domain(), "SEARCH_SNIPPET");
         }
         return null;
     }

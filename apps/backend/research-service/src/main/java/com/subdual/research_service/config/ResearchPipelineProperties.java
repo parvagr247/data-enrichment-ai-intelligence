@@ -9,7 +9,7 @@ public record ResearchPipelineProperties(
 ) {
     public ResearchPipelineProperties {
         if (maxSources <= 0) {
-            maxSources = 5;
+            maxSources = 12;
         }
         if (maxContentLength <= 0) {
             maxContentLength = 50000;

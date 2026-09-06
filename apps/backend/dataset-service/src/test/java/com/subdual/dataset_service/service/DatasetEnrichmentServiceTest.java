@@ -451,4 +451,93 @@ class DatasetEnrichmentServiceTest {
         assertEquals(0, result.assessment().overallScore());
         assertEquals(ObjectiveAssessment.PriorityTier.NONE, result.assessment().priorityTier());
     }
+
+    @Test
+    @DisplayName("Should report AI_DEGRADED when AI service fails with evidence")
+    void shouldReportAiDegradedWhenAiServiceFailsWithEvidence() {
+        when(aiServiceClient.interpretRequirement(anyString(), anyString(), any()))
+                .thenReturn(new AiServiceClient.RequirementCallResponse(
+                        List.of("currentRole"),
+                        "Target role",
+                        false
+                ));
+
+        when(researchServiceClient.executeResearch(any()))
+                .thenReturn(new ResearchServiceClient.ResearchCallResponse(
+                        "COMPLETED",
+                        "ent-degraded-1",
+                        new ResearchServiceClient.ResearchCallResult(
+                                "Bob Miller",
+                                "PERSON",
+                                "https://example.com/bob",
+                                Map.of("currentRole", new ResearchServiceClient.EvidenceTupleDto(
+                                        "Software Engineer",
+                                        "https://example.com/bob",
+                                        "Bob is a Software Engineer",
+                                        "HIGH",
+                                        List.of("https://example.com/bob"),
+                                        false
+                                ))
+                        ),
+                        List.of(new ResearchServiceClient.SourceItemDto("https://example.com/bob", "Bob Profile", "Bob is a Software Engineer", "PROFILE", "example.com", "tavily", 0.9, "2026-09-06T00:00:00Z")),
+                        100,
+                        List.of()
+                ));
+
+        when(aiServiceClient.synthesizeEnrichment(any())).thenReturn(null);
+        when(aiServiceClient.assessProfile(any())).thenReturn(null);
+
+        SingleEnrichmentRequest request = new SingleEnrichmentRequest(
+                Map.of("Name", "Bob Miller"),
+                Map.of("nameColumn", "Name"),
+                "PERSON",
+                "Identify Java Engineers"
+        );
+
+        RowEnrichmentResult result = enrichmentService.enrichSingle(request);
+
+        assertNotNull(result);
+        assertEquals("AI_DEGRADED", result.status());
+        assertTrue(result.message().contains("Deterministic fallback used"));
+        assertEquals("Software Engineer", result.attributes().get("currentRole").value());
+    }
+
+    @Test
+    @DisplayName("Should report INSUFFICIENT_EVIDENCE when research yields insufficient evidence")
+    void shouldReportInsufficientEvidenceWhenResearchYieldsInsufficientEvidence() {
+        when(aiServiceClient.interpretRequirement(anyString(), anyString(), any()))
+                .thenReturn(new AiServiceClient.RequirementCallResponse(
+                        List.of("currentRole"),
+                        "Target role",
+                        false
+                ));
+
+        when(researchServiceClient.executeResearch(any()))
+                .thenReturn(new ResearchServiceClient.ResearchCallResponse(
+                        "INSUFFICIENT_EVIDENCE",
+                        "ent-insufficient-1",
+                        new ResearchServiceClient.ResearchCallResult(
+                                "Unknown Ghost",
+                                "PERSON",
+                                "",
+                                Map.of()
+                        ),
+                        List.of(),
+                        50,
+                        List.of()
+                ));
+
+        SingleEnrichmentRequest request = new SingleEnrichmentRequest(
+                Map.of("Name", "Unknown Ghost"),
+                Map.of("nameColumn", "Name"),
+                "PERSON",
+                "Identify Java Engineers"
+        );
+
+        RowEnrichmentResult result = enrichmentService.enrichSingle(request);
+
+        assertNotNull(result);
+        assertEquals("INSUFFICIENT_EVIDENCE", result.status());
+        assertTrue(result.message().contains("insufficient grounded evidence"));
+    }
 }

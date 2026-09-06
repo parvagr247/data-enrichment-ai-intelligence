@@ -20,69 +20,85 @@ public class GlobalExceptionHandler {
     private static final String INSTANCE_PATH = "/api/v1/ai/extract";
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ProblemDetail handleValidationException(MethodArgumentNotValidException ex, jakarta.servlet.http.HttpServletRequest request) {
+    public org.springframework.http.ResponseEntity<ProblemDetail> handleValidationException(MethodArgumentNotValidException ex, jakarta.servlet.http.HttpServletRequest request) {
         String detailMessage = ex.getBindingResult().getFieldErrors().stream()
                 .findFirst()
                 .map(FieldError::getDefaultMessage)
                 .orElse("Validation failed for extraction payload");
 
         String path = request != null ? request.getRequestURI() : "/api/v1/ai";
-        log.warn("Validation failure on {}: {}", path, detailMessage);
+        String requestId = org.slf4j.MDC.get(com.subdual.ai_intelligent_service.configuration.CorrelationIdFilter.MDC_KEY);
+        log.warn("[AI_HTTP_ERROR] Validation failure on {} [requestId={}]: {}", path, requestId, detailMessage);
         ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, detailMessage);
         problemDetail.setType(DEFAULT_TYPE);
         problemDetail.setTitle("Bad Request");
         problemDetail.setInstance(URI.create(path));
         problemDetail.setProperty("code", "VALIDATION_ERROR");
-        problemDetail.setProperty("requestId", org.slf4j.MDC.get(com.subdual.ai_intelligent_service.configuration.CorrelationIdFilter.MDC_KEY));
+        problemDetail.setProperty("requestId", requestId);
         problemDetail.setProperty("timestamp", java.time.Instant.now().toString());
         problemDetail.setProperty("details", ex.getBindingResult().getFieldErrors().stream()
                 .map(f -> f.getField() + ": " + f.getDefaultMessage())
                 .toList());
-        return problemDetail;
+        return org.springframework.http.ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .body(problemDetail);
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
-    public ProblemDetail handleMessageNotReadable(HttpMessageNotReadableException ex, jakarta.servlet.http.HttpServletRequest request) {
+    public org.springframework.http.ResponseEntity<ProblemDetail> handleMessageNotReadable(HttpMessageNotReadableException ex, jakarta.servlet.http.HttpServletRequest request) {
         String path = request != null ? request.getRequestURI() : "/api/v1/ai";
-        log.warn("Malformed JSON on {}: {}", path, ex.getMessage());
+        String requestId = org.slf4j.MDC.get(com.subdual.ai_intelligent_service.configuration.CorrelationIdFilter.MDC_KEY);
+        log.warn("[AI_HTTP_ERROR] Malformed JSON on {} [requestId={}]: {}", path, requestId, ex.getMessage());
         ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Malformed JSON request payload");
         problemDetail.setType(DEFAULT_TYPE);
         problemDetail.setTitle("Bad Request");
         problemDetail.setInstance(URI.create(path));
         problemDetail.setProperty("code", "MALFORMED_PAYLOAD");
-        problemDetail.setProperty("requestId", org.slf4j.MDC.get(com.subdual.ai_intelligent_service.configuration.CorrelationIdFilter.MDC_KEY));
+        problemDetail.setProperty("requestId", requestId);
         problemDetail.setProperty("timestamp", java.time.Instant.now().toString());
-        return problemDetail;
+        return org.springframework.http.ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .body(problemDetail);
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
-    public ProblemDetail handleIllegalArgument(IllegalArgumentException ex, jakarta.servlet.http.HttpServletRequest request) {
+    public org.springframework.http.ResponseEntity<ProblemDetail> handleIllegalArgument(IllegalArgumentException ex, jakarta.servlet.http.HttpServletRequest request) {
         String path = request != null ? request.getRequestURI() : "/api/v1/ai";
-        log.warn("Illegal argument on {}: {}", path, ex.getMessage());
+        String requestId = org.slf4j.MDC.get(com.subdual.ai_intelligent_service.configuration.CorrelationIdFilter.MDC_KEY);
+        log.warn("[AI_HTTP_ERROR] Illegal argument on {} [requestId={}]: {}", path, requestId, ex.getMessage());
         ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
         problemDetail.setType(DEFAULT_TYPE);
         problemDetail.setTitle("Bad Request");
         problemDetail.setInstance(URI.create(path));
         problemDetail.setProperty("code", "BAD_REQUEST");
-        problemDetail.setProperty("requestId", org.slf4j.MDC.get(com.subdual.ai_intelligent_service.configuration.CorrelationIdFilter.MDC_KEY));
+        problemDetail.setProperty("requestId", requestId);
         problemDetail.setProperty("timestamp", java.time.Instant.now().toString());
-        return problemDetail;
+        return org.springframework.http.ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .body(problemDetail);
     }
 
     @ExceptionHandler(Exception.class)
-    public ProblemDetail handleGenericException(Exception ex, jakarta.servlet.http.HttpServletRequest request) {
+    public org.springframework.http.ResponseEntity<ProblemDetail> handleGenericException(Exception ex, jakarta.servlet.http.HttpServletRequest request) {
         String path = request != null ? request.getRequestURI() : "/api/v1/ai";
-        log.error("Unhandled error on {}: ", path, ex);
+        String requestId = org.slf4j.MDC.get(com.subdual.ai_intelligent_service.configuration.CorrelationIdFilter.MDC_KEY);
+        log.error("[AI_HTTP_ERROR] Unhandled error on {} [requestId={}]: {}", path, requestId, ex.getMessage(), ex);
         ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(
                 HttpStatus.INTERNAL_SERVER_ERROR,
-                "An unexpected internal error occurred"
+                "An unexpected internal error occurred: " + (ex.getMessage() != null ? ex.getMessage() : "Unknown error")
         );
         problemDetail.setType(DEFAULT_TYPE);
         problemDetail.setTitle("Internal Server Error");
         problemDetail.setInstance(URI.create(path));
         problemDetail.setProperty("code", "INTERNAL_SERVER_ERROR");
-        problemDetail.setProperty("requestId", org.slf4j.MDC.get(com.subdual.ai_intelligent_service.configuration.CorrelationIdFilter.MDC_KEY));
+        problemDetail.setProperty("requestId", requestId);
         problemDetail.setProperty("timestamp", java.time.Instant.now().toString());
-        return problemDetail;
+        return org.springframework.http.ResponseEntity
+                .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .body(problemDetail);
     }
 }

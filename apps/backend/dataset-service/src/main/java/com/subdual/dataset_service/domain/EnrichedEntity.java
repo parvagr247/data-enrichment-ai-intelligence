@@ -49,6 +49,30 @@ public class EnrichedEntity {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    @Column(name = "execution_status", length = 50)
+    private String executionStatus;
+
+    @Column(name = "execution_message", length = 2048)
+    private String executionMessage;
+
+    @Column(name = "priority_tier", length = 50)
+    private String priorityTier;
+
+    @Column(name = "relevance_score")
+    private Integer relevanceScore;
+
+    @Column(name = "profile_json", columnDefinition = "LONGTEXT")
+    private String profileJson;
+
+    @Column(name = "assessment_json", columnDefinition = "LONGTEXT")
+    private String assessmentJson;
+
+    @Column(name = "recommendation_json", columnDefinition = "LONGTEXT")
+    private String recommendationJson;
+
+    @Column(name = "findings_json", columnDefinition = "LONGTEXT")
+    private String findingsJson;
+
     @OneToMany(mappedBy = "entity", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<EnrichedSource> sources = new ArrayList<>();

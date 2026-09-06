@@ -142,6 +142,10 @@ export function EvidenceDetailModal({ record, onClose }: EvidenceDetailModalProp
                 className={`px-2.5 py-0.5 text-xs font-semibold rounded-full ${
                   record.status === "COMPLETED"
                     ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                    : record.status === "AI_DEGRADED"
+                    ? "bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-300 border border-amber-300"
+                    : record.status === "INSUFFICIENT_EVIDENCE"
+                    ? "bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-400 border border-zinc-300"
                     : record.status === "PARTIAL"
                     ? "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
                     : "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300"
@@ -153,6 +157,16 @@ export function EvidenceDetailModal({ record, onClose }: EvidenceDetailModalProp
                 {record.entityType || "PERSON"}
               </span>
             </div>
+            {record.status === "AI_DEGRADED" && (
+              <div className="mt-2 p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-xs text-amber-800 dark:text-amber-300">
+                ⚠️ <strong>Deterministic Fallback:</strong> AI service was unavailable or degraded. Attributes were deterministically synthesized from grounded evidence.
+              </div>
+            )}
+            {record.status === "INSUFFICIENT_EVIDENCE" && (
+              <div className="mt-2 p-2.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-xs text-zinc-700 dark:text-zinc-300">
+                ℹ️ <strong>Insufficient Evidence:</strong> Discovered sources contained insufficient grounded evidence to extract verifiable target attributes.
+              </div>
+            )}
             {record.canonicalUrl && (
               <a
                 href={record.canonicalUrl}
@@ -615,10 +629,21 @@ export function EvidenceDetailModal({ record, onClose }: EvidenceDetailModalProp
                       className="p-2.5 rounded-lg border border-zinc-200/80 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/20 flex flex-col sm:flex-row sm:items-center justify-between gap-1.5"
                     >
                       <div className="min-w-0">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span className="px-1.5 py-0.5 rounded bg-zinc-200 dark:bg-zinc-700 text-[10px] font-semibold">
                             {src.sourceType}
                           </span>
+                          {src.extractionMethod && (
+                            <span
+                              className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${
+                                src.extractionMethod === "FULL_PAGE"
+                                  ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                                  : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+                              }`}
+                            >
+                              {src.extractionMethod === "FULL_PAGE" ? "FULL PAGE" : "SEARCH SNIPPET"}
+                            </span>
+                          )}
                           <span className="font-medium text-zinc-800 dark:text-zinc-200 truncate">
                             {src.title || src.url}
                           </span>
