@@ -14,6 +14,7 @@ import {
   RowEnrichmentResult,
   EntitySummaryResponse,
   EntityDetailResponse,
+  ExecutionEvent,
 } from '@/types/dataset';
 
 export const datasetService = {
@@ -61,6 +62,68 @@ export const datasetService = {
         method: 'GET',
       }
     );
+  },
+
+  /**
+   * Subscribes to real-time Server-Sent Events for live batch execution observability.
+   * Returns an unsubscribe function to close the stream.
+   */
+  subscribeJobEvents(
+    jobId: string,
+    callbacks: {
+      onInit?: (initData: { jobId: string; datasetName: string; concurrency: number; totalRows: number; status: string }) => void;
+      onEvent?: (event: ExecutionEvent) => void;
+      onJobCompleted?: (data: { jobId: string; status: string; completedRows: number; failedRows: number; durationMs: number }) => void;
+      onError?: (error: any) => void;
+    }
+  ): () => void {
+    const url = `${ENV.DATASET_SERVICE_URL}/api/v1/enrichment/jobs/${encodeURIComponent(jobId)}/events`;
+    let eventSource: EventSource | null = null;
+
+    try {
+      eventSource = new EventSource(url);
+
+      eventSource.addEventListener('init', (e: MessageEvent) => {
+        try {
+          const data = JSON.parse(e.data);
+          callbacks.onInit?.(data);
+        } catch (err) {
+          console.error('Error parsing init event:', err);
+        }
+      });
+
+      eventSource.addEventListener('execution-event', (e: MessageEvent) => {
+        try {
+          const event: ExecutionEvent = JSON.parse(e.data);
+          callbacks.onEvent?.(event);
+        } catch (err) {
+          console.error('Error parsing execution event:', err);
+        }
+      });
+
+      eventSource.addEventListener('job-completed', (e: MessageEvent) => {
+        try {
+          const data = JSON.parse(e.data);
+          callbacks.onJobCompleted?.(data);
+        } catch (err) {
+          console.error('Error parsing job-completed event:', err);
+        } finally {
+          eventSource?.close();
+        }
+      });
+
+      eventSource.onerror = (err) => {
+        callbacks.onError?.(err);
+      };
+    } catch (err) {
+      callbacks.onError?.(err);
+    }
+
+    return () => {
+      if (eventSource) {
+        eventSource.close();
+      }
+    };
   },
 
   /**

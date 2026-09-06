@@ -194,9 +194,31 @@ Submits a batch enrichment job across multiple rows.
   ```
 
 ### `GET /api/v1/enrichment/jobs/{jobId}`
-Polls status, progress counters, and row-level results of a batch enrichment job.
+Polls status, progress counters, concurrency, and row-level results of a batch enrichment job.
 
-* **Response `200 OK`**: Returns current progress (`status: "QUEUED" | "PROCESSING" | "COMPLETED" | "PARTIAL" | "FAILED" | "CANCELLED"`) and completed row results.
+* **Response `200 OK`**: Returns current progress (`status: "QUEUED" | "PROCESSING" | "COMPLETED" | "PARTIAL" | "FAILED" | "CANCELLED"`, `concurrency: 3`) and completed row results.
+
+### `GET /api/v1/enrichment/jobs/{jobId}/events`
+Subscribes to a real-time Server-Sent Events (SSE) stream (`text/event-stream`) providing live visual observability of concurrent worker execution.
+
+* **Event Types**:
+  - `init`: Handshake containing `jobId`, `datasetName`, `concurrency`, `totalRows`, and current status.
+  - `execution-event`: Granular row lifecycle events with payload:
+    ```json
+    {
+      "jobId": "d8dfa97a-b1e2-4103-ac71-013252a3a824",
+      "rowId": "row-0",
+      "rowIndex": 0,
+      "entity": "Jasveer Singh",
+      "status": "PROCESSING",
+      "stage": "RESEARCH",
+      "workerId": "worker-1",
+      "message": "Searching public sources & discovering references...",
+      "timestamp": "2026-09-06T09:20:00.123Z",
+      "metadata": { "sourcesCount": 4, "confidence": 0.92 }
+    }
+    ```
+  - `job-completed`: Terminal event indicating batch execution is finished with final duration and statistics.
 
 ### `POST /api/v1/enrichment/jobs/{jobId}/cancel`
 Cancels an active or queued batch enrichment job. Currently executing rows complete while queued row futures are cancelled.

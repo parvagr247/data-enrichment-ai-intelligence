@@ -1,5 +1,10 @@
 package com.subdual.dataset_service.dto;
 
+import com.subdual.dataset_service.profile.model.ObjectiveAssessment;
+import com.subdual.dataset_service.profile.model.RecommendedApproach;
+import com.subdual.dataset_service.profile.model.ResearchFinding;
+import com.subdual.dataset_service.profile.model.ResearchProfile;
+
 import java.util.List;
 import java.util.Map;
 
@@ -16,7 +21,16 @@ public record RowEnrichmentResult(
         List<String> conflicts,
         double confidence,
         List<EntitySourceDto> sources,
-        String errorMessage
+        String errorMessage,
+        String stage,
+        String workerId,
+        String message,
+        Long startedAtMs,
+        Long completedAtMs,
+        ResearchProfile profile,
+        ObjectiveAssessment assessment,
+        RecommendedApproach recommendation,
+        List<ResearchFinding> findings
 ) {
     public RowEnrichmentResult {
         if (originalData == null) {
@@ -34,5 +48,53 @@ public record RowEnrichmentResult(
         if (sources == null) {
             sources = List.of();
         }
+        if (findings == null) {
+            findings = List.of();
+        }
+    }
+
+    public RowEnrichmentResult(
+            String rowId,
+            int rowIndex,
+            Map<String, String> originalData,
+            String status,
+            String displayName,
+            String canonicalUrl,
+            String entityType,
+            Map<String, EntityAttributeDto> attributes,
+            List<String> unresolvedFields,
+            List<String> conflicts,
+            double confidence,
+            List<EntitySourceDto> sources,
+            String errorMessage
+    ) {
+        this(rowId, rowIndex, originalData, status, displayName, canonicalUrl, entityType,
+                attributes, unresolvedFields, conflicts, confidence, sources, errorMessage,
+                null, null, null, null, null, null, null, null, List.of());
+    }
+
+    public RowEnrichmentResult(
+            String rowId,
+            int rowIndex,
+            Map<String, String> originalData,
+            String status,
+            String displayName,
+            String canonicalUrl,
+            String entityType,
+            Map<String, EntityAttributeDto> attributes,
+            List<String> unresolvedFields,
+            List<String> conflicts,
+            double confidence,
+            List<EntitySourceDto> sources,
+            String errorMessage,
+            String stage,
+            String workerId,
+            String message,
+            Long startedAtMs,
+            Long completedAtMs
+    ) {
+        this(rowId, rowIndex, originalData, status, displayName, canonicalUrl, entityType,
+                attributes, unresolvedFields, conflicts, confidence, sources, errorMessage,
+                stage, workerId, message, startedAtMs, completedAtMs, null, null, null, List.of());
     }
 }

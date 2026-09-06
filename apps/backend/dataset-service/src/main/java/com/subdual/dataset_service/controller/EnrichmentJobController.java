@@ -46,6 +46,12 @@ public class EnrichmentJobController {
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
+    @GetMapping(value = "/jobs/{jobId}/events", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public org.springframework.web.servlet.mvc.method.annotation.SseEmitter subscribeJobEvents(@PathVariable String jobId) {
+        log.info("Client subscribed to SSE events for enrichment job '{}'", jobId);
+        return datasetEnrichmentService.subscribeJobEvents(jobId);
+    }
+
     @PostMapping(value = "/jobs/{jobId}/cancel", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<Void> cancelJob(@PathVariable String jobId) {
         boolean cancelled = datasetEnrichmentService.cancelJob(jobId);

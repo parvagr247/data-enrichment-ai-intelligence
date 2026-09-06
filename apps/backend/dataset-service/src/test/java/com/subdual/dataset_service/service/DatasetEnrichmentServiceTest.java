@@ -2,10 +2,16 @@ package com.subdual.dataset_service.service;
 
 import com.subdual.dataset_service.dto.EnrichmentJobRequest;
 import com.subdual.dataset_service.dto.EnrichmentJobResponse;
+import com.subdual.dataset_service.dto.ProfileAssessmentRequest;
+import com.subdual.dataset_service.dto.ProfileAssessmentResponse;
 import com.subdual.dataset_service.dto.RowEnrichmentResult;
 import com.subdual.dataset_service.dto.SingleEnrichmentRequest;
 import com.subdual.dataset_service.integration.client.AiServiceClient;
 import com.subdual.dataset_service.integration.client.ResearchServiceClient;
+import com.subdual.dataset_service.profile.model.ObjectiveAssessment;
+import com.subdual.dataset_service.profile.model.RecommendedApproach;
+import com.subdual.dataset_service.profile.model.ResearchFinding;
+import com.subdual.dataset_service.profile.model.ResearchProfile;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -269,5 +275,180 @@ class DatasetEnrichmentServiceTest {
 
         EnrichmentJobResponse job = enrichmentService.getJob(submitted.jobId()).orElseThrow();
         assertEquals("CANCELLED", job.status());
+    }
+
+    @Test
+    @DisplayName("Should subscribe to job events and expose configured concurrency")
+    void shouldSubscribeToJobEventsAndExposeConcurrency() {
+        EnrichmentJobRequest request = new EnrichmentJobRequest(
+                "sse-test.csv",
+                null,
+                "PERSON",
+                Map.of("nameColumn", "Name"),
+                List.of(Map.of("Name", "Event User"))
+        );
+
+        EnrichmentJobResponse submitted = enrichmentService.createAndSubmitJob(request);
+        assertNotNull(submitted);
+        assertEquals(3, submitted.concurrency());
+
+        org.springframework.web.servlet.mvc.method.annotation.SseEmitter emitter =
+                enrichmentService.subscribeJobEvents(submitted.jobId());
+        assertNotNull(emitter);
+    }
+
+    @Test
+    @DisplayName("Should enrich single row with deep research profile and objective assessment")
+    void shouldEnrichWithDeepResearchProfileAndObjectiveAssessment() {
+        when(aiServiceClient.interpretRequirement(anyString(), anyString(), any()))
+                .thenReturn(new AiServiceClient.RequirementCallResponse(
+                        List.of("currentRole", "currentOrganization"),
+                        "Identify recruiters or leaders for Java internship",
+                        false
+                ));
+
+        when(researchServiceClient.executeResearch(any()))
+                .thenReturn(new ResearchServiceClient.ResearchCallResponse(
+                        "COMPLETED",
+                        "ent-profile-1",
+                        new ResearchServiceClient.ResearchCallResult(
+                                "Alex Rivera",
+                                "PERSON",
+                                "https://linkedin.com/in/alex-rivera-tech-recruiter",
+                                Map.of("currentRole", new ResearchServiceClient.EvidenceTupleDto(
+                                        "Senior Technical Recruiter",
+                                        "https://linkedin.com/in/alex-rivera-tech-recruiter",
+                                        "Alex is a Senior Technical Recruiter at NexaCorp",
+                                        "HIGH",
+                                        List.of(),
+                                        false
+                                ))
+                        ),
+                        List.of(),
+                        80,
+                        List.of()
+                ));
+
+        when(aiServiceClient.assessProfile(any(ProfileAssessmentRequest.class)))
+                .thenReturn(new ProfileAssessmentResponse(
+                        "Alex Rivera",
+                        "https://linkedin.com/in/alex-rivera-tech-recruiter",
+                        "PERSON",
+                        new ResearchProfile(
+                                "Senior Technical Recruiter",
+                                "NexaCorp",
+                                "Austin, TX",
+                                "Alex Rivera is a Senior Technical Recruiter specializing in backend engineering and university hiring.",
+                                "Extensive 7-year background in technology recruiting.",
+                                List.of("Java", "Spring Boot", "Technical Recruiting", "Talent Sourcing"),
+                                List.of(new ResearchProfile.ExperienceItem("Senior Technical Recruiter", "NexaCorp", "2021 - Present", "Leads backend engineering recruiting.", "Recruits for Java/Spring engineers.")),
+                                List.of(),
+                                List.of(new ResearchProfile.ActivityItem("Hiring Spring Boot Interns for Fall 2026", "AUTHORED", "Looking for talented backend engineers.", "HIRING_ANNOUNCEMENT", "https://linkedin.com/posts/alex-rivera-1"))
+                        ),
+                        new ObjectiveAssessment(
+                                94,
+                                ObjectiveAssessment.PriorityTier.HIGH,
+                                "Direct decision maker actively hiring Java and backend engineering interns.",
+                                Map.of("hiringRelevance", new ObjectiveAssessment.DimensionalScore(95, "Actively posted hiring announcement for Java roles.")),
+                                List.of("Active hiring posts", "Direct recruiter for target stack"),
+                                List.of()
+                        ),
+                        new RecommendedApproach(
+                                RecommendedApproach.ApproachType.RECRUITER_OUTREACH,
+                                "Direct recruiter outreach referencing recent post",
+                                "Alex explicitly invited candidates to reach out regarding Spring Boot roles.",
+                                List.of("Reference recent post regarding Fall 2026 backend interns", "Highlight Java and Spring Boot experience")
+                        ),
+                        List.of(new ResearchFinding("Active Technical Recruiter at NexaCorp", ResearchFinding.FindingType.FACT_SOURCE_DERIVED, "HIGH", "https://linkedin.com/in/alex-rivera-tech-recruiter", "Alex is a Senior Technical Recruiter at NexaCorp", "LinkedIn")),
+                        Map.of()
+                ));
+
+        SingleEnrichmentRequest request = new SingleEnrichmentRequest(
+                Map.of("Name", "Alex Rivera", "URL", "https://linkedin.com/in/alex-rivera-tech-recruiter"),
+                Map.of("nameColumn", "Name", "urlColumn", "URL"),
+                "PERSON",
+                "Identify recruiters or leaders for Java internship"
+        );
+
+        RowEnrichmentResult result = enrichmentService.enrichSingle(request);
+
+        assertNotNull(result);
+        assertEquals("Alex Rivera", result.displayName());
+        assertEquals("COMPLETED", result.status());
+
+        // Verify Deep Research Profile
+        assertNotNull(result.profile());
+        assertEquals("Senior Technical Recruiter", result.profile().currentRole());
+        assertEquals("NexaCorp", result.profile().currentOrganization());
+        assertTrue(result.profile().technicalExpertise().contains("Java"));
+        assertEquals(1, result.profile().publicActivity().size());
+
+        // Verify Objective Assessment
+        assertNotNull(result.assessment());
+        assertEquals(94, result.assessment().overallScore());
+        assertEquals(ObjectiveAssessment.PriorityTier.HIGH, result.assessment().priorityTier());
+        assertTrue(result.assessment().whyRelevant().contains("Direct decision maker"));
+
+        // Verify Recommended Approach
+        assertNotNull(result.recommendation());
+        assertEquals(RecommendedApproach.ApproachType.RECRUITER_OUTREACH, result.recommendation().approachType());
+        assertEquals(2, result.recommendation().suggestedTalkingPoints().size());
+
+        // Verify Grounded Findings
+        assertNotNull(result.findings());
+        assertEquals(1, result.findings().size());
+        assertEquals(ResearchFinding.FindingType.FACT_SOURCE_DERIVED, result.findings().get(0).findingType());
+    }
+
+    @Test
+    @DisplayName("Should provide neutral assessment when objective is blank")
+    void shouldProvideNeutralAssessmentWhenObjectiveIsBlank() {
+        when(aiServiceClient.interpretRequirement(any(), any(), any()))
+                .thenReturn(new AiServiceClient.RequirementCallResponse(
+                        List.of("currentRole"),
+                        "Default scope",
+                        true
+                ));
+
+        when(researchServiceClient.executeResearch(any()))
+                .thenReturn(new ResearchServiceClient.ResearchCallResponse(
+                        "COMPLETED",
+                        "ent-blank-1",
+                        new ResearchServiceClient.ResearchCallResult(
+                                "John Candidate",
+                                "PERSON",
+                                "https://example.com/john",
+                                Map.of()
+                        ),
+                        List.of(),
+                        50,
+                        List.of()
+                ));
+
+        when(aiServiceClient.assessProfile(any(ProfileAssessmentRequest.class)))
+                .thenReturn(new ProfileAssessmentResponse(
+                        "John Candidate",
+                        "https://example.com/john",
+                        "PERSON",
+                        new ResearchProfile("UNKNOWN", "UNKNOWN", "UNKNOWN", "General profile.", "General background.", List.of(), List.of(), List.of(), List.of()),
+                        ObjectiveAssessment.neutral("No objective specified"),
+                        new RecommendedApproach(RecommendedApproach.ApproachType.NETWORKING_CONVERSATION, "Networking", "Default", List.of()),
+                        List.of(),
+                        Map.of()
+                ));
+
+        SingleEnrichmentRequest request = new SingleEnrichmentRequest(
+                Map.of("Name", "John Candidate"),
+                Map.of("nameColumn", "Name"),
+                "PERSON",
+                ""
+        );
+
+        RowEnrichmentResult result = enrichmentService.enrichSingle(request);
+
+        assertNotNull(result);
+        assertNotNull(result.assessment());
+        assertEquals(0, result.assessment().overallScore());
+        assertEquals(ObjectiveAssessment.PriorityTier.NONE, result.assessment().priorityTier());
     }
 }

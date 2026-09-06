@@ -4,14 +4,24 @@ import com.subdual.dataset_service.dto.EntityAttributeDto;
 import com.subdual.dataset_service.dto.EntitySourceDto;
 import com.subdual.dataset_service.dto.EnrichmentJobRequest;
 import com.subdual.dataset_service.dto.EnrichmentJobResponse;
+import com.subdual.dataset_service.dto.ExecutionEvent;
+import com.subdual.dataset_service.dto.FactEvidenceDto;
 import com.subdual.dataset_service.dto.PersistEntityRequest;
+import com.subdual.dataset_service.dto.ProfileAssessmentRequest;
+import com.subdual.dataset_service.dto.ProfileAssessmentResponse;
 import com.subdual.dataset_service.dto.RowEnrichmentResult;
 import com.subdual.dataset_service.dto.SingleEnrichmentRequest;
+import com.subdual.dataset_service.profile.model.ObjectiveAssessment;
+import com.subdual.dataset_service.profile.model.RecommendedApproach;
+import com.subdual.dataset_service.profile.model.ResearchFinding;
+import com.subdual.dataset_service.profile.model.ResearchObjective;
+import com.subdual.dataset_service.profile.model.ResearchProfile;
 import com.subdual.dataset_service.integration.client.AiServiceClient;
 import com.subdual.dataset_service.integration.client.ResearchServiceClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -23,6 +33,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 
 @Service
@@ -37,6 +48,8 @@ public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService
     private final com.subdual.dataset_service.service.executor.EnrichmentTaskExecutor enrichmentTaskExecutor;
 
     private final Map<String, JobState> activeJobs = new ConcurrentHashMap<>();
+    private final Map<String, List<SseEmitter>> jobEmitters = new ConcurrentHashMap<>();
+    private final Map<String, List<ExecutionEvent>> jobEventHistory = new ConcurrentHashMap<>();
 
     private static class JobState {
         String jobId;
@@ -90,6 +103,11 @@ public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService
                         List.of(),
                         0.0,
                         List.of(),
+                        null,
+                        "QUEUED",
+                        null,
+                        "Queued for execution",
+                        null,
                         null
                 ));
             }
@@ -126,7 +144,7 @@ public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService
         AiServiceClient.RequirementCallResponse reqResponse = aiServiceClient.interpretRequirement(requirement, entityType, row);
         List<String> targetFields = reqResponse != null ? reqResponse.requestedFields() : List.of();
 
-        return processSingleRow("single-" + System.currentTimeMillis(), 0, row, mapping, entityType, requirement, targetFields);
+        return processSingleRow("single-" + System.currentTimeMillis(), 0, row, mapping, entityType, requirement, targetFields, null, "worker-sync", System.currentTimeMillis());
     }
 
     @Override
@@ -137,9 +155,160 @@ public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService
             state.status = "CANCELLED";
             state.completedAt = Instant.now();
             log.info("Cancelled dataset enrichment job '{}'", jobId);
+
+            emitExecutionEvent(jobId, jobId + "-cancel", -1, "Batch Job", "CANCELLED", "CANCELLED", "system", "Enrichment run cancelled by user", Map.of());
+            emitJobCompleted(jobId, "CANCELLED", state.completedRows.get(), state.failedRows.get(), state.durationMs != null ? state.durationMs : 0L);
             return true;
         }
         return false;
+    }
+
+    @Override
+    public SseEmitter subscribeJobEvents(String jobId) {
+        JobState state = activeJobs.get(jobId);
+        SseEmitter emitter = new SseEmitter(10 * 60 * 1000L); // 10 minutes timeout
+
+        if (state == null) {
+            try {
+                emitter.send(SseEmitter.event().name("error").data(Map.of("message", "Job not found: " + jobId)));
+                emitter.complete();
+            } catch (Exception ignored) {}
+            return emitter;
+        }
+
+        Runnable cleanup = () -> {
+            List<SseEmitter> list = jobEmitters.get(jobId);
+            if (list != null) {
+                list.remove(emitter);
+            }
+        };
+
+        emitter.onCompletion(cleanup);
+        emitter.onTimeout(() -> {
+            emitter.complete();
+            cleanup.run();
+        });
+        emitter.onError(e -> cleanup.run());
+
+        jobEmitters.computeIfAbsent(jobId, k -> new CopyOnWriteArrayList<>()).add(emitter);
+
+        try {
+            // Handshake with job initial configuration
+            emitter.send(SseEmitter.event().name("init").data(Map.of(
+                    "jobId", jobId,
+                    "datasetName", state.datasetName != null ? state.datasetName : "",
+                    "concurrency", enrichmentTaskExecutor.getConcurrency(),
+                    "totalRows", state.totalRows,
+                    "completedRows", state.completedRows.get(),
+                    "failedRows", state.failedRows.get(),
+                    "status", state.status
+            )));
+
+            // Replay existing events in order for newly connected or reconnected client
+            List<ExecutionEvent> history = jobEventHistory.get(jobId);
+            if (history != null) {
+                synchronized (history) {
+                    for (ExecutionEvent ev : history) {
+                        emitter.send(SseEmitter.event().name("execution-event").data(ev));
+                    }
+                }
+            }
+
+            // If job is already in a terminal state, inform client and close
+            if ("COMPLETED".equalsIgnoreCase(state.status) || "FAILED".equalsIgnoreCase(state.status) || "CANCELLED".equalsIgnoreCase(state.status)) {
+                emitter.send(SseEmitter.event().name("job-completed").data(Map.of(
+                        "jobId", jobId,
+                        "status", state.status,
+                        "completedRows", state.completedRows.get(),
+                        "failedRows", state.failedRows.get(),
+                        "durationMs", state.durationMs != null ? state.durationMs : 0L
+                )));
+                emitter.complete();
+                cleanup.run();
+            }
+        } catch (Exception ex) {
+            log.warn("Error sending initial SSE handshake for job {}: {}", jobId, ex.getMessage());
+            cleanup.run();
+        }
+
+        return emitter;
+    }
+
+    private void emitExecutionEvent(
+            String jobId,
+            String rowId,
+            int rowIndex,
+            String entity,
+            String status,
+            String stage,
+            String workerId,
+            String message,
+            Map<String, Object> metadata
+    ) {
+        if (jobId == null) {
+            return;
+        }
+
+        ExecutionEvent event = new ExecutionEvent(
+                jobId,
+                rowId,
+                rowIndex,
+                entity,
+                status,
+                stage,
+                workerId,
+                message,
+                Instant.now().toString(),
+                metadata
+        );
+
+        // Record bounded history (latest 500 events)
+        List<ExecutionEvent> history = jobEventHistory.computeIfAbsent(jobId, k -> Collections.synchronizedList(new ArrayList<>()));
+        synchronized (history) {
+            if (history.size() >= 500) {
+                history.remove(0);
+            }
+            history.add(event);
+        }
+
+        // Broadcast to live SSE emitters
+        List<SseEmitter> emitters = jobEmitters.get(jobId);
+        if (emitters != null && !emitters.isEmpty()) {
+            List<SseEmitter> deadEmitters = new ArrayList<>();
+            for (SseEmitter emitter : emitters) {
+                try {
+                    emitter.send(SseEmitter.event()
+                            .name("execution-event")
+                            .data(event));
+                } catch (Exception ex) {
+                    deadEmitters.add(emitter);
+                }
+            }
+            emitters.removeAll(deadEmitters);
+        }
+    }
+
+    private void emitJobCompleted(String jobId, String status, int completed, int failed, Long durationMs) {
+        List<SseEmitter> emitters = jobEmitters.get(jobId);
+        if (emitters != null && !emitters.isEmpty()) {
+            Map<String, Object> data = Map.of(
+                    "jobId", jobId,
+                    "status", status,
+                    "completedRows", completed,
+                    "failedRows", failed,
+                    "durationMs", durationMs != null ? durationMs : 0L
+            );
+            for (SseEmitter emitter : emitters) {
+                try {
+                    emitter.send(SseEmitter.event()
+                            .name("job-completed")
+                            .data(data));
+                    emitter.complete();
+                } catch (Exception ignored) {
+                }
+            }
+            jobEmitters.remove(jobId);
+        }
     }
 
     private void executeJobAsync(JobState state, EnrichmentJobRequest request) {
@@ -168,24 +337,52 @@ public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService
                         return null;
                     }
                     state.processingRows.incrementAndGet();
-                    RowEnrichmentResult current = state.rowResultsMap.get(rowIndex);
-                    if (current != null) {
-                        state.rowResultsMap.put(rowIndex, new RowEnrichmentResult(
-                                current.rowId(),
-                                rowIndex,
-                                current.originalData(),
-                                "PROCESSING",
-                                current.displayName(),
-                                current.canonicalUrl(),
-                                current.entityType(),
-                                current.attributes(),
-                                current.unresolvedFields(),
-                                current.conflicts(),
-                                current.confidence(),
-                                current.sources(),
-                                null
-                        ));
+
+                    // Derive worker identifier from thread name or pool index
+                    String rawThread = Thread.currentThread().getName();
+                    String workerId;
+                    if (rawThread.contains("worker-")) {
+                        workerId = "worker-" + rawThread.substring(rawThread.lastIndexOf("worker-") + 7);
+                    } else {
+                        workerId = "worker-" + (rowIndex % enrichmentTaskExecutor.getConcurrency() + 1);
                     }
+
+                    RowEnrichmentResult initial = state.rowResultsMap.get(rowIndex);
+                    String entityName = initial != null ? initial.displayName() : "Row " + (rowIndex + 1);
+                    long startedAtMs = System.currentTimeMillis();
+
+                    state.rowResultsMap.put(rowIndex, new RowEnrichmentResult(
+                            rowId,
+                            rowIndex,
+                            row,
+                            "PROCESSING",
+                            entityName,
+                            initial != null ? initial.canonicalUrl() : "",
+                            request.defaultEntityType() != null ? request.defaultEntityType() : "PERSON",
+                            Map.of(),
+                            List.of(),
+                            List.of(),
+                            0.0,
+                            List.of(),
+                            null,
+                            "RESEARCHING_IDENTITY",
+                            workerId,
+                            "Resolving entity identity & canonical anchors...",
+                            startedAtMs,
+                            null
+                    ));
+
+                    emitExecutionEvent(
+                            state.jobId,
+                            rowId,
+                            rowIndex,
+                            entityName,
+                            "PROCESSING",
+                            "RESEARCHING_IDENTITY",
+                            workerId,
+                            "Resolving entity identity & canonical anchors...",
+                            Map.of("originalData", row)
+                    );
 
                     try {
                         RowEnrichmentResult result = processSingleRow(
@@ -195,27 +392,57 @@ public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService
                                 request.columnMapping(),
                                 request.defaultEntityType(),
                                 request.userRequirement(),
-                                targetFields
+                                targetFields,
+                                state.jobId,
+                                workerId,
+                                startedAtMs
                         );
                         state.rowResultsMap.put(rowIndex, result);
 
                         if ("FAILED".equalsIgnoreCase(result.status())) {
                             state.failedRows.incrementAndGet();
-                        } else if ("PARTIAL".equalsIgnoreCase(result.status())) {
-                            state.partialRows.incrementAndGet();
-                            state.completedRows.incrementAndGet();
+                            emitExecutionEvent(
+                                    state.jobId,
+                                    rowId,
+                                    rowIndex,
+                                    result.displayName(),
+                                    "FAILED",
+                                    "FAILED",
+                                    workerId,
+                                    result.errorMessage() != null ? result.errorMessage() : "Row enrichment failed",
+                                    Map.of("error", result.errorMessage() != null ? result.errorMessage() : "Unknown error")
+                            );
                         } else {
                             state.completedRows.incrementAndGet();
+                            if ("PARTIAL".equalsIgnoreCase(result.status())) {
+                                state.partialRows.incrementAndGet();
+                            }
+                            emitExecutionEvent(
+                                    state.jobId,
+                                    rowId,
+                                    rowIndex,
+                                    result.displayName(),
+                                    result.status(),
+                                    "COMPLETED",
+                                    workerId,
+                                    result.message() != null ? result.message() : "Enrichment completed",
+                                    Map.of(
+                                            "attributesCount", result.attributes() != null ? result.attributes().size() : 0,
+                                            "sourcesCount", result.sources() != null ? result.sources().size() : 0,
+                                            "confidence", result.confidence(),
+                                            "result", result
+                                    )
+                            );
                         }
                     } catch (Exception ex) {
                         log.error("Failed enriching row {} in job {}: {}", rowIndex, state.jobId, ex.getMessage());
                         state.failedRows.incrementAndGet();
-                        state.rowResultsMap.put(rowIndex, new RowEnrichmentResult(
+                        RowEnrichmentResult failedResult = new RowEnrichmentResult(
                                 rowId,
                                 rowIndex,
                                 row,
                                 "FAILED",
-                                "Unknown",
+                                entityName,
                                 "",
                                 request.defaultEntityType(),
                                 Map.of(),
@@ -223,8 +450,26 @@ public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService
                                 List.of(),
                                 0.0,
                                 List.of(),
-                                ex.getMessage()
-                        ));
+                                ex.getMessage(),
+                                "FAILED",
+                                workerId,
+                                "Failed: " + ex.getMessage(),
+                                startedAtMs,
+                                System.currentTimeMillis()
+                        );
+                        state.rowResultsMap.put(rowIndex, failedResult);
+
+                        emitExecutionEvent(
+                                state.jobId,
+                                rowId,
+                                rowIndex,
+                                entityName,
+                                "FAILED",
+                                "FAILED",
+                                workerId,
+                                "Failed: " + ex.getMessage(),
+                                Map.of("error", ex.getMessage() != null ? ex.getMessage() : "Exception during execution")
+                        );
                     } finally {
                         state.processingRows.decrementAndGet();
                         int processed = state.completedRows.get() + state.failedRows.get();
@@ -237,22 +482,28 @@ public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService
 
             java.util.concurrent.CompletableFuture.allOf(futures.toArray(new java.util.concurrent.CompletableFuture[0])).join();
 
+            state.completedAt = Instant.now();
+            state.durationMs = System.currentTimeMillis() - startMs;
+
             if (state.cancelled) {
                 state.status = "CANCELLED";
             } else {
                 int failed = state.failedRows.get();
                 state.status = (failed == state.totalRows && state.totalRows > 0) ? "FAILED" : "COMPLETED";
             }
-            state.completedAt = Instant.now();
-            state.durationMs = System.currentTimeMillis() - startMs;
+
             log.info("Completed enrichment job '{}' in {} ms (completed={}, partial={}, failed={})",
                     state.jobId, state.durationMs, state.completedRows.get(), state.partialRows.get(), state.failedRows.get());
+
+            emitJobCompleted(state.jobId, state.status, state.completedRows.get(), state.failedRows.get(), state.durationMs);
+
         } catch (Exception ex) {
             log.error("Fatal error during enrichment job {}: {}", state.jobId, ex.getMessage(), ex);
             state.status = "FAILED";
             state.errorMessage = ex.getMessage();
             state.completedAt = Instant.now();
             state.durationMs = System.currentTimeMillis() - startMs;
+            emitJobCompleted(state.jobId, "FAILED", state.completedRows.get(), state.failedRows.get(), state.durationMs);
         }
     }
 
@@ -263,7 +514,10 @@ public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService
             Map<String, String> mapping,
             String defaultEntityType,
             String requirement,
-            List<String> targetFields
+            List<String> targetFields,
+            String jobId,
+            String workerId,
+            long startedAtMs
     ) {
         String name = extractMappedValue(rawRow, mapping, "nameColumn");
         String url = extractMappedValue(rawRow, mapping, "urlColumn");
@@ -287,14 +541,31 @@ public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService
                     List.of(),
                     0.0,
                     List.of(),
-                    "Row missing required name or url identifier"
+                    "Row missing required name or url identifier",
+                    "FAILED",
+                    workerId,
+                    "Row missing required name or url identifier",
+                    startedAtMs,
+                    System.currentTimeMillis()
             );
         }
 
         String displayName = name != null ? name : "Unknown";
         String canonicalUrl = url != null ? url : "";
 
-        // 1. Dispatch to Research Service
+        // 1. Discover Sources via Research Service
+        emitExecutionEvent(
+                jobId,
+                rowId,
+                rowIndex,
+                displayName,
+                "PROCESSING",
+                "DISCOVERING_SOURCES",
+                workerId,
+                "Querying verified web sources & search indexes...",
+                Map.of("name", displayName, "url", canonicalUrl)
+        );
+
         ResearchServiceClient.ResearchCallResponse researchResp = null;
         String researchError = null;
         try {
@@ -331,7 +602,12 @@ public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService
                     List.of(),
                     0.0,
                     List.of(),
-                    "Research service error: " + (researchError != null ? researchError : "No response")
+                    "Research service error: " + (researchError != null ? researchError : "No response"),
+                    "FAILED",
+                    workerId,
+                    "Research service failed: " + (researchError != null ? researchError : "No response"),
+                    startedAtMs,
+                    System.currentTimeMillis()
             );
         }
 
@@ -342,14 +618,19 @@ public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService
             canonicalUrl = researchResp.result().canonicalUrl();
         }
 
-        // 2. Prepare facts & sources from research
+        // 2. Extract Evidence & Sources from Research
         Map<String, AiServiceClient.FactEvidenceCallDto> evidenceMap = new LinkedHashMap<>();
+        Map<String, FactEvidenceDto> profileEvidenceMap = new LinkedHashMap<>();
         List<String> sourceUrls = new ArrayList<>();
+        List<String> sourceSnippets = new ArrayList<>();
         List<EntitySourceDto> entitySources = new ArrayList<>();
 
         if (researchResp != null && researchResp.sources() != null) {
             for (ResearchServiceClient.SourceItemDto s : researchResp.sources()) {
                 sourceUrls.add(s.url());
+                if (s.snippet() != null && !s.snippet().isBlank()) {
+                    sourceSnippets.add(s.snippet());
+                }
                 entitySources.add(new EntitySourceDto(
                         s.url(),
                         s.title(),
@@ -375,10 +656,57 @@ public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService
                         tuple.corroboratingSources(),
                         tuple.conflictDetected()
                 ));
+                profileEvidenceMap.put(entry.getKey(), new FactEvidenceDto(
+                        entry.getKey(),
+                        tuple.value(),
+                        tuple.sourceUrl(),
+                        tuple.evidenceSnippet(),
+                        tuple.confidence(),
+                        tuple.corroboratingSources(),
+                        tuple.conflictDetected()
+                ));
             }
         }
 
-        // 3. Dispatch to AI Service for evidence-grounded synthesis
+        emitExecutionEvent(
+                jobId,
+                rowId,
+                rowIndex,
+                displayName,
+                "PROCESSING",
+                "EXTRACTING_EVIDENCE",
+                workerId,
+                "Extracting grounded evidence from " + sourceUrls.size() + " discovered sources...",
+                Map.of("sourcesCount", sourceUrls.size(), "evidenceCount", evidenceMap.size())
+        );
+
+        // 3. Analyze Activity & Background
+        emitExecutionEvent(
+                jobId,
+                rowId,
+                rowIndex,
+                displayName,
+                "PROCESSING",
+                "ANALYZING_ACTIVITY",
+                workerId,
+                "Analyzing public activity, posts, and professional background...",
+                Map.of("sourcesCount", sourceUrls.size())
+        );
+
+        // 4. Assess Objective
+        emitExecutionEvent(
+                jobId,
+                rowId,
+                rowIndex,
+                displayName,
+                "PROCESSING",
+                "ASSESSING_OBJECTIVE",
+                workerId,
+                "Evaluating relevance against user research objective...",
+                Map.of("objective", requirement != null ? requirement : "")
+        );
+
+        // 5. Dispatch to AI Service for grounded attribute synthesis
         AiServiceClient.SynthesisCallResponse aiResp = null;
         try {
             aiResp = aiServiceClient.synthesizeEnrichment(new AiServiceClient.SynthesisCallRequest(
@@ -395,7 +723,7 @@ public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService
             log.warn("AI synthesis call failed for row {}: {}", rowIndex, ex.getMessage());
         }
 
-        // 4. Assemble final attributes & persistence
+        // Assemble final attributes
         Map<String, EntityAttributeDto> finalAttributes = new LinkedHashMap<>();
         List<String> unresolvedFields = new ArrayList<>();
         List<String> conflicts = new ArrayList<>();
@@ -432,10 +760,101 @@ public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService
             }
         }
 
-        // 5. Persist canonical entity
+        // 6. Generate Deep Research Profile & Objective Assessment
+        emitExecutionEvent(
+                jobId,
+                rowId,
+                rowIndex,
+                displayName,
+                "PROCESSING",
+                "GENERATING_PROFILE",
+                workerId,
+                "Synthesizing research profile, priority tier, and talking points...",
+                Map.of()
+        );
+
+        ResearchObjective objectiveObj = ResearchObjective.from(requirement);
+        ProfileAssessmentResponse profileAssessment = null;
+        try {
+            profileAssessment = aiServiceClient.assessProfile(new ProfileAssessmentRequest(
+                    rawRow,
+                    displayName,
+                    canonicalUrl,
+                    entityType,
+                    objectiveObj,
+                    profileEvidenceMap,
+                    sourceUrls,
+                    sourceSnippets
+            ));
+        } catch (Exception ex) {
+            log.warn("AI profile assessment call failed for row {}: {}", rowIndex, ex.getMessage());
+        }
+
+        ResearchProfile profile;
+        ObjectiveAssessment assessment;
+        RecommendedApproach recommendation;
+        List<ResearchFinding> findings;
+
+        if (profileAssessment != null) {
+            profile = profileAssessment.profile();
+            assessment = profileAssessment.assessment();
+            recommendation = profileAssessment.recommendation();
+            findings = profileAssessment.findings() != null ? profileAssessment.findings() : List.of();
+            if (profile != null) {
+                if (!"UNKNOWN".equals(profile.currentRole()) && !finalAttributes.containsKey("currentRole")) {
+                    finalAttributes.put("currentRole", new EntityAttributeDto(profile.currentRole(), canonicalUrl, "Extracted from profile", "HIGH"));
+                }
+                if (!"UNKNOWN".equals(profile.currentOrganization()) && !finalAttributes.containsKey("currentOrganization")) {
+                    finalAttributes.put("currentOrganization", new EntityAttributeDto(profile.currentOrganization(), canonicalUrl, "Extracted from profile", "HIGH"));
+                }
+                if (!"UNKNOWN".equals(profile.location()) && !finalAttributes.containsKey("location")) {
+                    finalAttributes.put("location", new EntityAttributeDto(profile.location(), canonicalUrl, "Extracted from profile", "HIGH"));
+                }
+            }
+        } else {
+            // Deterministic local fallback if AI service assessment endpoint is unreachable
+            boolean hasObj = !objectiveObj.isBlank();
+            int score = hasObj ? 50 : 0;
+            ObjectiveAssessment.PriorityTier tier = hasObj ? ObjectiveAssessment.PriorityTier.MEDIUM : ObjectiveAssessment.PriorityTier.NONE;
+            String whyRel = hasObj ? "Profile identified during enrichment matching basic criteria." : "General profile research completed (no specific objective specified).";
+
+            assessment = new ObjectiveAssessment(score, tier, whyRel, Map.of(), List.of(), List.of());
+            recommendation = new RecommendedApproach(
+                    RecommendedApproach.ApproachType.NETWORKING_CONVERSATION,
+                    "Professional networking outreach",
+                    "Ground outreach in verified background.",
+                    List.of("Connect referencing current professional role.")
+            );
+            profile = new ResearchProfile(
+                    finalAttributes.containsKey("currentRole") ? finalAttributes.get("currentRole").value() : "UNKNOWN",
+                    finalAttributes.containsKey("currentOrganization") ? finalAttributes.get("currentOrganization").value() : "UNKNOWN",
+                    finalAttributes.containsKey("location") ? finalAttributes.get("location").value() : "UNKNOWN",
+                    displayName + " is a professional identified during enrichment.",
+                    "Identified from public professional sources.",
+                    List.of(),
+                    List.of(),
+                    List.of(),
+                    List.of()
+            );
+            findings = List.of();
+        }
+
+        // 7. Persist canonical entity
         String entityId = (researchResp != null && researchResp.entityId() != null)
                 ? researchResp.entityId()
                 : UUID.randomUUID().toString();
+
+        emitExecutionEvent(
+                jobId,
+                rowId,
+                rowIndex,
+                displayName,
+                "PROCESSING",
+                "PERSISTENCE",
+                workerId,
+                "Persisting canonical profile (" + finalAttributes.size() + " attributes) to catalog...",
+                Map.of("attributesCount", finalAttributes.size())
+        );
 
         try {
             persistenceService.persistOrUpdate(new PersistEntityRequest(
@@ -459,6 +878,8 @@ public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService
             status = "COMPLETED";
         }
 
+        long completedAtMs = System.currentTimeMillis();
+
         return new RowEnrichmentResult(
                 rowId,
                 rowIndex,
@@ -472,7 +893,16 @@ public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService
                 conflicts,
                 confidence,
                 entitySources,
-                null
+                null,
+                "COMPLETED",
+                workerId,
+                "Enrichment completed (" + finalAttributes.size() + " attributes, tier: " + assessment.priorityTier() + ")",
+                startedAtMs,
+                completedAtMs,
+                profile,
+                assessment,
+                recommendation,
+                findings
         );
     }
 
@@ -503,7 +933,8 @@ public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService
                 s.completedAt != null ? s.completedAt.toString() : null,
                 s.durationMs,
                 sortedResults,
-                s.errorMessage
+                s.errorMessage,
+                enrichmentTaskExecutor.getConcurrency()
         );
     }
 

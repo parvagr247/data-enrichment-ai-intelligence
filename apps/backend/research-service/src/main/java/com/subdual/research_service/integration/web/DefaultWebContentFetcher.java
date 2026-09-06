@@ -272,6 +272,30 @@ public class DefaultWebContentFetcher implements WebContentFetcher {
                     "Jane Doe is an actress. Filmography includes award-winning short films and stage plays in Los Angeles, CA."
             );
         }
+        if (lowerUrl.contains("alex-rivera")) {
+            return new MockData(
+                    "Alex Rivera - Senior Technical Recruiter at CloudScale Systems",
+                    "Alex Rivera is a Senior Technical Recruiter at CloudScale Systems in San Francisco, CA.",
+                    "CloudScale Systems",
+                    "Alex Rivera is Senior Technical Recruiter at CloudScale Systems, based in San Francisco, CA. Role: Senior Technical Recruiter. Organization: CloudScale Systems. Location: San Francisco, CA. Skills: Technical Recruiting, Talent Sourcing, Candidate Screening. Activity: [AUTHORED] We are actively hiring backend interns and junior engineers for our Spring Boot platform at CloudScale Systems! DM me with your resume. Education: B.S. from University of California, Berkeley."
+            );
+        }
+        if (lowerUrl.contains("sarah-chen") || lowerUrl.contains("fintechglobal")) {
+            return new MockData(
+                    "Dr. Sarah Chen - Staff Backend Architect at FinTech Global",
+                    "Dr. Sarah Chen is Staff Backend Architect at FinTech Global in New York, NY.",
+                    "FinTech Global",
+                    "Dr. Sarah Chen is Staff Backend Architect at FinTech Global, based in New York, NY. Role: Staff Backend Architect. Organization: FinTech Global. Location: New York, NY. Education: Ph.D. in Computer Science from MIT. Skills: Java, Spring Boot, Microservices, Kubernetes, Docker, Distributed Systems. Activity: [AUTHORED] Designing High-Throughput Spring Boot 3 Microservices in Production: key architectural patterns and resilience strategies."
+            );
+        }
+        if (lowerUrl.contains("marcus-vance") || lowerUrl.contains("devscale")) {
+            return new MockData(
+                    "Marcus Vance - Founder & CEO at DevScale AI",
+                    "Marcus Vance is Founder and CEO at DevScale AI in Austin, TX.",
+                    "DevScale AI",
+                    "Marcus Vance is Founder and CEO at DevScale AI, based in Austin, TX. Role: Founder & CEO. Organization: DevScale AI. Location: Austin, TX. Education: B.S. in Computer Science from Stanford University. Skills: Distributed Systems, AI Infrastructure, Go, Python. Activity: [AUTHORED] Building scalable engineering teams and scaling our distributed data infrastructure. Always open to mentorship and hiring talented engineers."
+            );
+        }
         if (lowerUrl.contains("cloudscale") || (lowerUrl.contains("jane-doe") && lowerUrl.contains("team"))) {
             return new MockData(
                     "Jane Doe - Principal Infrastructure Engineer at CloudScale Systems",

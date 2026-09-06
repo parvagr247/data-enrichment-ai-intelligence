@@ -1,0 +1,127 @@
+# 31. Objective-Driven Research Profiles & Multi-Dimensional Scoring
+
+## 1. The Paradigm Shift: Beyond Shallow Attribute Extraction
+
+Early versions of entity enrichment engines suffered from a fundamental product flaw: they extracted shallow, disconnected attributes (such as `jobTitle`, `skills`, and `organization`) without understanding **why** the user was conducting research in the first place.
+
+When a user provides an objective such as:
+> *"Identify and enrich the profiles of people most likely to help with a Java/Spring Boot/backend internship — especially recruiters, hiring managers, Java/Spring engineers, engineering leaders, founders, or people who could provide guidance/referrals — so I can manually prioritize and approach the most valuable people."*
+
+A flat table with `skills: "Java, Spring"` and `title: "Recruiter"` provides inadequate signal. It leaves the user to manually guess:
+- Is this person actually recruiting right now, or did they work in recruiting 5 years ago?
+- Are they working on the relevant tech stack (e.g., Spring Boot, distributed systems)?
+- Why are they relevant to *this specific goal*?
+- How should the user approach them, and what talking points will resonate?
+
+The **Objective-Driven Intelligence Engine** solves this by converting raw research evidence into deep, goal-aligned research profiles:
+
+$$\text{Entity Seed} + \text{ResearchObjective} + \text{Verified Sources} \longrightarrow \begin{cases}
+\textbf{ResearchProfile} & \text{Executive summary, career trajectory, public activity} \\
+\textbf{ObjectiveAssessment} & \text{0–100 score, priority tier (HIGH/MED/LOW), dimensional fit} \\
+\textbf{RecommendedApproach} & \text{Strategy, outreach angle, customized talking points} \\
+\textbf{GroundedFindings} & \text{FACT vs INFERENCE classification with source URLs}
+\end{cases}$$
+
+---
+
+## 2. Domain-Agnostic Architecture
+
+Crucially, the objective evaluation engine is **domain-agnostic**. It does not hardcode rules for "Java" or "Spring Boot". Instead, it parses any natural language research objective into structured characteristics:
+
+```java
+public record ResearchObjective(
+        String rawObjective,
+        List<String> targetPersonCharacteristics,
+        List<String> desiredRelationships,
+        List<String> relevantTopics,
+        List<String> constraints,
+        List<String> outputPreferences,
+        boolean isBlank
+)
+```
+
+Whether the user's objective is:
+1. Finding backend engineering hiring managers for internships,
+2. Identifying executive leaders for B2B enterprise sales,
+3. Sourcing AI researchers in robotics for academic collaboration, or
+4. Locating seed-stage venture capitalists investing in dev tools,
+
+the engine decomposes the prompt into target characteristics, relationship types, and domain keywords, weighting evidence accordingly.
+
+---
+
+## 3. The 5 Evaluation Dimensions (0–100)
+
+Relevance is evaluated across five orthogonal dimensions:
+
+| Dimension | Description | Evaluation Signals |
+| :--- | :--- | :--- |
+| **Capability Fit** | Alignment of technical, domain, or functional skills | Verified stack, open-source repositories, architectural contributions |
+| **Leadership Fit** | Seniority, decision-making authority, influence | Title hierarchy (Director, VP, Head of, Principal), team leadership |
+| **Hiring Relevance** | Probability of direct involvement in recruiting/hiring | Recruiter/Sourcer roles, recent posts announcing openings or internships |
+| **Mentorship Relevance** | Willingness and background for guidance and advice | Advisory roles, mentorship posts, university community involvement |
+| **Network Relevance** | Value for referrals, introductions, or ecosystem reach | Mutual network centrality, community organizer roles, alumni affiliation |
+
+The weighted combination determines the **Priority Tier**:
+- **HIGH** (Score 80–100): Direct alignment with high decision-making power or active hiring activity.
+- **MEDIUM** (Score 50–79): Strong thematic alignment or relevant adjacent position.
+- **LOW** (Score 20–49): Distantly related or legacy background.
+- **NONE** (Score 0): Blank objective or completely non-relevant entity.
+
+---
+
+## 4. Strict Neutrality for Blank Objectives
+
+A core failure mode of LLM-based pipelines is hallucination: when given an empty prompt, generative models often invent hypothetical reasons why someone might be relevant.
+
+The platform implements strict deterministic neutrality:
+```java
+if (objective.isBlank()) {
+    return ProfileAssessmentResponse.neutral(
+        displayName,
+        canonicalUrl,
+        entityType,
+        profile,
+        "General profile research completed (no specific objective specified)."
+    );
+}
+```
+When no research objective is specified:
+- `overallScore` is strictly `0`
+- `priorityTier` is strictly `NONE`
+- No speculative claims, recommendations, or fabricated alignments are generated.
+
+---
+
+## 5. Distinction Between Facts and Inferences
+
+To maintain auditability and trust, every finding generated by the platform is explicitly labeled:
+
+1. `FACT_SOURCE_DERIVED`: Directly extracted and verified from authoritative public sources (e.g. current role at NexaCorp verified on LinkedIn profile). Contains exact source URLs and verbatim evidence snippets.
+2. `INFERRED_ASSESSMENT`: Analytical conclusion synthesized by the intelligence engine (e.g. *"Candidate has high decision-making authority for engineering hiring based on Director title and recent hiring posts"*).
+
+---
+
+## 6. Honest Granular Concurrency Tracking
+
+During asynchronous batch enrichment, entities transition through transparent, honest pipeline stages:
+
+```
+QUEUED
+  ↓
+RESEARCHING_IDENTITY   (Resolving name, canonical URL, web anchors)
+  ↓
+DISCOVERING_SOURCES    (Querying search providers & index APIs)
+  ↓
+EXTRACTING_EVIDENCE    (Parsing HTML, extracting snippets & facts)
+  ↓
+ANALYZING_ACTIVITY     (Evaluating public activity & social posts)
+  ↓
+ASSESSING_OBJECTIVE    (Multi-dimensional scoring against user objective)
+  ↓
+GENERATING_PROFILE     (Synthesizing executive summary & talking points)
+  ↓
+COMPLETED / FAILED     (Persisting canonical profile & dispatching SSE events)
+```
+
+The frontend visualizes each worker's current stage with pulsing status badges and real-time event logs, providing complete execution transparency.

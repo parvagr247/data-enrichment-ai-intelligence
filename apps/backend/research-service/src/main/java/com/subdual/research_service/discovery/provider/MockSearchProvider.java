@@ -73,6 +73,15 @@ public class MockSearchProvider implements SearchProvider {
         if (lowerQuery.contains("parv-agrawal") || lowerQuery.contains("parv agrawal")) {
             return mockParvAgrawalSources(lowerQuery, now);
         }
+        if (lowerQuery.contains("alex-rivera") || lowerQuery.contains("alex rivera")) {
+            return mockAlexRiveraSources(now);
+        }
+        if (lowerQuery.contains("sarah-chen") || lowerQuery.contains("sarah chen")) {
+            return mockSarahChenSources(now);
+        }
+        if (lowerQuery.contains("marcus-vance") || lowerQuery.contains("marcus vance")) {
+            return mockMarcusVanceSources(now);
+        }
         if (lowerQuery.contains("linkedin") || lowerQuery.contains("example")) {
             return mockLinkedInSources(now);
         }
@@ -262,6 +271,69 @@ public class MockSearchProvider implements SearchProvider {
                         now,
                         0.70,
                         "Search index results for Example Organization."
+                )
+        );
+    }
+
+    private List<DiscoveredSource> mockAlexRiveraSources(Instant now) {
+        return List.of(
+                new DiscoveredSource(
+                        "https://cloudscale.io/team/alex-rivera",
+                        "[MOCK] Alex Rivera - Senior Technical Recruiter - CloudScale Systems",
+                        "OFFICIAL_WEBSITE",
+                        now,
+                        0.98,
+                        "Alex Rivera is Senior Technical Recruiter at CloudScale Systems in San Francisco, CA. Actively recruiting backend engineers and Java/Spring Boot interns."
+                ),
+                new DiscoveredSource(
+                        "https://www.linkedin.com/in/alex-rivera",
+                        "[MOCK] Alex Rivera - Senior Technical Recruiter | LinkedIn",
+                        "SOCIAL_PROFILE",
+                        now,
+                        0.95,
+                        "Senior Technical Recruiter at CloudScale Systems. Activity: [AUTHORED] We are actively hiring backend interns and junior engineers for our Spring Boot platform at CloudScale Systems! DM me with your resume."
+                )
+        );
+    }
+
+    private List<DiscoveredSource> mockSarahChenSources(Instant now) {
+        return List.of(
+                new DiscoveredSource(
+                        "https://fintechglobal.com/engineering/sarah-chen",
+                        "[MOCK] Dr. Sarah Chen - Staff Backend Architect - FinTech Global",
+                        "OFFICIAL_WEBSITE",
+                        now,
+                        0.98,
+                        "Dr. Sarah Chen is Staff Backend Architect at FinTech Global. Education: Ph.D. in Computer Science from MIT. Core expertise: Java, Spring Boot, Microservices, Kubernetes."
+                ),
+                new DiscoveredSource(
+                        "https://www.linkedin.com/in/sarah-chen",
+                        "[MOCK] Dr. Sarah Chen - Staff Backend Architect | LinkedIn",
+                        "SOCIAL_PROFILE",
+                        now,
+                        0.95,
+                        "Staff Backend Architect at FinTech Global. Activity: [AUTHORED] Designing High-Throughput Spring Boot 3 Microservices in Production: key architectural patterns and resilience strategies."
+                )
+        );
+    }
+
+    private List<DiscoveredSource> mockMarcusVanceSources(Instant now) {
+        return List.of(
+                new DiscoveredSource(
+                        "https://devscale.ai/leadership/marcus-vance",
+                        "[MOCK] Marcus Vance - Founder & CEO - DevScale AI",
+                        "OFFICIAL_WEBSITE",
+                        now,
+                        0.98,
+                        "Marcus Vance is Founder and CEO at DevScale AI in Austin, TX. Formerly Engineering Director. Education: B.S. in Computer Science from Stanford University."
+                ),
+                new DiscoveredSource(
+                        "https://www.linkedin.com/in/marcus-vance",
+                        "[MOCK] Marcus Vance - Founder & CEO | LinkedIn",
+                        "SOCIAL_PROFILE",
+                        now,
+                        0.95,
+                        "Founder & CEO at DevScale AI. Activity: [AUTHORED] Building scalable engineering teams and scaling our distributed data infrastructure. Always open to mentorship and hiring talented engineers."
                 )
         );
     }

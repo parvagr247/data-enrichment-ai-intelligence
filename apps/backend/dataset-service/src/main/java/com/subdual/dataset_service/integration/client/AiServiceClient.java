@@ -121,4 +121,19 @@ public class AiServiceClient {
             return null;
         }
     }
+
+    public com.subdual.dataset_service.dto.ProfileAssessmentResponse assessProfile(com.subdual.dataset_service.dto.ProfileAssessmentRequest request) {
+        try {
+            return restClient.post()
+                    .uri("/api/v2/ai/profile/assess")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .accept(MediaType.APPLICATION_JSON)
+                    .body(request)
+                    .retrieve()
+                    .body(com.subdual.dataset_service.dto.ProfileAssessmentResponse.class);
+        } catch (Exception ex) {
+            log.warn("Failed calling AI profile assessment ({}), falling back to deterministic synthesis", ex.getMessage());
+            return null;
+        }
+    }
 }

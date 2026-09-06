@@ -305,6 +305,21 @@
           }
         },
         {
+          "name": "Subscribe Real-Time Events (SSE)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "text/event-stream", "type": "text" }
+            ],
+            "url": {
+              "raw": "{{datasetBaseUrl}}/api/v1/enrichment/jobs/{{jobId}}/events",
+              "host": ["{{datasetBaseUrl}}"],
+              "path": ["api", "v1", "enrichment", "jobs", "{{jobId}}", "events"]
+            },
+            "description": "Subscribes to live Server-Sent Events (SSE) stream for real-time observable execution, dynamic worker cards, and incremental row completions."
+          }
+        },
+        {
           "name": "Cancel Batch Job",
           "event": [
             {
@@ -1149,6 +1164,208 @@
               "path": ["api", "v1", "ai", "extract"]
             },
             "description": "Scenario 10: Resiliency verification: heuristic fallback guarantees pipeline continuity if LLM calls fail."
+          }
+        }
+      ]
+    },
+    {
+      "name": "08 Objective-Driven Research Profiles",
+      "description": "Validates the deep research profile assessment engine, objective-aware multi-dimensional scoring, and evidence-grounded approach generation.",
+      "item": [
+        {
+          "name": "01 Parse Research Objective",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Objective parsed with characteristics and topics\", function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.targetPersonCharacteristics).to.be.an('array').that.includes('Recruiters / Talent Acquisition');",
+                  "    pm.expect(json.relevantTopics).to.be.an('array').that.includes('Java');",
+                  "    pm.expect(json.isBlank).to.eql(false);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json", "type": "text" },
+              { "key": "Accept", "value": "application/json", "type": "text" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"objective\": \"Identify and enrich the profiles of people most likely to help with a Java/Spring Boot/backend internship — especially recruiters, hiring managers, Java/Spring engineers, engineering leaders, founders, or people who could provide guidance/referrals\"\n}"
+            },
+            "url": {
+              "raw": "{{aiBaseUrl}}/api/v2/ai/objective/parse",
+              "host": ["{{aiBaseUrl}}"],
+              "path": ["api", "v2", "ai", "objective", "parse"]
+            },
+            "description": "Parses natural language research objectives into structured characteristics, topics, and criteria."
+          }
+        },
+        {
+          "name": "02 Profile Assessment - Recruiter (High Priority)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Recruiter assessed as HIGH priority tier\", function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.assessment.priorityTier).to.eql('HIGH');",
+                  "    pm.expect(json.assessment.overallScore).to.be.above(80);",
+                  "    pm.expect(json.recommendation.approachType).to.eql('RECRUITER_OUTREACH');",
+                  "    pm.expect(json.recommendation.suggestedTalkingPoints.length).to.be.above(0);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json", "type": "text" },
+              { "key": "Accept", "value": "application/json", "type": "text" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"displayName\": \"Alex Rivera\",\n  \"canonicalUrl\": \"https://www.linkedin.com/in/alex-rivera-tech-recruiter\",\n  \"entityType\": \"PERSON\",\n  \"objective\": {\n    \"rawObjective\": \"Identify recruiters or leaders for Java/Spring Boot internship\",\n    \"targetPersonCharacteristics\": [\"Recruiters / Talent Acquisition\"],\n    \"relevantTopics\": [\"Java\", \"Spring Boot\"],\n    \"isBlank\": false\n  },\n  \"researchEvidence\": {\n    \"currentRole\": {\n      \"field\": \"currentRole\",\n      \"value\": \"Senior Technical Recruiter\",\n      \"sourceUrl\": \"https://www.linkedin.com/in/alex-rivera-tech-recruiter\",\n      \"evidenceSnippet\": \"Senior Technical Recruiter at NexaCorp hiring backend engineers and university interns\",\n      \"confidence\": \"HIGH\"\n    }\n  },\n  \"sourceUrls\": [\"https://www.linkedin.com/in/alex-rivera-tech-recruiter\"],\n  \"sourceSnippets\": [\"Alex Rivera | Senior Technical Recruiter at NexaCorp. Actively hiring Spring Boot Interns for Fall 2026.\"]\n}"
+            },
+            "url": {
+              "raw": "{{aiBaseUrl}}/api/v2/ai/profile/assess",
+              "host": ["{{aiBaseUrl}}"],
+              "path": ["api", "v2", "ai", "profile", "assess"]
+            },
+            "description": "Evaluates candidate profile against Java internship recruiter objective."
+          }
+        },
+        {
+          "name": "03 Profile Assessment - Staff Architect (High Priority)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Staff Architect assessed as HIGH priority tier with technical guidance approach\", function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.assessment.priorityTier).to.eql('HIGH');",
+                  "    pm.expect(json.assessment.overallScore).to.be.above(80);",
+                  "    pm.expect(json.recommendation.approachType).to.eql('TECHNICAL_GUIDANCE');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json", "type": "text" },
+              { "key": "Accept", "value": "application/json", "type": "text" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"displayName\": \"Dr. Sarah Chen\",\n  \"canonicalUrl\": \"https://www.linkedin.com/in/sarah-chen-architect\",\n  \"entityType\": \"PERSON\",\n  \"objective\": {\n    \"rawObjective\": \"Identify senior engineers or mentors for Java/Spring Boot backend guidance\",\n    \"targetPersonCharacteristics\": [\"Engineers / Technical Leads\"],\n    \"relevantTopics\": [\"Java\", \"Spring Boot\"],\n    \"isBlank\": false\n  },\n  \"researchEvidence\": {\n    \"currentRole\": {\n      \"field\": \"currentRole\",\n      \"value\": \"Principal Software Architect\",\n      \"sourceUrl\": \"https://www.linkedin.com/in/sarah-chen-architect\",\n      \"evidenceSnippet\": \"Principal Architect leading Spring Cloud and reactive microservices\",\n      \"confidence\": \"HIGH\"\n    }\n  },\n  \"sourceUrls\": [\"https://www.linkedin.com/in/sarah-chen-architect\"],\n  \"sourceSnippets\": [\"Dr. Sarah Chen | Principal Architect. Mentoring young engineers in Spring Boot microservices.\"]\n}"
+            },
+            "url": {
+              "raw": "{{aiBaseUrl}}/api/v2/ai/profile/assess",
+              "host": ["{{aiBaseUrl}}"],
+              "path": ["api", "v2", "ai", "profile", "assess"]
+            },
+            "description": "Evaluates technical architect profile against mentorship and guidance objective."
+          }
+        },
+        {
+          "name": "04 Profile Assessment - Neutral Blank Objective",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Blank objective yields 0 score and NONE priority tier\", function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.assessment.overallScore).to.eql(0);",
+                  "    pm.expect(json.assessment.priorityTier).to.eql('NONE');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json", "type": "text" },
+              { "key": "Accept", "value": "application/json", "type": "text" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"displayName\": \"John Doe\",\n  \"canonicalUrl\": \"https://example.com/john\",\n  \"entityType\": \"PERSON\",\n  \"objective\": {\n    \"rawObjective\": \"\",\n    \"isBlank\": true\n  },\n  \"researchEvidence\": {},\n  \"sourceUrls\": [],\n  \"sourceSnippets\": []\n}"
+            },
+            "url": {
+              "raw": "{{aiBaseUrl}}/api/v2/ai/profile/assess",
+              "host": ["{{aiBaseUrl}}"],
+              "path": ["api", "v2", "ai", "profile", "assess"]
+            },
+            "description": "Verifies that a blank objective never fabricates claims or relevance scores."
+          }
+        },
+        {
+          "name": "05 End-to-End Single Entity Objective Enrichment",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Enrichment result includes profile, assessment, and recommendation\", function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('profile');",
+                  "    pm.expect(json).to.have.property('assessment');",
+                  "    pm.expect(json).to.have.property('recommendation');",
+                  "    pm.expect(json).to.have.property('findings');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json", "type": "text" },
+              { "key": "Accept", "value": "application/json", "type": "text" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"row\": {\n    \"Name\": \"Alex Rivera\",\n    \"URL\": \"https://www.linkedin.com/in/alex-rivera-tech-recruiter\"\n  },\n  \"columnMapping\": {\n    \"nameColumn\": \"Name\",\n    \"urlColumn\": \"URL\"\n  },\n  \"entityType\": \"PERSON\",\n  \"userRequirement\": \"Identify recruiters or leaders for Java/Spring Boot internship\"\n}"
+            },
+            "url": {
+              "raw": "{{datasetBaseUrl}}/api/v1/enrichment/single",
+              "host": ["{{datasetBaseUrl}}"],
+              "path": ["api", "v1", "enrichment", "single"]
+            },
+            "description": "End-to-end execution of single-row objective-driven research and profile assessment."
           }
         }
       ]
