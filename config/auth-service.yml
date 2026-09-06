@@ -7,10 +7,13 @@ server:
 
 spring:
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://mysql:3306/enrichment_db}
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://mysql:3306/enrichment_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}
     username: ${SPRING_DATASOURCE_USERNAME:enrichment_user}
     password: ${SPRING_DATASOURCE_PASSWORD:enrichment_password}
     driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      connection-timeout: 60000
+      validation-timeout: 5000
   jpa:
     hibernate:
       ddl-auto: ${SPRING_JPA_HIBERNATE_DDL_AUTO:validate}

@@ -20,6 +20,7 @@ services:
     image: mysql:latest
     container_name: enrichment-mysql
     restart: unless-stopped
+    stop_grace_period: 60s
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
       MYSQL_DATABASE: ${MYSQL_DATABASE:-enrichment_db}
@@ -28,15 +29,18 @@ services:
     volumes:
       - mysql_data:/var/lib/mysql
     networks:
-      - enrichment-network
+      enrichment-network:
+        aliases:
+          - mysql
+          - enrichment-mysql
     expose:
       - "3306"
     healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h localhost --silent"]
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 --silent"]
       interval: 5s
       timeout: 5s
-      retries: 15
-      start_period: 40s
+      retries: 20
+      start_period: 60s
 
   # ----------------------------------------------------------------------------
   # 2. Centralized Configuration Server (Internal Only :9736)
@@ -111,6 +115,8 @@ services:
       JWT_EXPIRATION_MS: ${JWT_EXPIRATION_MS:-86400000}
     depends_on:
       mysql:
+        condition: service_healthy
+      config-server:
         condition: service_healthy
       discovery-server:
         condition: service_healthy
@@ -222,6 +228,8 @@ services:
       ENRICHMENT_AI_ENABLED: ${ENRICHMENT_AI_ENABLED:-true}
     depends_on:
       mysql:
+        condition: service_healthy
+      config-server:
         condition: service_healthy
       discovery-server:
         condition: service_healthy
