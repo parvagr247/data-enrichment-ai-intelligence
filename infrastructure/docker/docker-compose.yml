@@ -1,5 +1,5 @@
 # ==============================================================================
-# Production / Linux VM Deployment Stack
+# Production / GCP VM Deployment Stack
 # Data Enrichment AI Intelligence Platform
 #
 # Primary Public Endpoints:
@@ -43,7 +43,7 @@ services:
   # ----------------------------------------------------------------------------
   config-server:
     build:
-      context: apps/backend/config-server
+      context: ../../apps/backend/config-server
       dockerfile: Dockerfile
     container_name: enrichment-config-server
     restart: unless-stopped
@@ -52,7 +52,7 @@ services:
       SPRING_PROFILES_ACTIVE: native
       EUREKA_SERVER_URL: http://discovery-server:9737/eureka/
     volumes:
-      - ./config:/config:ro
+      - ../../config:/config:ro
     networks:
       - enrichment-network
     expose:
@@ -69,7 +69,7 @@ services:
   # ----------------------------------------------------------------------------
   discovery-server:
     build:
-      context: apps/backend/discovery-server
+      context: ../../apps/backend/discovery-server
       dockerfile: Dockerfile
     container_name: enrichment-discovery-server
     restart: unless-stopped
@@ -95,7 +95,7 @@ services:
   # ----------------------------------------------------------------------------
   auth-service:
     build:
-      context: apps/backend/auth-service
+      context: ../../apps/backend/auth-service
       dockerfile: Dockerfile
     container_name: enrichment-auth-service
     restart: unless-stopped
@@ -130,7 +130,7 @@ services:
   # ----------------------------------------------------------------------------
   ai-intelligent-service:
     build:
-      context: apps/backend/ai-intelligent-service
+      context: ../../apps/backend/ai-intelligent-service
       dockerfile: Dockerfile
     container_name: enrichment-ai-intelligent-service
     restart: unless-stopped
@@ -161,7 +161,7 @@ services:
   # ----------------------------------------------------------------------------
   research-service:
     build:
-      context: apps/backend/research-service
+      context: ../../apps/backend/research-service
       dockerfile: Dockerfile
     container_name: enrichment-research-service
     restart: unless-stopped
@@ -201,7 +201,7 @@ services:
   # ----------------------------------------------------------------------------
   dataset-service:
     build:
-      context: apps/backend/dataset-service
+      context: ../../apps/backend/dataset-service
       dockerfile: Dockerfile
     container_name: enrichment-dataset-service
     restart: unless-stopped
@@ -241,7 +241,7 @@ services:
   # ----------------------------------------------------------------------------
   api-gateway:
     build:
-      context: apps/backend/api-gateway
+      context: ../../apps/backend/api-gateway
       dockerfile: Dockerfile
     container_name: enrichment-api-gateway
     restart: unless-stopped
@@ -278,7 +278,7 @@ services:
   # ----------------------------------------------------------------------------
   frontend:
     build:
-      context: apps/frontend
+      context: ../../apps/frontend
       dockerfile: Dockerfile
     container_name: enrichment-frontend
     restart: unless-stopped
@@ -289,7 +289,6 @@ services:
       PORT: 3000
       HOSTNAME: "0.0.0.0"
       NEXT_PUBLIC_GATEWAY_URL: ${NEXT_PUBLIC_GATEWAY_URL:-http://localhost:9738}
-      NEXT_PUBLIC_AUTH_SERVICE_URL: ${NEXT_PUBLIC_AUTH_SERVICE_URL:-http://localhost:9738}
       NEXT_PUBLIC_GATEWAY_API_KEY: ${GATEWAY_API_KEY:-}
     depends_on:
       api-gateway:

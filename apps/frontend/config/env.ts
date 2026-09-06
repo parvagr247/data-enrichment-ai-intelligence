@@ -24,4 +24,8 @@ export const ENV = {
     process.env.NEXT_PUBLIC_DATASET_SERVICE_URL,
     defaultGatewayUrl
   ),
+  AUTH_SERVICE_URL: cleanUrl(
+    process.env.NEXT_PUBLIC_AUTH_SERVICE_URL,
+    defaultGatewayUrl
+  ),
 } as const;

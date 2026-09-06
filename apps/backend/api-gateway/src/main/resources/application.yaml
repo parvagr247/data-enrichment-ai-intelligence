@@ -39,6 +39,10 @@ spring:
               uri: ${DATASET_SERVICE_URL:http://localhost:9743}
               predicates:
                 - Path=/api/v1/entities/**
+            - id: auth-service
+              uri: ${AUTH_SERVICE_URL:http://localhost:9739}
+              predicates:
+                - Path=/api/v1/auth/**
 
 eureka:
   client:
@@ -51,6 +55,9 @@ gateway:
     api-key: ${GATEWAY_API_KEY:}
   cors:
     allowed-origins: ${GATEWAY_CORS_ALLOWED_ORIGINS:http://localhost:3000,http://127.0.0.1:3000}
+
+jwt:
+  secret: ${JWT_SECRET:enrichment-platform-super-secret-jwt-signing-key-256-bits-minimum-required}
 
 management:
   endpoints:

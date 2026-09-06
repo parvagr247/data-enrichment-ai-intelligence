@@ -1,6 +1,7 @@
 package com.subdual.api_gateway.config;
 
 import com.subdual.api_gateway.filter.ApiKeyAuthenticationFilter;
+import com.subdual.api_gateway.filter.JwtAuthenticationFilter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -22,13 +23,16 @@ import java.util.List;
 public class GatewaySecurityConfiguration {
 
     private final ApiKeyAuthenticationFilter apiKeyAuthenticationFilter;
+    private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final List<String> allowedOrigins;
 
     public GatewaySecurityConfiguration(
             ApiKeyAuthenticationFilter apiKeyAuthenticationFilter,
+            JwtAuthenticationFilter jwtAuthenticationFilter,
             @Value("${gateway.cors.allowed-origins:http://localhost:3000,http://127.0.0.1:3000}") String allowedOriginsStr
     ) {
         this.apiKeyAuthenticationFilter = apiKeyAuthenticationFilter;
+        this.jwtAuthenticationFilter = jwtAuthenticationFilter;
         this.allowedOrigins = Arrays.stream(allowedOriginsStr.split(","))
                 .map(String::trim)
                 .filter(s -> !s.isEmpty())
@@ -50,7 +54,8 @@ public class GatewaySecurityConfiguration {
                 .authorizeHttpRequests(auth -> auth
                         .anyRequest().permitAll()
                 )
-                .addFilterBefore(apiKeyAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(apiKeyAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterAfter(jwtAuthenticationFilter, ApiKeyAuthenticationFilter.class);
 
         return http.build();
     }

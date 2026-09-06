@@ -8,8 +8,28 @@ import java.util.List;
 import java.util.Optional;
 
 public interface EntityPersistenceService {
-    EntityDetailResponse persistOrUpdate(PersistEntityRequest request);
-    Optional<EntityDetailResponse> findById(String entityId);
-    List<EntitySummaryResponse> listAll();
-    List<EntitySummaryResponse> list(int page, int size);
+
+    default EntityDetailResponse persistOrUpdate(PersistEntityRequest request) {
+        return persistOrUpdate(request, null);
+    }
+
+    EntityDetailResponse persistOrUpdate(PersistEntityRequest request, String userId);
+
+    default Optional<EntityDetailResponse> findById(String entityId) {
+        return findById(entityId, null);
+    }
+
+    Optional<EntityDetailResponse> findById(String entityId, String userId);
+
+    default List<EntitySummaryResponse> listAll() {
+        return listAll(null);
+    }
+
+    List<EntitySummaryResponse> listAll(String userId);
+
+    default List<EntitySummaryResponse> list(int page, int size) {
+        return list(page, size, null);
+    }
+
+    List<EntitySummaryResponse> list(int page, int size, String userId);
 }

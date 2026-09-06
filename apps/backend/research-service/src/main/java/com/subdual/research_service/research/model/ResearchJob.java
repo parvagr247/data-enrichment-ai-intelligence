@@ -7,6 +7,7 @@ import java.time.Instant;
 
 public record ResearchJob(
         String jobId,
+        String userId,
         ResearchRequest request,
         ResearchJobStatus status,
         int progress,
@@ -15,19 +16,23 @@ public record ResearchJob(
         ResearchResponse result,
         String error
 ) {
+    public static ResearchJob submitted(String jobId, String userId, ResearchRequest request) {
+        return new ResearchJob(jobId, userId, request, ResearchJobStatus.SUBMITTED, 0, Instant.now(), null, null, null);
+    }
+
     public static ResearchJob submitted(String jobId, ResearchRequest request) {
-        return new ResearchJob(jobId, request, ResearchJobStatus.SUBMITTED, 0, Instant.now(), null, null, null);
+        return submitted(jobId, null, request);
     }
 
     public ResearchJob withStatus(ResearchJobStatus newStatus, int newProgress) {
-        return new ResearchJob(jobId, request, newStatus, newProgress, createdAt, completedAt, result, error);
+        return new ResearchJob(jobId, userId, request, newStatus, newProgress, createdAt, completedAt, result, error);
     }
 
     public ResearchJob withCompleted(ResearchResponse response) {
-        return new ResearchJob(jobId, request, ResearchJobStatus.COMPLETED, 100, createdAt, Instant.now(), response, null);
+        return new ResearchJob(jobId, userId, request, ResearchJobStatus.COMPLETED, 100, createdAt, Instant.now(), response, null);
     }
 
     public ResearchJob withFailed(String errorMessage) {
-        return new ResearchJob(jobId, request, ResearchJobStatus.FAILED, 100, createdAt, Instant.now(), null, errorMessage);
+        return new ResearchJob(jobId, userId, request, ResearchJobStatus.FAILED, 100, createdAt, Instant.now(), null, errorMessage);
     }
 }

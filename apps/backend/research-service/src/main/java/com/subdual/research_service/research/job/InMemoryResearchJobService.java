@@ -33,11 +33,16 @@ public class InMemoryResearchJobService implements ResearchJobService, Disposabl
 
     @Override
     public ResearchJobResponse submitJob(ResearchRequest request) {
+        return submitJob(request, null);
+    }
+
+    @Override
+    public ResearchJobResponse submitJob(ResearchRequest request, String userId) {
         String jobId = UUID.randomUUID().toString();
-        ResearchJob initialJob = ResearchJob.submitted(jobId, request);
+        ResearchJob initialJob = ResearchJob.submitted(jobId, userId, request);
         jobs.put(jobId, initialJob);
 
-        log.info("[AsyncJob: SUBMITTED] JobId='{}', URL='{}'", jobId, request.url());
+        log.info("[AsyncJob: SUBMITTED] JobId='{}', User='{}', URL='{}'", jobId, userId, request.url());
 
         executor.submit(() -> processJob(jobId, request));
 
@@ -46,7 +51,20 @@ public class InMemoryResearchJobService implements ResearchJobService, Disposabl
 
     @Override
     public Optional<ResearchJobResponse> getJob(String jobId) {
-        return Optional.ofNullable(jobs.get(jobId)).map(this::toResponse);
+        return getJob(jobId, null);
+    }
+
+    @Override
+    public Optional<ResearchJobResponse> getJob(String jobId, String userId) {
+        ResearchJob job = jobs.get(jobId);
+        if (job == null) {
+            return Optional.empty();
+        }
+        if (userId != null && !userId.isBlank() && job.userId() != null && !job.userId().equals(userId)) {
+            // IDOR Protection: User B cannot inspect User A's research job
+            return Optional.empty();
+        }
+        return Optional.of(toResponse(job));
     }
 
     private void processJob(String jobId, ResearchRequest request) {

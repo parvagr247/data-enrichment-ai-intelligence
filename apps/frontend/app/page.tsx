@@ -1,6 +1,9 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
 import {
   EntityType,
   ColumnMapping,
@@ -31,6 +34,15 @@ import { EntityCatalog } from "@/components/catalog/EntityCatalog";
 type WorkflowStep = "UPLOAD" | "PREVIEW" | "MAPPING" | "CONFIG" | "RUNNING" | "RESULTS";
 
 export default function Home() {
+  const { user, loading, logout } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push("/login");
+    }
+  }, [loading, user, router]);
+
   const [activeTab, setActiveTab] = useState<"batch" | "single" | "catalog">("batch");
 
   // Workflow State
@@ -585,6 +597,30 @@ export default function Home() {
     });
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex items-center justify-center">
+        <div className="flex items-center gap-3 text-zinc-500 dark:text-zinc-400">
+          <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+          </svg>
+          <span className="text-sm font-medium">Authenticating...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return null;
+  }
+
+  const userInitials = user.name
+    ? user.name.trim().split(' ').length >= 2
+      ? (user.name.trim().split(' ')[0][0] + user.name.trim().split(' ')[1][0]).toUpperCase()
+      : user.name.slice(0, 2).toUpperCase()
+    : 'U';
+
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 p-4 md:p-8">
       <div className="max-w-6xl mx-auto space-y-6">
@@ -596,16 +632,52 @@ export default function Home() {
               Automated Entity Research, Multi-Source Fact Extraction &amp; Evidence-Grounded Dataset Enrichment
             </p>
           </div>
-          <div className="flex items-center gap-2 text-xs font-mono">
-            <span className="px-2.5 py-1 rounded bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300">
-              Research :9741
-            </span>
-            <span className="px-2.5 py-1 rounded bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300">
-              AI :9742
-            </span>
-            <span className="px-2.5 py-1 rounded bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300">
-              Dataset :9743
-            </span>
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2 text-xs font-mono">
+              <span className="px-2 py-0.5 rounded bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300">
+                Auth :9739
+              </span>
+              <span className="px-2 py-0.5 rounded bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300">
+                Research :9741
+              </span>
+              <span className="px-2 py-0.5 rounded bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300">
+                AI :9742
+              </span>
+              <span className="px-2 py-0.5 rounded bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300">
+                Dataset :9743
+              </span>
+            </div>
+
+            {/* User Profile Badge & Logout */}
+            <div className="flex items-center gap-2.5 pl-3 border-l border-zinc-300 dark:border-zinc-700">
+              <Link
+                href="/account"
+                className="flex items-center gap-2 p-1 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-850 transition-colors group"
+                title="Account Settings & Data Ownership"
+              >
+                <div className="w-7 h-7 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold text-xs shadow-sm">
+                  {userInitials}
+                </div>
+                <div className="text-left hidden sm:block">
+                  <div className="text-xs font-medium text-zinc-900 dark:text-zinc-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400">
+                    {user.name}
+                  </div>
+                  <div className="text-[10px] text-zinc-500 dark:text-zinc-400 max-w-[120px] truncate">
+                    {user.email}
+                  </div>
+                </div>
+              </Link>
+              <button
+                type="button"
+                onClick={logout}
+                className="p-1.5 text-zinc-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-colors"
+                title="Sign Out"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+              </button>
+            </div>
           </div>
         </header>
 

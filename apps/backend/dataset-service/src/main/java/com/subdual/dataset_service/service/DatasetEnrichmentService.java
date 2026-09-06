@@ -11,15 +11,35 @@ import java.util.Optional;
 
 public interface DatasetEnrichmentService {
 
-    EnrichmentJobResponse createAndSubmitJob(EnrichmentJobRequest request);
+    default EnrichmentJobResponse createAndSubmitJob(EnrichmentJobRequest request) {
+        return createAndSubmitJob(request, null);
+    }
 
-    Optional<EnrichmentJobResponse> getJob(String jobId);
+    EnrichmentJobResponse createAndSubmitJob(EnrichmentJobRequest request, String userId);
 
-    List<EnrichmentJobResponse> listJobs();
+    default Optional<EnrichmentJobResponse> getJob(String jobId) {
+        return getJob(jobId, null);
+    }
+
+    Optional<EnrichmentJobResponse> getJob(String jobId, String userId);
+
+    default List<EnrichmentJobResponse> listJobs() {
+        return listJobs(null);
+    }
+
+    List<EnrichmentJobResponse> listJobs(String userId);
 
     RowEnrichmentResult enrichSingle(SingleEnrichmentRequest request);
 
-    boolean cancelJob(String jobId);
+    default boolean cancelJob(String jobId) {
+        return cancelJob(jobId, null);
+    }
 
-    SseEmitter subscribeJobEvents(String jobId);
+    boolean cancelJob(String jobId, String userId);
+
+    default SseEmitter subscribeJobEvents(String jobId) {
+        return subscribeJobEvents(jobId, null);
+    }
+
+    SseEmitter subscribeJobEvents(String jobId, String userId);
 }

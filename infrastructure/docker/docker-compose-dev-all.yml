@@ -97,6 +97,7 @@ services:
       RESEARCH_SERVICE_URL: http://research-service:9741
       AI_INTELLIGENT_SERVICE_URL: http://ai-intelligent-service:9742
       DATASET_SERVICE_URL: http://dataset-service:9743
+      AUTH_SERVICE_URL: http://auth-service:9739
       GATEWAY_API_KEY: ${GATEWAY_API_KEY:-}
       GATEWAY_CORS_ALLOWED_ORIGINS: ${GATEWAY_CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
     volumes:
@@ -110,6 +111,43 @@ services:
         - path: ../../apps/backend/api-gateway/Dockerfile
           action: rebuild
         - path: ../../apps/backend/api-gateway/src
+          target: /app/src
+          action: sync+restart
+    networks:
+      - enrichment-network
+
+  auth-service:
+    build:
+      context: ../../apps/backend/auth-service
+      dockerfile: Dockerfile
+    container_name: enrichment-auth-service
+    restart: unless-stopped
+    ports:
+      - "9739:9739"
+    environment:
+      SERVER_PORT: 9739
+      SPRING_APPLICATION_NAME: auth-service
+      CONFIG_SERVER_URL: http://config-server:9736
+      EUREKA_SERVER_URL: http://discovery-server:9737/eureka/
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-enrichment_db}?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER:-enrichment_user}
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:-enrichment_password}
+      JWT_SECRET: ${JWT_SECRET:-enrichment-platform-super-secret-jwt-signing-key-256-bits-minimum-required}
+      JWT_EXPIRATION_MS: ${JWT_EXPIRATION_MS:-86400000}
+    depends_on:
+      mysql:
+        condition: service_healthy
+    volumes:
+      - maven_cache:/root/.m2
+      - ../../apps/backend/auth-service/pom.xml:/app/pom.xml
+      - ../../apps/backend/auth-service/src:/app/src
+    develop:
+      watch:
+        - path: ../../apps/backend/auth-service/pom.xml
+          action: rebuild
+        - path: ../../apps/backend/auth-service/Dockerfile
+          action: rebuild
+        - path: ../../apps/backend/auth-service/src
           target: /app/src
           action: sync+restart
     networks:
@@ -242,6 +280,7 @@ services:
       NEXT_PUBLIC_RESEARCH_SERVICE_URL: ${NEXT_PUBLIC_RESEARCH_SERVICE_URL:-http://localhost:9738}
       NEXT_PUBLIC_AI_INTELLIGENT_SERVICE_URL: ${NEXT_PUBLIC_AI_INTELLIGENT_SERVICE_URL:-http://localhost:9738}
       NEXT_PUBLIC_DATASET_SERVICE_URL: ${NEXT_PUBLIC_DATASET_SERVICE_URL:-http://localhost:9738}
+      NEXT_PUBLIC_AUTH_SERVICE_URL: ${NEXT_PUBLIC_AUTH_SERVICE_URL:-http://localhost:9738}
       NEXT_PUBLIC_GATEWAY_API_KEY: ${GATEWAY_API_KEY:-}
     volumes:
       - ../../apps/frontend:/app

@@ -38,7 +38,8 @@ flowchart TD
 | **End-to-End Pipeline & Observability** | [Enrichment Flow](enrichment-flow.md) | Step-by-step dataset lifecycle: upload, schema profiling, bounded concurrency, SSE streaming, corroboration, and export. |
 | **HTTP & Streaming API Contracts** | [API Reference](api.md) | Authoritative specifications for all REST endpoints, SSE streams, DTOs, and RFC 7807 error models across all services. |
 | **Local Setup, Docker & Testing** | [Development Guide](development.md) | Environment setup, Docker Compose workflows (`docker-compose-dev-all.yml`), port mappings, and testing suites. |
-| **Decisions & Future Roadmap** | [Architecture Decisions (ADRs)](decisions.md) | Foundational ADRs (why 3 services, bounded concurrency, zero-hallucination, SSE vs WebSockets) and strategic evolution roadmap. |
+| **Production & GCP VM Deployment** | [GCP VM Deployment Guide](../infrastructure/docker/GCP_VM_DEPLOYMENT.md) & [Docker Overview](../infrastructure/docker/README.md) | Full 9-container production deployment on GCP Compute Engine VM, networking, firewall, backup/restore, and troubleshooting. |
+| **Decisions & Future Roadmap** | [Architecture Decisions (ADRs)](decisions.md) | Foundational ADRs (why microservices, bounded concurrency, zero-hallucination, SSE vs WebSockets) and strategic evolution roadmap. |
 | **Engineering Concepts & Post-Mortems** | [Learning Series](learning/README.md) | 6 deep conceptual guides covering microservices, evidence pipelines, Spring AI, concurrency, database persistence, and 11 root-cause post-mortems. |
 
 ---
@@ -46,9 +47,13 @@ flowchart TD
 ## 3. Microservice Packages
 
 Each backend service and frontend app contains its own dedicated package README:
+* **API Gateway**: [`apps/backend/api-gateway/README.md`](../apps/backend/api-gateway/README.md)
+* **Auth Service**: [`apps/backend/auth-service/README.md`](../apps/backend/auth-service/README.md)
 * **AI Intelligent Service**: [`apps/backend/ai-intelligent-service/README.md`](../apps/backend/ai-intelligent-service/README.md)
 * **Dataset Service**: [`apps/backend/dataset-service/README.md`](../apps/backend/dataset-service/README.md)
 * **Research Service**: [`apps/backend/research-service/README.md`](../apps/backend/research-service/README.md)
+* **Config Server**: [`apps/backend/config-server/README.md`](../apps/backend/config-server/README.md)
+* **Discovery Server**: [`apps/backend/discovery-server/README.md`](../apps/backend/discovery-server/README.md)
 * **Frontend Application**: [`apps/frontend/README.md`](../apps/frontend/README.md)
 
 ---

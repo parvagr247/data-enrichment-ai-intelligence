@@ -44,9 +44,9 @@ public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
             return;
         }
 
-        // 2. Allow public health / actuator endpoints
+        // 2. Allow public health / actuator and authentication endpoints
         String path = request.getRequestURI();
-        if (path.startsWith("/actuator/health") || path.startsWith("/actuator/info")) {
+        if (path.startsWith("/actuator/health") || path.startsWith("/actuator/info") || path.startsWith("/api/v1/auth")) {
             filterChain.doFilter(request, response);
             return;
         }

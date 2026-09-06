@@ -35,6 +35,12 @@ export async function apiClient<T>(url: string, options: RequestOptions = {}): P
   if (ENV.GATEWAY_API_KEY && !headers.has('X-API-Key')) {
     headers.set('X-API-Key', ENV.GATEWAY_API_KEY);
   }
+  if (typeof window !== 'undefined') {
+    const token = localStorage.getItem('enrichment_auth_token');
+    if (token && !headers.has('Authorization')) {
+      headers.set('Authorization', `Bearer ${token}`);
+    }
+  }
 
   let finalBody: BodyInit | null = null;
   if (body instanceof FormData) {
@@ -73,6 +79,15 @@ export async function apiClient<T>(url: string, options: RequestOptions = {}): P
         }
       } catch {
         // Response was not JSON
+      }
+
+      if (response.status === 401 && typeof window !== 'undefined') {
+        const path = window.location.pathname;
+        if (!path.startsWith('/login') && !path.startsWith('/register')) {
+          localStorage.removeItem('enrichment_auth_token');
+          localStorage.removeItem('enrichment_auth_user');
+          window.location.href = '/login';
+        }
       }
 
       throw new ApiError(errorMessage, response.status, problem);

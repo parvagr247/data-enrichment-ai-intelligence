@@ -31,7 +31,15 @@ public class DefaultEntityPersistenceService implements EntityPersistenceService
 
     @Override
     public EntityDetailResponse persistOrUpdate(PersistEntityRequest request) {
+        return persistOrUpdate(request, null);
+    }
+
+    @Override
+    public EntityDetailResponse persistOrUpdate(PersistEntityRequest request, String userId) {
         EnrichedEntity entity = findOrCreateEntity(request.entityId());
+        if (userId != null && !userId.isBlank()) {
+            entity.setUserId(userId);
+        }
         updateMetadata(entity, request);
         replaceSources(entity, request.sources());
         replaceAttributes(entity, request.attributes());
@@ -113,15 +121,39 @@ public class DefaultEntityPersistenceService implements EntityPersistenceService
     @Override
     @Transactional(readOnly = true)
     public Optional<EntityDetailResponse> findById(String entityId) {
-        return entityRepository.findById(entityId).map(this::toDetailResponse);
+        return findById(entityId, null);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<EntityDetailResponse> findById(String entityId, String userId) {
+        Optional<EnrichedEntity> entityOpt = entityRepository.findById(entityId);
+        if (entityOpt.isEmpty()) {
+            return Optional.empty();
+        }
+        EnrichedEntity entity = entityOpt.get();
+        if (userId != null && !userId.isBlank() && entity.getUserId() != null && !entity.getUserId().equals(userId)) {
+            // IDOR Protection: Prevent User B from inspecting User A's entity details
+            return Optional.empty();
+        }
+        return Optional.of(toDetailResponse(entity));
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<EntitySummaryResponse> listAll() {
+        return listAll(null);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<EntitySummaryResponse> listAll(String userId) {
         Sort sort = Sort.by(Sort.Direction.DESC, "updatedAt");
-        return entityRepository.findAll(sort)
-                .stream()
+        List<EnrichedEntity> list = (userId != null && !userId.isBlank())
+                ? entityRepository.findByUserId(userId, sort)
+                : entityRepository.findAll(sort);
+
+        return list.stream()
                 .map(this::toSummaryResponse)
                 .toList();
     }
@@ -129,8 +161,16 @@ public class DefaultEntityPersistenceService implements EntityPersistenceService
     @Override
     @Transactional(readOnly = true)
     public List<EntitySummaryResponse> list(int page, int size) {
+        return list(page, size, null);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<EntitySummaryResponse> list(int page, int size, String userId) {
         Pageable pageable = buildPageRequest(page, size);
-        return entityRepository.findAll(pageable)
+        return ((userId != null && !userId.isBlank())
+                ? entityRepository.findByUserId(userId, pageable)
+                : entityRepository.findAll(pageable))
                 .map(this::toSummaryResponse)
                 .getContent();
     }

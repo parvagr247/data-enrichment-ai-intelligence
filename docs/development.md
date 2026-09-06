@@ -52,6 +52,18 @@ docker compose -f infrastructure/docker/docker-compose-dev.yml up -d
 docker compose -f infrastructure/docker/docker-compose-dev.yml down
 ```
 
+### Option C: Production Stack & GCP VM Deployment
+Starts the hardened 9-container production topology with internal network isolation and healthcheck dependency sequencing:
+
+```bash
+# Start full production stack
+docker compose -f infrastructure/docker/docker-compose.prod.yml up -d --build
+
+# View production status
+docker compose -f infrastructure/docker/docker-compose.prod.yml ps
+```
+> For complete instructions on provisioning a fresh GCP VM, configuring VPC firewall rules, setting up swap memory, and executing database backups, see the **[GCP VM Deployment Guide](../infrastructure/docker/GCP_VM_DEPLOYMENT.md)**.
+
 ---
 
 ## 3. Local Microservice Development (Terminal / IDE)

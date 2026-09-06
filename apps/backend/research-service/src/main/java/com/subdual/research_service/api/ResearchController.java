@@ -5,6 +5,7 @@ import com.subdual.research_service.api.dto.ResearchRequest;
 import com.subdual.research_service.api.dto.ResearchResponse;
 import com.subdual.research_service.research.job.ResearchJobService;
 import com.subdual.research_service.research.ResearchService;
+import java.util.Optional;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -38,16 +39,26 @@ public class ResearchController {
 
     @PostMapping(value = "/jobs", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     @ResponseStatus(HttpStatus.ACCEPTED)
-    public ResponseEntity<ResearchJobResponse> submitJob(@Valid @RequestBody ResearchRequest request) {
-        log.info("Received asynchronous research job request for URL='{}'", request != null ? request.url() : null);
-        ResearchJobResponse response = researchJobService.submitJob(request);
+    public ResponseEntity<ResearchJobResponse> submitJob(
+            @Valid @RequestBody ResearchRequest request,
+            @org.springframework.web.bind.annotation.RequestHeader(value = "X-User-Id", required = false) String userId
+    ) {
+        log.info("Received asynchronous research job request for URL='{}' from user='{}'", request != null ? request.url() : null, userId);
+        ResearchJobResponse response = (userId != null && !userId.isBlank())
+                ? researchJobService.submitJob(request, userId)
+                : researchJobService.submitJob(request);
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(response);
     }
 
     @GetMapping(value = "/jobs/{jobId}", produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<ResearchJobResponse> getJob(@PathVariable String jobId) {
-        return researchJobService.getJob(jobId)
-                .map(ResponseEntity::ok)
+    public ResponseEntity<ResearchJobResponse> getJob(
+            @PathVariable String jobId,
+            @org.springframework.web.bind.annotation.RequestHeader(value = "X-User-Id", required = false) String userId
+    ) {
+        Optional<ResearchJobResponse> opt = (userId != null && !userId.isBlank())
+                ? researchJobService.getJob(jobId, userId)
+                : researchJobService.getJob(jobId);
+        return opt.map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 }

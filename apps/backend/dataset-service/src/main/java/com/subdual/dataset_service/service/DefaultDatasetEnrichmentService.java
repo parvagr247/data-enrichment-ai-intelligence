@@ -82,6 +82,7 @@ public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService
 
     private static class JobState {
         String jobId;
+        String userId;
         String datasetName;
         String userRequirement;
         volatile String status;
@@ -103,11 +104,17 @@ public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService
 
     @Override
     public EnrichmentJobResponse createAndSubmitJob(EnrichmentJobRequest request) {
+        return createAndSubmitJob(request, null);
+    }
+
+    @Override
+    public EnrichmentJobResponse createAndSubmitJob(EnrichmentJobRequest request, String userId) {
         String jobId = UUID.randomUUID().toString();
         int totalRows = request.rows() != null ? request.rows().size() : 0;
 
         JobState state = new JobState();
         state.jobId = jobId;
+        state.userId = userId;
         state.datasetName = request.datasetName() != null ? request.datasetName() : "dataset-" + jobId.substring(0, 8);
         state.userRequirement = request.userRequirement();
         state.status = "PROCESSING";
@@ -157,13 +164,31 @@ public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService
 
     @Override
     public Optional<EnrichmentJobResponse> getJob(String jobId) {
+        return getJob(jobId, null);
+    }
+
+    @Override
+    public Optional<EnrichmentJobResponse> getJob(String jobId, String userId) {
         JobState state = activeJobs.get(jobId);
-        return state != null ? Optional.of(toJobResponse(state)) : Optional.empty();
+        if (state == null) {
+            return Optional.empty();
+        }
+        if (userId != null && !userId.isBlank() && state.userId != null && !state.userId.equals(userId)) {
+            // IDOR Protection: User B cannot view User A's job
+            return Optional.empty();
+        }
+        return Optional.of(toJobResponse(state));
     }
 
     @Override
     public List<EnrichmentJobResponse> listJobs() {
+        return listJobs(null);
+    }
+
+    @Override
+    public List<EnrichmentJobResponse> listJobs(String userId) {
         return activeJobs.values().stream()
+                .filter(state -> userId == null || userId.isBlank() || state.userId == null || state.userId.equals(userId))
                 .sorted((a, b) -> b.createdAt.compareTo(a.createdAt))
                 .map(this::toJobResponse)
                 .toList();
@@ -184,12 +209,21 @@ public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService
 
     @Override
     public boolean cancelJob(String jobId) {
+        return cancelJob(jobId, null);
+    }
+
+    @Override
+    public boolean cancelJob(String jobId, String userId) {
         JobState state = activeJobs.get(jobId);
         if (state != null && "PROCESSING".equalsIgnoreCase(state.status)) {
+            if (userId != null && !userId.isBlank() && state.userId != null && !state.userId.equals(userId)) {
+                // IDOR Protection: User B cannot cancel User A's job
+                return false;
+            }
             state.cancelled = true;
             state.status = "CANCELLED";
             state.completedAt = Instant.now();
-            log.info("Cancelled dataset enrichment job '{}'", jobId);
+            log.info("Cancelled dataset enrichment job '{}' by user '{}'", jobId, userId);
 
             emitExecutionEvent(jobId, jobId + "-cancel", -1, "Batch Job", "CANCELLED", "CANCELLED", "system", "Enrichment run cancelled by user", Map.of());
             emitJobCompleted(jobId, "CANCELLED", state.completedRows.get(), state.failedRows.get(), state.durationMs != null ? state.durationMs : 0L);
@@ -200,12 +234,17 @@ public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService
 
     @Override
     public SseEmitter subscribeJobEvents(String jobId) {
+        return subscribeJobEvents(jobId, null);
+    }
+
+    @Override
+    public SseEmitter subscribeJobEvents(String jobId, String userId) {
         JobState state = activeJobs.get(jobId);
         SseEmitter emitter = new SseEmitter(10 * 60 * 1000L); // 10 minutes timeout
 
-        if (state == null) {
+        if (state == null || (userId != null && !userId.isBlank() && state.userId != null && !state.userId.equals(userId))) {
             try {
-                emitter.send(SseEmitter.event().name("error").data(Map.of("message", "Job not found: " + jobId)));
+                emitter.send(SseEmitter.event().name("error").data(Map.of("message", "Job not found or access denied: " + jobId)));
                 emitter.complete();
             } catch (Exception ignored) {}
             return emitter;
@@ -954,6 +993,8 @@ public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService
         }
 
         try {
+            JobState jobState = jobId != null ? activeJobs.get(jobId) : null;
+            String rowUserId = jobState != null ? jobState.userId : null;
             persistenceService.persistOrUpdate(new PersistEntityRequest(
                     entityId,
                     displayName,
@@ -969,7 +1010,7 @@ public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService
                     assessmentJson,
                     recommendationJson,
                     findingsJson
-            ));
+            ), rowUserId);
         } catch (Exception ex) {
             log.warn("Failed persisting entity {} in database: {}", entityId, ex.getMessage());
         }

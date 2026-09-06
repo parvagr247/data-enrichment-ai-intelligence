@@ -31,36 +31,51 @@ public class EnrichmentJobController {
 
     @PostMapping(value = "/jobs", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     @ResponseStatus(HttpStatus.ACCEPTED)
-    public ResponseEntity<EnrichmentJobResponse> submitJob(@Valid @RequestBody EnrichmentJobRequest request) {
-        log.info("Received dataset enrichment job submission for '{}' ({} rows)",
+    public ResponseEntity<EnrichmentJobResponse> submitJob(
+            @Valid @RequestBody EnrichmentJobRequest request,
+            @org.springframework.web.bind.annotation.RequestHeader(value = "X-User-Id", required = false) String userId
+    ) {
+        log.info("Received dataset enrichment job submission for '{}' ({} rows) from user '{}'",
                 request != null ? request.datasetName() : "unknown",
-                request != null && request.rows() != null ? request.rows().size() : 0);
-        EnrichmentJobResponse response = datasetEnrichmentService.createAndSubmitJob(request);
+                request != null && request.rows() != null ? request.rows().size() : 0,
+                userId);
+        EnrichmentJobResponse response = datasetEnrichmentService.createAndSubmitJob(request, userId);
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(response);
     }
 
     @GetMapping(value = "/jobs/{jobId}", produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<EnrichmentJobResponse> getJob(@PathVariable String jobId) {
-        return datasetEnrichmentService.getJob(jobId)
+    public ResponseEntity<EnrichmentJobResponse> getJob(
+            @PathVariable String jobId,
+            @org.springframework.web.bind.annotation.RequestHeader(value = "X-User-Id", required = false) String userId
+    ) {
+        return datasetEnrichmentService.getJob(jobId, userId)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @GetMapping(value = "/jobs/{jobId}/events", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public org.springframework.web.servlet.mvc.method.annotation.SseEmitter subscribeJobEvents(@PathVariable String jobId) {
-        log.info("Client subscribed to SSE events for enrichment job '{}'", jobId);
-        return datasetEnrichmentService.subscribeJobEvents(jobId);
+    public org.springframework.web.servlet.mvc.method.annotation.SseEmitter subscribeJobEvents(
+            @PathVariable String jobId,
+            @org.springframework.web.bind.annotation.RequestHeader(value = "X-User-Id", required = false) String userId
+    ) {
+        log.info("Client subscribed to SSE events for enrichment job '{}' (user '{}')", jobId, userId);
+        return datasetEnrichmentService.subscribeJobEvents(jobId, userId);
     }
 
     @PostMapping(value = "/jobs/{jobId}/cancel", produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<Void> cancelJob(@PathVariable String jobId) {
-        boolean cancelled = datasetEnrichmentService.cancelJob(jobId);
+    public ResponseEntity<Void> cancelJob(
+            @PathVariable String jobId,
+            @org.springframework.web.bind.annotation.RequestHeader(value = "X-User-Id", required = false) String userId
+    ) {
+        boolean cancelled = datasetEnrichmentService.cancelJob(jobId, userId);
         return cancelled ? ResponseEntity.ok().build() : ResponseEntity.notFound().build();
     }
 
     @GetMapping(value = "/jobs", produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<List<EnrichmentJobResponse>> listJobs() {
-        return ResponseEntity.ok(datasetEnrichmentService.listJobs());
+    public ResponseEntity<List<EnrichmentJobResponse>> listJobs(
+            @org.springframework.web.bind.annotation.RequestHeader(value = "X-User-Id", required = false) String userId
+    ) {
+        return ResponseEntity.ok(datasetEnrichmentService.listJobs(userId));
     }
 
     @PostMapping(value = "/single", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)

@@ -21,7 +21,8 @@ import java.util.List;
 
 @Entity
 @Table(name = "entities", indexes = {
-        @Index(name = "idx_entities_type", columnList = "entity_type")
+        @Index(name = "idx_entities_type", columnList = "entity_type"),
+        @Index(name = "idx_entities_user_id", columnList = "user_id")
 })
 @Getter
 @Setter
@@ -33,6 +34,9 @@ public class EnrichedEntity {
     @Id
     @Column(name = "entity_id", length = 64, nullable = false, updatable = false)
     private String entityId;
+
+    @Column(name = "user_id", length = 36)
+    private String userId;
 
     @Column(name = "display_name", nullable = false)
     private String displayName;

@@ -135,7 +135,7 @@ class ResearchControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.status").value(400))
                 .andExpect(jsonPath("$.title").value("Bad Request"))
-                .andExpect(jsonPath("$.detail").value("Either 'url' or 'name' must be provided for research"))
+                .andExpect(jsonPath("$.detail").value("Either 'url', 'name', 'fullName', or 'firstName' must be provided for research"))
                 .andExpect(jsonPath("$.instance").value("/api/v1/research"));
     }
 

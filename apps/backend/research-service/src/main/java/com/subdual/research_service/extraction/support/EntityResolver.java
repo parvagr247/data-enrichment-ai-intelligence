@@ -308,7 +308,11 @@ public class EntityResolver {
         String seedOrg = target.seedOrganization().toLowerCase(Locale.ROOT);
         String normSeedOrg = OrganizationNormalizer.normalize(target.seedOrganization()).toLowerCase(Locale.ROOT);
 
-        if (lowerText.contains(seedOrg) || (!normSeedOrg.isBlank() && lowerText.contains(normSeedOrg))) {
+        boolean textContainsSeed = lowerText.contains(seedOrg);
+        if (!textContainsSeed && !normSeedOrg.isBlank() && normSeedOrg.length() >= 2) {
+            textContainsSeed = java.util.regex.Pattern.compile("\\b" + java.util.regex.Pattern.quote(normSeedOrg) + "\\b", java.util.regex.Pattern.CASE_INSENSITIVE).matcher(lowerText).find();
+        }
+        if (textContainsSeed) {
             return false;
         }
 
@@ -334,7 +338,11 @@ public class EntityResolver {
                     int idx = lowerTitle.indexOf(sep);
                     if (idx > 0) {
                         String suffix = lowerTitle.substring(idx + sep.length()).trim();
-                        if (!suffix.isBlank() && !suffix.contains(seedOrg) && !normSeedOrg.isEmpty() && !suffix.contains(normSeedOrg)) {
+                        boolean suffixContainsSeed = suffix.contains(seedOrg);
+                        if (!suffixContainsSeed && !normSeedOrg.isBlank() && normSeedOrg.length() >= 2) {
+                            suffixContainsSeed = java.util.regex.Pattern.compile("\\b" + java.util.regex.Pattern.quote(normSeedOrg) + "\\b", java.util.regex.Pattern.CASE_INSENSITIVE).matcher(suffix).find();
+                        }
+                        if (!suffix.isBlank() && !suffixContainsSeed) {
                             if (suffix.length() >= 3 && !isGenericTitleSuffix(suffix, target)) {
                                 return true;
                             }
