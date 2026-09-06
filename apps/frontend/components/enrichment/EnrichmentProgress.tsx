@@ -1,61 +1,53 @@
 "use client";
 
 import React from "react";
-import { EnrichmentProgressState } from "@/lib/api";
+import { EnrichmentProgressState } from "@/types/common";
 
 interface EnrichmentProgressProps {
   progress: EnrichmentProgressState;
+  jobId?: string;
+  durationMs?: number;
   onCancel?: () => void;
 }
 
 export function EnrichmentProgress({
   progress,
+  jobId,
+  durationMs,
   onCancel,
 }: EnrichmentProgressProps) {
+  const processed = progress.completed + progress.failed;
   const percent =
     progress.total > 0
-      ? Math.round(
-          ((progress.completed + progress.failed) / progress.total) * 100
-        )
+      ? Math.min(100, Math.round((processed / progress.total) * 100))
+      : progress.isFinished
+      ? 100
       : 0;
 
   return (
-    <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 shadow-sm space-y-4">
-      <div className="flex items-center justify-between">
+    <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 shadow-xs space-y-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <div>
           <h4 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
             {!progress.isFinished ? (
               <>
-                <svg
-                  className="animate-spin h-4 w-4 text-blue-600"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  />
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  />
-                </svg>
-                Enriching Dataset Records...
+                <span className="animate-spin inline-block w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full" />
+                <span>Enrichment in progress...</span>
               </>
             ) : (
               <>
                 <span className="text-emerald-500 font-bold">✓</span>
-                Enrichment Run Finished
+                <span>Enrichment Run Finished</span>
               </>
             )}
           </h4>
           <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-            Querying the Research Engine, verifying sources, and extracting evidence
+            {progress.isFinished
+              ? durationMs != null
+                ? `Processed ${progress.total} records in ${(durationMs / 1000).toFixed(1)}s`
+                : "Batch job execution completed"
+              : `Processing ${processed} of ${progress.total} records`}
+            {jobId && <span className="font-mono text-[10px] text-zinc-400 ml-2">({jobId.slice(0, 8)})</span>}
           </p>
         </div>
 
@@ -63,7 +55,7 @@ export function EnrichmentProgress({
           <button
             type="button"
             onClick={onCancel}
-            className="text-xs font-medium text-red-600 hover:text-red-700 dark:text-red-400 px-2.5 py-1 rounded bg-red-50 dark:bg-red-950/40 hover:bg-red-100"
+            className="text-xs font-medium text-rose-600 hover:text-rose-700 dark:text-rose-400 px-3 py-1.5 rounded-lg bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 transition-colors self-start sm:self-auto"
           >
             Cancel Run
           </button>
@@ -73,50 +65,45 @@ export function EnrichmentProgress({
       {/* Progress Bar */}
       <div className="space-y-1.5">
         <div className="flex justify-between text-xs font-mono text-zinc-600 dark:text-zinc-400">
-          <span>Progress</span>
+          <span>{progress.statusText || (progress.isFinished ? "Completed" : "Running")}</span>
           <span>{percent}%</span>
         </div>
-        <div className="w-full bg-zinc-100 dark:bg-zinc-800 rounded-full h-2.5 overflow-hidden">
+        <div className="w-full bg-zinc-100 dark:bg-zinc-800 rounded-full h-2 overflow-hidden">
           <div
-            className="bg-blue-600 h-2.5 rounded-full transition-all duration-300 ease-out"
+            className="bg-blue-600 dark:bg-blue-500 h-2 rounded-full transition-all duration-300 ease-out"
             style={{ width: `${percent}%` }}
           />
         </div>
       </div>
 
       {/* Counters Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-2">
-        <div className="bg-zinc-50 dark:bg-zinc-800/50 p-2.5 rounded-lg text-center border border-zinc-100 dark:border-zinc-800">
-          <div className="text-xs text-zinc-400">Total</div>
-          <div className="text-base font-semibold text-zinc-800 dark:text-zinc-200">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+        <div className="bg-zinc-50 dark:bg-zinc-800/40 p-2.5 rounded-lg text-center border border-zinc-100 dark:border-zinc-800">
+          <div className="text-[10px] uppercase tracking-wider text-zinc-400">Total Rows</div>
+          <div className="text-sm font-semibold text-zinc-800 dark:text-zinc-200 mt-0.5">
             {progress.total}
           </div>
         </div>
 
-        <div className="bg-zinc-50 dark:bg-zinc-800/50 p-2.5 rounded-lg text-center border border-zinc-100 dark:border-zinc-800">
-          <div className="text-xs text-blue-500">Processing</div>
-          <div className="text-base font-semibold text-blue-600 dark:text-blue-400">
-            {progress.processing}
+        <div className="bg-zinc-50 dark:bg-zinc-800/40 p-2.5 rounded-lg text-center border border-zinc-100 dark:border-zinc-800">
+          <div className="text-[10px] uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+            Completed
           </div>
-        </div>
-
-        <div className="bg-zinc-50 dark:bg-zinc-800/50 p-2.5 rounded-lg text-center border border-zinc-100 dark:border-zinc-800">
-          <div className="text-xs text-emerald-500">Completed</div>
-          <div className="text-base font-semibold text-emerald-600 dark:text-emerald-400">
+          <div className="text-sm font-semibold text-emerald-600 dark:text-emerald-400 mt-0.5">
             {progress.completed}
           </div>
         </div>
 
-        <div className="bg-zinc-50 dark:bg-zinc-800/50 p-2.5 rounded-lg text-center border border-zinc-100 dark:border-zinc-800">
-          <div className="text-xs text-red-500">Failed</div>
-          <div className="text-base font-semibold text-red-600 dark:text-red-400">
+        <div className="bg-zinc-50 dark:bg-zinc-800/40 p-2.5 rounded-lg text-center border border-zinc-100 dark:border-zinc-800">
+          <div className="text-[10px] uppercase tracking-wider text-rose-500">Failed</div>
+          <div className="text-sm font-semibold text-rose-600 dark:text-rose-400 mt-0.5">
             {progress.failed}
           </div>
         </div>
 
-        <div className="bg-zinc-50 dark:bg-zinc-800/50 p-2.5 rounded-lg text-center border border-zinc-100 dark:border-zinc-800 col-span-2 sm:col-span-1">
-          <div className="text-xs text-zinc-400">Remaining</div>
-          <div className="text-base font-semibold text-zinc-600 dark:text-zinc-400">
+        <div className="bg-zinc-50 dark:bg-zinc-800/40 p-2.5 rounded-lg text-center border border-zinc-100 dark:border-zinc-800">
+          <div className="text-[10px] uppercase tracking-wider text-zinc-400">Remaining</div>
+          <div className="text-sm font-semibold text-zinc-600 dark:text-zinc-400 mt-0.5">
             {progress.remaining}
           </div>
         </div>

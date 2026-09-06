@@ -1,5 +1,5 @@
 import * as XLSX from 'xlsx';
-import { EnrichedRecord } from '@/lib/api';
+import { EnrichedRecord } from '@/types/dataset';
 
 export function exportDataset(
   records: EnrichedRecord[],
@@ -11,17 +11,35 @@ export function exportDataset(
   }
 
   // Create clean export rows combining original input and enriched values
-  const exportRows = records.map(record => {
+  const exportRows = records.map((record) => {
     const row: Record<string, string> = { ...record.originalData };
 
     row['Enrichment_Status'] = record.status;
-    if (record.response?.result?.canonicalUrl) {
-      row['Canonical_Url'] = record.response.result.canonicalUrl;
+
+    const canonicalUrl = record.canonicalUrl || record.response?.result?.canonicalUrl;
+    if (canonicalUrl) {
+      row['Canonical_Url'] = canonicalUrl;
     }
 
-    if (record.response?.result?.attributes) {
+    if (record.attributes) {
+      for (const [key, attr] of Object.entries(record.attributes)) {
+        row[`Enriched_${key}`] = attr.value ?? 'UNKNOWN';
+        if (attr.confidence) {
+          row[`Enriched_${key}_Confidence`] = attr.confidence;
+        }
+        if (attr.sourceUrl) {
+          row[`Enriched_${key}_Source`] = attr.sourceUrl;
+        }
+      }
+    } else if (record.response?.result?.attributes) {
       for (const [key, tuple] of Object.entries(record.response.result.attributes)) {
         row[`Enriched_${key}`] = tuple.value ?? 'UNKNOWN';
+        if (tuple.confidence) {
+          row[`Enriched_${key}_Confidence`] = tuple.confidence;
+        }
+        if (tuple.sourceUrl) {
+          row[`Enriched_${key}_Source`] = tuple.sourceUrl;
+        }
       }
     }
 

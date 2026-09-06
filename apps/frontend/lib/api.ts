@@ -1,213 +1,58 @@
 /**
- * Consolidated API Boundary & Types for Data Enrichment Engine
+ * Central API Facade re-exporting modular services and types
  */
 
-// ==========================================
-// TYPES
-// ==========================================
+export * from '@/types/common';
+export * from '@/types/research';
+export * from '@/types/dataset';
+export * from '@/types/ai';
+export * from '@/config/env';
+export * from '@/lib/apiClient';
 
-export type EntityType =
-  | 'PERSON'
-  | 'ORGANIZATION'
-  | 'PRODUCT'
-  | 'REPOSITORY'
-  | 'WEBSITE'
-  | 'OTHER';
+import { researchService } from '@/services/researchService';
+import { datasetService } from '@/services/datasetService';
+import { aiService } from '@/services/aiService';
+import {
+  ResearchRequest,
+  ResearchResponse,
+  ResearchJobResponse,
+  EntityType,
+} from '@/types/research';
+import {
+  EnrichmentJobRequest,
+  EnrichmentJobResponse,
+  EntitySummaryResponse,
+  EntityDetailResponse,
+  ColumnMapping,
+  RawRow,
+} from '@/types/dataset';
 
-export type ConfidenceTier = 'HIGH' | 'MEDIUM' | 'LOW' | 'UNKNOWN';
+// Export service singletons
+export { researchService, datasetService, aiService };
 
-export interface EvidenceTuple {
-  value: string;
-  sourceUrl: string | null;
-  evidenceSnippet: string | null;
-  confidence: ConfidenceTier;
-  corroboratingSources?: string[];
-  conflictDetected?: boolean;
-}
+// Backward-compatible delegators
+export const executeResearch = (req: ResearchRequest): Promise<ResearchResponse> =>
+  researchService.executeResearch(req);
 
-export interface SourceItem {
-  url: string;
-  title?: string;
-  snippet?: string;
-  sourceType: string;
-  domain?: string;
-  provider?: string;
-  relevance?: number;
-  retrievedAt: string;
-}
+export const submitResearchJob = (req: ResearchRequest): Promise<ResearchJobResponse> =>
+  researchService.submitJob(req);
 
-export interface ResearchRequest {
-  url?: string;
-  name?: string;
-  organization?: string;
-  role?: string;
-  entityType?: EntityType;
-  targetFields?: string[];
-  depth?: 'SHALLOW' | 'NORMAL' | 'DEEP';
-  userRequirement?: string;
-}
+export const getResearchJob = (jobId: string): Promise<ResearchJobResponse> =>
+  researchService.getJob(jobId);
 
-export interface ResearchResult {
-  displayName: string;
-  entityType: EntityType;
-  canonicalUrl: string;
-  attributes: Record<string, EvidenceTuple>;
-}
+export const submitDatasetEnrichmentJob = (
+  req: EnrichmentJobRequest
+): Promise<EnrichmentJobResponse> => datasetService.submitBatchJob(req);
 
-export interface ResearchResponse {
-  status: 'COMPLETED' | 'PARTIAL' | 'FAILED';
-  entityId: string;
-  result: ResearchResult;
-  sources: SourceItem[];
-  executionTimeMs: number;
-  warnings?: string[];
-}
+export const getDatasetEnrichmentJob = (jobId: string): Promise<EnrichmentJobResponse> =>
+  datasetService.getJobStatus(jobId);
 
-export interface ResearchJobResponse {
-  jobId: string;
-  status: 'SUBMITTED' | 'IN_PROGRESS' | 'COMPLETED' | 'FAILED';
-  progress: number;
-  createdAt: string;
-  completedAt?: string | null;
-  durationMs?: number | null;
-  result?: ResearchResponse | null;
-  error?: string | null;
-}
+export const fetchSavedEntities = (): Promise<EntitySummaryResponse[]> =>
+  datasetService.fetchSavedEntities();
 
-export interface EntitySummaryResponse {
-  entityId: string;
-  displayName: string;
-  entityType: string;
-  canonicalUrl: string;
-  sourcesCount: number;
-  attributesCount: number;
-  updatedAt: string;
-}
+export const fetchEntityDetail = (id: string): Promise<EntityDetailResponse> =>
+  datasetService.fetchEntityDetail(id);
 
-export interface EntityDetailResponse {
-  entityId: string;
-  displayName: string;
-  entityType: string;
-  canonicalUrl: string;
-  sources: SourceItem[];
-  attributes: Record<
-    string,
-    {
-      value: string;
-      sourceUrl?: string;
-      evidenceSnippet?: string;
-      confidence?: string;
-    }
-  >;
-  createdAt: string;
-  updatedAt: string;
-}
-
-// Dataset & Workflow Types
-export type RawRow = Record<string, string>;
-
-export interface ColumnMapping {
-  nameColumn?: string;
-  urlColumn?: string;
-  organizationColumn?: string;
-  roleColumn?: string;
-  entityTypeColumn?: string;
-}
-
-export type RowEnrichmentStatus = 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'PARTIAL' | 'FAILED';
-
-export interface EnrichedRecord {
-  id: string;
-  rowIndex: number;
-  originalData: RawRow;
-  status: RowEnrichmentStatus;
-  errorMessage?: string;
-  response?: ResearchResponse;
-}
-
-export interface EnrichmentProgressState {
-  total: number;
-  completed: number;
-  processing: number;
-  failed: number;
-  remaining: number;
-  isFinished: boolean;
-}
-
-// ==========================================
-// CONFIGURATION
-// ==========================================
-
-const RESEARCH_URL = (
-  process.env.NEXT_PUBLIC_RESEARCH_SERVICE_URL || 'http://localhost:9741'
-).replace(/\/+$/, '');
-
-const DATASET_URL = (
-  process.env.NEXT_PUBLIC_DATASET_SERVICE_URL || 'http://localhost:9743'
-).replace(/\/+$/, '');
-
-// ==========================================
-// API CLIENT METHODS
-// ==========================================
-
-async function handleResponse<T>(res: Response): Promise<T> {
-  if (!res.ok) {
-    let message = `API request failed with HTTP ${res.status}`;
-    try {
-      const err = await res.json();
-      if (err?.detail) message = err.detail;
-      else if (err?.title) message = err.title;
-    } catch {
-      // Fallback to default message
-    }
-    throw new Error(message);
-  }
-  return res.json();
-}
-
-/**
- * Synchronously executes research for a single request payload.
- */
-export async function executeResearch(request: ResearchRequest): Promise<ResearchResponse> {
-  const res = await fetch(`${RESEARCH_URL}/api/v1/research`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-    },
-    body: JSON.stringify(request),
-  });
-  return handleResponse<ResearchResponse>(res);
-}
-
-/**
- * Submits an asynchronous background research job.
- */
-export async function submitResearchJob(request: ResearchRequest): Promise<ResearchJobResponse> {
-  const res = await fetch(`${RESEARCH_URL}/api/v1/research/jobs`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-    },
-    body: JSON.stringify(request),
-  });
-  return handleResponse<ResearchJobResponse>(res);
-}
-
-/**
- * Polls the current status and result of a background research job.
- */
-export async function getResearchJob(jobId: string): Promise<ResearchJobResponse> {
-  const res = await fetch(`${RESEARCH_URL}/api/v1/research/jobs/${encodeURIComponent(jobId)}`, {
-    headers: { 'Accept': 'application/json' },
-  });
-  return handleResponse<ResearchJobResponse>(res);
-}
-
-/**
- * Enriches a single dataset raw row using confirmed column mappings.
- */
 export async function enrichSingleRecord(
   row: RawRow,
   mapping: ColumnMapping,
@@ -227,7 +72,7 @@ export async function enrichSingleRecord(
     }
   }
 
-  return executeResearch({
+  return researchService.executeResearch({
     url: url || undefined,
     name: name || undefined,
     organization: org || undefined,
@@ -235,55 +80,4 @@ export async function enrichSingleRecord(
     entityType,
     userRequirement: userRequirement?.trim() || undefined,
   });
-}
-
-export interface BatchEnrichmentJobRequest {
-  datasetName?: string;
-  userRequirement?: string;
-  defaultEntityType?: string;
-  columnMapping?: ColumnMapping;
-  rows: RawRow[];
-}
-
-export async function submitDatasetEnrichmentJob(
-  req: BatchEnrichmentJobRequest
-): Promise<ResearchJobResponse> {
-  const res = await fetch(`${DATASET_URL}/api/v1/enrichment/jobs`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-    },
-    body: JSON.stringify(req),
-  });
-  return handleResponse<ResearchJobResponse>(res);
-}
-
-export async function getDatasetEnrichmentJob(
-  jobId: string
-): Promise<ResearchJobResponse> {
-  const res = await fetch(`${DATASET_URL}/api/v1/enrichment/jobs/${encodeURIComponent(jobId)}`, {
-    headers: { Accept: 'application/json' },
-  });
-  return handleResponse<ResearchJobResponse>(res);
-}
-
-/**
- * Fetches the persisted entity catalog from dataset-service.
- */
-export async function fetchSavedEntities(): Promise<EntitySummaryResponse[]> {
-  const res = await fetch(`${DATASET_URL}/api/v1/entities`, {
-    headers: { 'Accept': 'application/json' },
-  });
-  return handleResponse<EntitySummaryResponse[]>(res);
-}
-
-/**
- * Fetches detail for a single persisted entity from dataset-service.
- */
-export async function fetchEntityDetail(entityId: string): Promise<EntityDetailResponse> {
-  const res = await fetch(`${DATASET_URL}/api/v1/entities/${encodeURIComponent(entityId)}`, {
-    headers: { 'Accept': 'application/json' },
-  });
-  return handleResponse<EntityDetailResponse>(res);
 }

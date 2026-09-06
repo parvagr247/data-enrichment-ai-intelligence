@@ -1,266 +1,234 @@
-'use client';
+"use client";
 
-import React, { useState, useMemo } from 'react';
-import { EnrichedRecord, ColumnMapping, RowEnrichmentStatus } from '@/lib/api';
+import React, { useMemo } from "react";
+import { EnrichedRecord, ColumnMapping, RowEnrichmentStatus } from "@/types/dataset";
 
 interface EnrichedDatasetTableProps {
   records: EnrichedRecord[];
   mapping: ColumnMapping;
   onSelectRecord: (record: EnrichedRecord) => void;
+  filter?: "ALL" | RowEnrichmentStatus;
 }
 
-export const EnrichedDatasetTable: React.FC<EnrichedDatasetTableProps> = ({
+export function EnrichedDatasetTable({
   records,
   mapping,
   onSelectRecord,
-}) => {
-  const [filter, setFilter] = useState<'ALL' | RowEnrichmentStatus>('ALL');
-
-  const counts = useMemo(() => {
-    return records.reduce(
-      (acc, r) => {
-        acc[r.status] = (acc[r.status] || 0) + 1;
-        return acc;
-      },
-      {} as Record<RowEnrichmentStatus, number>
-    );
-  }, [records]);
-
+  filter = "ALL",
+}: EnrichedDatasetTableProps) {
+  // Filter records
   const filteredRecords = useMemo(() => {
-    if (filter === 'ALL') return records;
+    if (filter === "ALL") return records;
     return records.filter((r) => r.status === filter);
   }, [records, filter]);
 
+  // Extract all enriched field keys across all records
+  const enrichedFieldKeys = useMemo(() => {
+    const keys = new Set<string>();
+    records.forEach((r) => {
+      if (r.attributes) {
+        Object.keys(r.attributes).forEach((k) => keys.add(k));
+      }
+      if (r.response?.result?.attributes) {
+        Object.keys(r.response.result.attributes).forEach((k) => keys.add(k));
+      }
+    });
+    return Array.from(keys);
+  }, [records]);
+
+  // Determine original columns to display (using mapped columns first, then others)
+  const originalColumns = useMemo(() => {
+    if (records.length === 0) return [];
+    const firstRow = records[0].originalData;
+    const allCols = Object.keys(firstRow);
+    const mapped = [
+      mapping.nameColumn,
+      mapping.organizationColumn,
+      mapping.roleColumn,
+      mapping.urlColumn,
+    ].filter(Boolean) as string[];
+
+    const remaining = allCols.filter((c) => !mapped.includes(c));
+    return [...mapped, ...remaining].slice(0, 4); // Limit to top 4 original columns for table readability
+  }, [records, mapping]);
+
   const renderStatusBadge = (status: RowEnrichmentStatus) => {
     switch (status) {
-      case 'COMPLETED':
+      case "COMPLETED":
         return (
-          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+          <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
             COMPLETED
           </span>
         );
-      case 'PARTIAL':
+      case "PARTIAL":
         return (
-          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+          <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300">
             PARTIAL
           </span>
         );
-      case 'FAILED':
+      case "FAILED":
         return (
-          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300">
+          <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300">
             FAILED
           </span>
         );
-      case 'PROCESSING':
+      case "PROCESSING":
         return (
-          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-semibold bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300">
-            <span className="animate-spin inline-block w-2.5 h-2.5 border-2 border-current border-t-transparent rounded-full" />
-            PROCESSING
+          <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300 flex items-center gap-1">
+            <span className="animate-spin inline-block w-2 h-2 border-2 border-current border-t-transparent rounded-full" />
+            RUNNING
           </span>
         );
-      case 'PENDING':
       default:
         return (
-          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
-            PENDING
+          <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-400">
+            {status}
           </span>
         );
     }
   };
 
-  const getConfidenceDot = (tier?: string) => {
-    const t = (tier || 'LOW').toUpperCase();
-    if (t === 'HIGH') return 'bg-emerald-500';
-    if (t === 'MEDIUM') return 'bg-amber-500';
-    return 'bg-rose-400';
+  const getAttributeValue = (record: EnrichedRecord, key: string) => {
+    if (record.attributes && record.attributes[key]) {
+      return record.attributes[key];
+    }
+    if (record.response?.result?.attributes && record.response.result.attributes[key]) {
+      return record.response.result.attributes[key];
+    }
+    return null;
   };
 
   return (
-    <div className="space-y-4">
-      {/* Header & Filter Controls */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-zinc-900 p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-xs">
+    <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden shadow-xs">
+      <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
         <div>
-          <h3 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">
-            Enriched Dataset ({records.length} Records)
-          </h3>
-          <p className="text-xs text-zinc-500 mt-0.5">
-            Grounded AI fact extraction and verifiable source evidence
+          <h4 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+            Enriched Dataset View
+          </h4>
+          <p className="text-[11px] text-zinc-500 mt-0.5">
+            Click any row or attribute pill to inspect grounded evidence, verbatim quotes, and source URLs.
           </p>
         </div>
-
-        {/* Filter Pills */}
-        <div className="flex items-center gap-1 text-xs">
-          <button
-            onClick={() => setFilter('ALL')}
-            className={`px-2.5 py-1 rounded-lg font-medium transition-colors ${
-              filter === 'ALL'
-                ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900'
-                : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800'
-            }`}
-          >
-            All ({records.length})
-          </button>
-          <button
-            onClick={() => setFilter('COMPLETED')}
-            className={`px-2.5 py-1 rounded-lg font-medium transition-colors ${
-              filter === 'COMPLETED'
-                ? 'bg-emerald-600 text-white'
-                : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800'
-            }`}
-          >
-            Completed ({counts.COMPLETED || 0})
-          </button>
-          <button
-            onClick={() => setFilter('PARTIAL')}
-            className={`px-2.5 py-1 rounded-lg font-medium transition-colors ${
-              filter === 'PARTIAL'
-                ? 'bg-amber-600 text-white'
-                : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800'
-            }`}
-          >
-            Partial ({counts.PARTIAL || 0})
-          </button>
-          <button
-            onClick={() => setFilter('FAILED')}
-            className={`px-2.5 py-1 rounded-lg font-medium transition-colors ${
-              filter === 'FAILED'
-                ? 'bg-rose-600 text-white'
-                : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800'
-            }`}
-          >
-            Failed ({counts.FAILED || 0})
-          </button>
-        </div>
+        <span className="text-xs font-mono text-zinc-400">
+          Showing {filteredRecords.length} records
+        </span>
       </div>
 
-      {/* Records Table */}
-      <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden shadow-xs">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-zinc-50 dark:bg-zinc-800/50 border-b border-zinc-200 dark:border-zinc-800 font-semibold text-zinc-500 uppercase tracking-wider">
-              <tr>
-                <th className="p-3.5 w-12 text-center">#</th>
-                <th className="p-3.5">Target Entity</th>
-                <th className="p-3.5">Input Context</th>
-                <th className="p-3.5">Status</th>
-                <th className="p-3.5">Enriched Attributes</th>
-                <th className="p-3.5 text-center">Sources</th>
-                <th className="p-3.5 text-right">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
-              {filteredRecords.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="p-8 text-center text-zinc-400">
-                    No records found matching filter &ldquo;{filter}&rdquo;.
-                  </td>
-                </tr>
-              ) : (
-                filteredRecords.map((record) => {
-                  const nameVal =
-                    (mapping.nameColumn && record.originalData[mapping.nameColumn]) ||
-                    record.response?.result?.displayName ||
-                    'Unknown Entity';
+      <div className="overflow-x-auto max-h-[600px]">
+        <table className="w-full text-left text-xs border-collapse">
+          <thead className="bg-zinc-50 dark:bg-zinc-800/80 border-b border-zinc-200 dark:border-zinc-800 sticky top-0 z-10 text-[11px] text-zinc-500 font-semibold">
+            <tr>
+              <th className="p-3 w-10 text-center text-zinc-400 font-mono">#</th>
+              <th className="p-3 w-24">Status</th>
 
-                  const secondaryVal =
-                    (mapping.organizationColumn && record.originalData[mapping.organizationColumn]) ||
-                    (mapping.roleColumn && record.originalData[mapping.roleColumn]) ||
-                    (mapping.urlColumn && record.originalData[mapping.urlColumn]) ||
-                    '—';
+              {/* Original Columns Header Group */}
+              {originalColumns.map((col) => (
+                <th key={`orig-${col}`} className="p-3 text-zinc-700 dark:text-zinc-300">
+                  <div className="flex flex-col">
+                    <span className="truncate">{col}</span>
+                    <span className="text-[9px] text-zinc-400 uppercase font-mono">Original</span>
+                  </div>
+                </th>
+              ))}
 
-                  const attributes = record.response?.result?.attributes || {};
-                  const attrEntries = Object.entries(attributes);
-                  const sourcesCount = record.response?.sources?.length || 0;
+              {/* Enriched Columns Header Group */}
+              {enrichedFieldKeys.map((key) => (
+                <th
+                  key={`enrich-${key}`}
+                  className="p-3 text-blue-900 dark:text-blue-200 bg-blue-50/40 dark:bg-blue-950/20 border-l border-blue-100 dark:border-blue-900/40"
+                >
+                  <div className="flex flex-col">
+                    <span className="truncate capitalize">{key.replace(/_/g, " ")}</span>
+                    <span className="text-[9px] text-blue-600 dark:text-blue-400 uppercase font-mono">
+                      Enriched
+                    </span>
+                  </div>
+                </th>
+              ))}
+
+              <th className="p-3 text-right">Evidence</th>
+            </tr>
+          </thead>
+
+          <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
+            {filteredRecords.map((record, idx) => (
+              <tr
+                key={record.id || idx}
+                onClick={() => onSelectRecord(record)}
+                className="hover:bg-blue-50/30 dark:hover:bg-zinc-800/50 cursor-pointer transition-colors"
+              >
+                <td className="p-3 text-center text-zinc-400 font-mono text-[11px]">
+                  {record.rowIndex + 1}
+                </td>
+                <td className="p-3 whitespace-nowrap">{renderStatusBadge(record.status)}</td>
+
+                {/* Original Values */}
+                {originalColumns.map((col) => {
+                  const val = record.originalData[col];
+                  return (
+                    <td key={`orig-val-${col}`} className="p-3 text-zinc-800 dark:text-zinc-200 max-w-[180px] truncate">
+                      {val || <span className="text-zinc-300 dark:text-zinc-600 italic">null</span>}
+                    </td>
+                  );
+                })}
+
+                {/* Enriched Values */}
+                {enrichedFieldKeys.map((key) => {
+                  const attr = getAttributeValue(record, key);
+                  if (!attr) {
+                    return (
+                      <td
+                        key={`enrich-val-${key}`}
+                        className="p-3 bg-blue-50/20 dark:bg-blue-950/10 border-l border-blue-100/50 dark:border-blue-900/20 text-zinc-300 dark:text-zinc-600 italic"
+                      >
+                        —
+                      </td>
+                    );
+                  }
+
+                  const confidenceTier = (attr.confidence || "LOW").toUpperCase();
+                  const badgeColor =
+                    confidenceTier === "HIGH"
+                      ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                      : confidenceTier === "MEDIUM"
+                      ? "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+                      : "bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-400";
 
                   return (
-                    <tr
-                      key={record.id}
-                      className="hover:bg-zinc-50/75 dark:hover:bg-zinc-800/40 transition-colors"
+                    <td
+                      key={`enrich-val-${key}`}
+                      className="p-3 bg-blue-50/20 dark:bg-blue-950/10 border-l border-blue-100/50 dark:border-blue-900/20 max-w-[220px]"
                     >
-                      <td className="p-3.5 text-center text-zinc-400 font-mono">
-                        {record.rowIndex + 1}
-                      </td>
-
-                      {/* Target Entity */}
-                      <td className="p-3.5 font-medium text-zinc-900 dark:text-zinc-100">
-                        <div className="font-semibold">{nameVal}</div>
-                        {record.response?.result?.canonicalUrl && (
-                          <div className="text-[11px] text-zinc-400 truncate max-w-[200px]">
-                            {record.response.result.canonicalUrl}
-                          </div>
-                        )}
-                      </td>
-
-                      {/* Input Context */}
-                      <td className="p-3.5 text-zinc-600 dark:text-zinc-300 truncate max-w-[180px]">
-                        {secondaryVal}
-                      </td>
-
-                      {/* Status */}
-                      <td className="p-3.5">{renderStatusBadge(record.status)}</td>
-
-                      {/* Enriched Attributes Preview */}
-                      <td className="p-3.5">
-                        {attrEntries.length === 0 ? (
-                          <span className="text-zinc-400 italic">
-                            {record.status === 'PROCESSING' ? 'Researching...' : 'No attributes'}
-                          </span>
-                        ) : (
-                          <div className="flex flex-wrap gap-1 max-w-sm">
-                            {attrEntries.slice(0, 3).map(([key, tuple]) => (
-                              <span
-                                key={key}
-                                className="inline-flex items-center gap-1.5 px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-[11px] text-zinc-700 dark:text-zinc-300 border border-zinc-200/50 dark:border-zinc-700/50"
-                                title={`${key}: ${tuple.value} [Confidence: ${tuple.confidence}${tuple.conflictDetected ? ' | CONFLICT' : ''}]`}
-                              >
-                                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${getConfidenceDot(tuple.confidence)}`} />
-                                <span className="font-semibold text-zinc-500 capitalize">
-                                  {key}:
-                                </span>
-                                <span className="truncate max-w-[100px]">{tuple.value}</span>
-                                {tuple.conflictDetected && (
-                                  <span className="text-[10px] text-rose-500 font-bold" title="Conflict detected across sources">!</span>
-                                )}
-                              </span>
-                            ))}
-                            {attrEntries.length > 3 && (
-                              <span className="text-[10px] text-zinc-400 self-center">
-                                +{attrEntries.length - 3} more
-                              </span>
-                            )}
-                          </div>
-                        )}
-                      </td>
-
-                      {/* Sources Count */}
-                      <td className="p-3.5 text-center font-mono text-zinc-500">
-                        {sourcesCount > 0 ? (
-                          <span className="px-2 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-[11px]">
-                            {sourcesCount}
-                          </span>
-                        ) : (
-                          '0'
-                        )}
-                      </td>
-
-                      {/* Action */}
-                      <td className="p-3.5 text-right">
-                        <button
-                          onClick={() => onSelectRecord(record)}
-                          disabled={record.status === 'PENDING'}
-                          className="px-3 py-1 rounded-lg bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 text-xs font-medium hover:opacity-90 disabled:opacity-30 transition-opacity"
-                        >
-                          Inspect Evidence
-                        </button>
-                      </td>
-                    </tr>
+                      <div className="flex items-center justify-between gap-1.5">
+                        <span className="text-zinc-900 dark:text-zinc-100 font-medium truncate">
+                          {attr.value}
+                        </span>
+                        <span className={`px-1.5 py-0.2 text-[9px] font-semibold rounded shrink-0 ${badgeColor}`}>
+                          {confidenceTier[0]}
+                        </span>
+                      </div>
+                    </td>
                   );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+                })}
+
+                {/* Action button */}
+                <td className="p-3 text-right whitespace-nowrap">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onSelectRecord(record);
+                    }}
+                    className="px-2.5 py-1 text-[11px] font-medium rounded-md bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 transition-colors"
+                  >
+                    Inspect
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );
-};
+}

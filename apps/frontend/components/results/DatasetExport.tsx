@@ -1,32 +1,32 @@
-'use client';
+"use client";
 
-import React, { useState } from 'react';
-import { EnrichedRecord } from '@/lib/api';
-import { exportDataset } from '@/lib/exporter';
+import React, { useState } from "react";
+import { EnrichedRecord } from "@/types/dataset";
+import { exportDataset } from "@/lib/exporter";
 
 interface DatasetExportProps {
   records: EnrichedRecord[];
   baseFilename: string;
 }
 
-export const DatasetExport: React.FC<DatasetExportProps> = ({ records, baseFilename }) => {
+export function DatasetExport({ records, baseFilename }: DatasetExportProps) {
   const [exportError, setExportError] = useState<string | null>(null);
   const [downloadSuccess, setDownloadSuccess] = useState<string | null>(null);
 
-  const handleExport = (format: 'csv' | 'xlsx') => {
+  const handleExport = (format: "csv" | "xlsx") => {
     try {
       setExportError(null);
       setDownloadSuccess(null);
       exportDataset(records, baseFilename, format);
-      setDownloadSuccess(`Successfully generated ${format.toUpperCase()} export file.`);
+      setDownloadSuccess(`Successfully exported ${format.toUpperCase()} dataset.`);
       setTimeout(() => setDownloadSuccess(null), 4000);
     } catch (err: unknown) {
-      setExportError(err instanceof Error ? err.message : 'Failed to export dataset');
+      setExportError(err instanceof Error ? err.message : "Failed to export dataset");
     }
   };
 
   const completedCount = records.filter(
-    (r) => r.status === 'COMPLETED' || r.status === 'PARTIAL'
+    (r) => r.status === "COMPLETED" || r.status === "PARTIAL"
   ).length;
 
   return (
@@ -37,20 +37,22 @@ export const DatasetExport: React.FC<DatasetExportProps> = ({ records, baseFilen
             Export Enriched Dataset
           </h4>
           <p className="text-xs text-zinc-500 mt-0.5">
-            Download combined original input columns and <code className="text-zinc-700 dark:text-zinc-300 font-mono">Enriched_*</code> attributes with full status tracking.
+            Download combined original columns and verified <code className="text-zinc-700 dark:text-zinc-300 font-mono">Enriched_*</code> attributes with confidence and provenance URLs.
           </p>
         </div>
 
         <div className="flex items-center gap-2">
           <button
-            onClick={() => handleExport('csv')}
+            type="button"
+            onClick={() => handleExport("csv")}
             disabled={records.length === 0}
             className="px-4 py-2 rounded-lg bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 text-xs font-semibold hover:opacity-90 disabled:opacity-40 transition-opacity flex items-center gap-1.5"
           >
             <span>Download CSV</span>
           </button>
           <button
-            onClick={() => handleExport('xlsx')}
+            type="button"
+            onClick={() => handleExport("xlsx")}
             disabled={records.length === 0}
             className="px-4 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 text-xs font-semibold hover:bg-zinc-50 dark:hover:bg-zinc-800 disabled:opacity-40 transition-colors flex items-center gap-1.5"
           >
@@ -59,12 +61,12 @@ export const DatasetExport: React.FC<DatasetExportProps> = ({ records, baseFilen
         </div>
       </div>
 
-      <div className="flex items-center gap-4 text-xs text-zinc-500 pt-2 border-t border-zinc-100 dark:border-zinc-800">
+      <div className="flex flex-wrap items-center gap-4 text-xs text-zinc-500 pt-2 border-t border-zinc-100 dark:border-zinc-800">
         <div>
           Total Records: <span className="font-semibold text-zinc-800 dark:text-zinc-200">{records.length}</span>
         </div>
         <div>
-          Enriched (Completed/Partial):{' '}
+          Enriched (Completed/Partial):{" "}
           <span className="font-semibold text-emerald-600 dark:text-emerald-400">{completedCount}</span>
         </div>
         <div className="text-zinc-400">
@@ -85,4 +87,4 @@ export const DatasetExport: React.FC<DatasetExportProps> = ({ records, baseFilen
       )}
     </div>
   );
-};
+}
