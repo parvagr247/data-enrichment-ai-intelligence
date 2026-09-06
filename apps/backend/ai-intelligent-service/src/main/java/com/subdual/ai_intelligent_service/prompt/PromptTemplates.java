@@ -65,12 +65,18 @@ public final class PromptTemplates {
             %s
             
             CRITICAL ANTI-HALLUCINATION RULES:
-            1. DO NOT INVENT INFORMATION.
+            1. DO NOT INVENT INFORMATION. Never fabricate dates, companies, degrees, or skills.
             2. Ground EVERY claimed attribute strictly in the provided research evidence or raw input.
-            3. If an evidence snippet supports a fact, quote or cite it verbatim.
-            4. If no evidence supports a target field, DO NOT FABRICATE A VALUE. Add that field to "unresolvedFields".
+            3. If an evidence snippet supports a fact, quote or cite it verbatim in the evidence field.
+            4. If no evidence supports a target field, DO NOT FABRICATE A VALUE. Add that field to "unresolvedFields" and set value to "UNKNOWN" with status "UNRESOLVED".
             5. If multiple sources contradict each other on a field (e.g. conflicting current employers or roles), set status to "CONFLICT" and note both values.
-            6. For confidence:
+            6. For rich professional entity dimensions (PERSON):
+               - "experience": Detail past and current roles, companies, and date periods (or structured timeline) strictly verified by evidence.
+               - "education": Universities/institutions, degrees, fields of study, and graduation years.
+               - "skills": Canonical, normalized technical skills and proficiencies extracted from evidence.
+               - "projects": Notable open-source repositories, products, or initiatives authored or contributed to.
+               - "activity": Distinct professional activity, authored articles/posts vs mentions, speaking, or publications.
+            7. For confidence:
                - HIGH: Fact verified by primary official sources or multiple corroborating sources.
                - MEDIUM: Fact asserted in a single credible web source with explicit sentence quote.
                - LOW: Weak or ambiguous reference.

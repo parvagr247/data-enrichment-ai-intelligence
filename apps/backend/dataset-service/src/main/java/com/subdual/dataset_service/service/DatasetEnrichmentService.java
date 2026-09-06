@@ -17,4 +17,7 @@ public interface DatasetEnrichmentService {
     List<EnrichmentJobResponse> listJobs();
 
     RowEnrichmentResult enrichSingle(SingleEnrichmentRequest request);
+
+    boolean cancelJob(String jobId);
 }
+

@@ -47,9 +47,15 @@ public class ContentExtractor {
     private String extractCleanBodyText(Document doc, int maxContentLength) {
         stripNoiseTags(doc);
 
+        // Preserve block-level boundaries so experience, education, and list items remain discrete
+        doc.select("br").append("\n");
+        doc.select("p, li, h1, h2, h3, h4, h5, h6, tr, section, article").prepend("\n");
+
         Element body = doc.body();
-        String rawText = body != null ? body.text() : doc.text();
-        String cleanText = rawText.replaceAll("\\s+", " ").trim();
+        String rawText = body != null ? body.wholeText() : doc.wholeText();
+        String cleanText = rawText.replaceAll("[ \\t\\x0B\\f]+", " ")
+                .replaceAll("(\\r?\\n\\s*){3,}", "\n\n")
+                .trim();
 
         if (maxContentLength > 0 && cleanText.length() > maxContentLength) {
             return cleanText.substring(0, maxContentLength);

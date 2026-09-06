@@ -29,6 +29,24 @@ public class DefaultSourceEvidenceService implements SourceEvidenceService {
     private final EntityResolver entityResolver;
     private final EvidenceExtractor evidenceExtractor;
     private final ResearchPipelineProperties pipelineProperties;
+    private final com.subdual.research_service.discovery.cache.ThreadSafeSourceCache sourceCache;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public DefaultSourceEvidenceService(
+            WebContentFetcher webContentFetcher,
+            ContentExtractor contentExtractor,
+            EntityResolver entityResolver,
+            EvidenceExtractor evidenceExtractor,
+            ResearchPipelineProperties pipelineProperties,
+            @org.springframework.lang.Nullable com.subdual.research_service.discovery.cache.ThreadSafeSourceCache sourceCache
+    ) {
+        this.webContentFetcher = webContentFetcher;
+        this.contentExtractor = contentExtractor;
+        this.entityResolver = entityResolver;
+        this.evidenceExtractor = evidenceExtractor;
+        this.pipelineProperties = pipelineProperties;
+        this.sourceCache = sourceCache != null ? sourceCache : new com.subdual.research_service.discovery.cache.ThreadSafeSourceCache();
+    }
 
     public DefaultSourceEvidenceService(
             WebContentFetcher webContentFetcher,
@@ -37,11 +55,7 @@ public class DefaultSourceEvidenceService implements SourceEvidenceService {
             EvidenceExtractor evidenceExtractor,
             ResearchPipelineProperties pipelineProperties
     ) {
-        this.webContentFetcher = webContentFetcher;
-        this.contentExtractor = contentExtractor;
-        this.entityResolver = entityResolver;
-        this.evidenceExtractor = evidenceExtractor;
-        this.pipelineProperties = pipelineProperties;
+        this(webContentFetcher, contentExtractor, entityResolver, evidenceExtractor, pipelineProperties, null);
     }
 
     @Override
@@ -95,7 +109,17 @@ public class DefaultSourceEvidenceService implements SourceEvidenceService {
             ResearchTarget target,
             ResearchDiagnostics diagnostics
     ) {
-        FetchedContent fetched = webContentFetcher.fetch(source.url());
+        FetchedContent fetched = null;
+        if (sourceCache != null) {
+            fetched = sourceCache.getFetchedContent(source.url()).orElse(null);
+        }
+        if (fetched == null) {
+            fetched = webContentFetcher.fetch(source.url());
+            if (fetched != null && fetched.success() && sourceCache != null) {
+                sourceCache.putFetchedContent(source.url(), fetched);
+            }
+        }
+
         if (fetched != null && fetched.success()) {
             int maxLength = pipelineProperties != null ? pipelineProperties.maxContentLength() : 50000;
             return contentExtractor.extract(fetched, maxLength);
@@ -106,7 +130,7 @@ public class DefaultSourceEvidenceService implements SourceEvidenceService {
     }
 
     private ExtractedDocument resolveSnippetFallbackDocument(ResearchSource source) {
-        if (source.snippet() != null && source.snippet().trim().length() > 50) {
+        if (source.snippet() != null && source.snippet().trim().length() > 20) {
             log.info("Using search provider snippet fallback for blocked source '{}'", source.url());
             return new ExtractedDocument(source.url(), source.title(), source.snippet(), null, source.domain());
         }

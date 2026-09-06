@@ -19,6 +19,10 @@ class FieldExtractorTest {
     private final EducationFieldExtractor eduExtractor = new EducationFieldExtractor();
     private final LocationFieldExtractor locExtractor = new LocationFieldExtractor();
     private final TechFieldExtractor techExtractor = new TechFieldExtractor();
+    private final ExperienceFieldExtractor expExtractor = new ExperienceFieldExtractor();
+    private final SkillFieldExtractor skillExtractor = new SkillFieldExtractor();
+    private final ActivityFieldExtractor actExtractor = new ActivityFieldExtractor();
+    private final ProjectFieldExtractor projExtractor = new ProjectFieldExtractor();
 
     @Test
     @DisplayName("Should extract role from document text with verbatim snippet")
@@ -101,5 +105,101 @@ class FieldExtractorTest {
         EvidenceTuple tech = techExtractor.extract(doc, target);
         assertThat(tech).isNotNull();
         assertThat(tech.value()).contains("Java");
+    }
+
+    @Test
+    @DisplayName("Should extract structured experience history")
+    void shouldExtractStructuredExperience() {
+        ResearchTarget target = new ResearchTarget("https://linkedin.com/in/jane", "https://linkedin.com/in/jane", "id-1", EntityType.PERSON, "Jane");
+        ExtractedDocument doc = new ExtractedDocument(
+                "https://example.com/jane/resume",
+                "Jane Resume",
+                null,
+                null,
+                "Staff Engineer at Stripe (2021 - Present)\nSoftware Engineer at Google from 2018 to 2021",
+                Instant.now()
+        );
+
+        EvidenceTuple result = expExtractor.extract(doc, target);
+        assertThat(result).isNotNull();
+        assertThat(result.value()).contains("Stripe");
+        assertThat(result.value()).contains("Staff Engineer");
+        assertThat(result.extractionMethod()).isEqualTo("STRUCTURED_EXPERIENCE_EXTRACTOR");
+    }
+
+    @Test
+    @DisplayName("Should extract and normalize skills without duplicates")
+    void shouldExtractAndNormalizeSkills() {
+        ResearchTarget target = new ResearchTarget("https://linkedin.com/in/jane", "https://linkedin.com/in/jane", "id-1", EntityType.PERSON, "Jane");
+        ExtractedDocument doc = new ExtractedDocument(
+                "https://example.com/jane",
+                "Jane Skills",
+                null,
+                null,
+                "Skills: Spring Boot, springboot, Java, TypeScript, Docker, k8s, React",
+                Instant.now()
+        );
+
+        EvidenceTuple result = skillExtractor.extract(doc, target);
+        assertThat(result).isNotNull();
+        assertThat(result.value()).contains("Spring Boot");
+        assertThat(result.value()).contains("Kubernetes");
+        assertThat(result.value()).contains("Java");
+    }
+
+    @Test
+    @DisplayName("Should extract activity and distinguish AUTHORED from LIKED")
+    void shouldExtractActivityWithAuthorDistinction() {
+        ResearchTarget target = new ResearchTarget("https://linkedin.com/in/jane", "https://linkedin.com/in/jane", "id-1", EntityType.PERSON, "Jane");
+        ExtractedDocument doc = new ExtractedDocument(
+                "https://example.com/jane/activity",
+                "Jane Activity",
+                null,
+                null,
+                "Published article: \"Building Resilient Microservices with Spring Boot\"\nLiked: \"Check out this new frontend framework\"",
+                Instant.now()
+        );
+
+        EvidenceTuple result = actExtractor.extract(doc, target);
+        assertThat(result).isNotNull();
+        assertThat(result.value()).contains("AUTHORED");
+        assertThat(result.value()).contains("LIKED");
+        assertThat(result.value()).contains("Building Resilient Microservices");
+    }
+
+    @Test
+    @DisplayName("Should extract notable projects")
+    void shouldExtractNotableProjects() {
+        ResearchTarget target = new ResearchTarget("https://github.com/torvalds", "https://github.com/torvalds", "id-1", EntityType.PERSON, "Linus Torvalds");
+        ExtractedDocument doc = new ExtractedDocument(
+                "https://example.com/linus",
+                "Linus Torvalds Profile",
+                null,
+                null,
+                "Linus is the Creator of Linux kernel and Author of Git tool.",
+                Instant.now()
+        );
+
+        EvidenceTuple result = projExtractor.extract(doc, target);
+        assertThat(result).isNotNull();
+        assertThat(result.value()).contains("Linux");
+        assertThat(result.value()).contains("Git");
+    }
+
+    @Test
+    @DisplayName("Should verify thread-safe source caching")
+    void shouldVerifyThreadSafeSourceCache() {
+        com.subdual.research_service.discovery.cache.ThreadSafeSourceCache cache = new com.subdual.research_service.discovery.cache.ThreadSafeSourceCache();
+        assertThat(cache.getFetchedContent("https://example.com/test")).isEmpty();
+
+        com.subdual.research_service.integration.web.FetchedContent content =
+                com.subdual.research_service.integration.web.FetchedContent.success(
+                        "https://example.com/test", 200, "text/html", "<html><body>Cached</body></html>"
+                );
+        cache.putFetchedContent("https://example.com/test", content);
+
+        assertThat(cache.getFetchedContent("https://example.com/test")).isPresent();
+        assertThat(cache.getFetchedContent("https://example.com/test/")).isPresent(); // normalized trailing slash
+        assertThat(cache.size()).isEqualTo(1);
     }
 }

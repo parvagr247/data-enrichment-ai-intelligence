@@ -25,12 +25,20 @@ public record ResearchTarget(
         return null;
     }
 
+    public String organization() {
+        return seedOrganization();
+    }
+
     public String seedRole() {
         if (metadata != null && metadata.containsKey("role")) {
             Object val = metadata.get("role");
             return val != null ? val.toString().trim() : null;
         }
         return null;
+    }
+
+    public String role() {
+        return seedRole();
     }
 
     public List<String> targetFields() {

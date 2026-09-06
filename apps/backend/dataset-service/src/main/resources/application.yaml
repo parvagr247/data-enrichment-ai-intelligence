@@ -40,4 +40,17 @@ services:
   ai:
     url: ${AI_INTELLIGENT_SERVICE_URL:http://localhost:9742}
 
+enrichment:
+  execution:
+    concurrency: ${ENRICHMENT_CONCURRENCY:3}
+    queue-capacity: ${ENRICHMENT_QUEUE_CAPACITY:500}
+  research:
+    max-sources-per-entity: ${ENRICHMENT_MAX_SOURCES:5}
+  timeout:
+    entity-seconds: ${ENRICHMENT_ENTITY_TIMEOUT:60}
+    job-minutes: ${ENRICHMENT_JOB_TIMEOUT:30}
+  ai:
+    enabled: ${ENRICHMENT_AI_ENABLED:true}
+
+
 

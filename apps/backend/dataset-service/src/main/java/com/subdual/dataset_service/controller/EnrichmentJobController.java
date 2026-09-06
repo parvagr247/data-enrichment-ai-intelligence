@@ -46,6 +46,12 @@ public class EnrichmentJobController {
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
+    @PostMapping(value = "/jobs/{jobId}/cancel", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<Void> cancelJob(@PathVariable String jobId) {
+        boolean cancelled = datasetEnrichmentService.cancelJob(jobId);
+        return cancelled ? ResponseEntity.ok().build() : ResponseEntity.notFound().build();
+    }
+
     @GetMapping(value = "/jobs", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<List<EnrichmentJobResponse>> listJobs() {
         return ResponseEntity.ok(datasetEnrichmentService.listJobs());

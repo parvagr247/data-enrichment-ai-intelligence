@@ -36,13 +36,24 @@ class DatasetEnrichmentServiceTest {
 
     private DefaultDatasetEnrichmentService enrichmentService;
 
+    private com.subdual.dataset_service.service.executor.EnrichmentTaskExecutor taskExecutor;
+
     @BeforeEach
     void setUp() {
+        taskExecutor = new com.subdual.dataset_service.service.executor.EnrichmentTaskExecutor(
+                new com.subdual.dataset_service.config.EnrichmentProperties(
+                        new com.subdual.dataset_service.config.EnrichmentProperties.Execution(3, 100),
+                        new com.subdual.dataset_service.config.EnrichmentProperties.Research(5),
+                        new com.subdual.dataset_service.config.EnrichmentProperties.Timeout(60, 30),
+                        new com.subdual.dataset_service.config.EnrichmentProperties.Ai(true)
+                )
+        );
         enrichmentService = new DefaultDatasetEnrichmentService(
                 researchServiceClient,
                 aiServiceClient,
                 persistenceService,
-                Executors.newSingleThreadExecutor()
+                Executors.newSingleThreadExecutor(),
+                taskExecutor
         );
     }
 
@@ -138,8 +149,8 @@ class DatasetEnrichmentServiceTest {
                         true
                 ));
 
-        // First row succeeds
-        when(researchServiceClient.executeResearch(any()))
+        // Deterministic mock based on row entity name
+        when(researchServiceClient.executeResearch(argThat(r -> r != null && "Alice Smith".equals(r.name()))))
                 .thenReturn(new ResearchServiceClient.ResearchCallResponse(
                         "COMPLETED",
                         "ent-good",
@@ -152,8 +163,9 @@ class DatasetEnrichmentServiceTest {
                         List.of(),
                         50,
                         List.of()
-                ))
-                // Second row throws exception
+                ));
+
+        when(researchServiceClient.executeResearch(argThat(r -> r != null && "Bad Row Data".equals(r.name()))))
                 .thenThrow(new RuntimeException("Simulated upstream network error"));
 
         EnrichmentJobRequest request = new EnrichmentJobRequest(
@@ -186,5 +198,76 @@ class DatasetEnrichmentServiceTest {
         assertEquals("COMPLETED", row1.status());
         assertEquals("FAILED", row2.status());
         assertTrue(row2.errorMessage().contains("Simulated upstream network error"));
+    }
+
+    @Test
+    @DisplayName("Should execute multiple rows in bounded parallel fashion")
+    void shouldExecuteRowsConcurrently() throws InterruptedException {
+        when(aiServiceClient.interpretRequirement(any(), any(), any()))
+                .thenReturn(new AiServiceClient.RequirementCallResponse(List.of("currentRole"), "Role scope", true));
+
+        java.util.concurrent.atomic.AtomicInteger concurrentCalls = new java.util.concurrent.atomic.AtomicInteger(0);
+        java.util.concurrent.atomic.AtomicInteger maxConcurrentSeen = new java.util.concurrent.atomic.AtomicInteger(0);
+
+        when(researchServiceClient.executeResearch(any())).thenAnswer(invocation -> {
+            int current = concurrentCalls.incrementAndGet();
+            maxConcurrentSeen.updateAndGet(prev -> Math.max(prev, current));
+            Thread.sleep(100);
+            concurrentCalls.decrementAndGet();
+            return new ResearchServiceClient.ResearchCallResponse(
+                    "COMPLETED",
+                    "ent-test",
+                    new ResearchServiceClient.ResearchCallResult("Test User", "PERSON", "https://example.com/user", Map.of()),
+                    List.of(),
+                    100,
+                    List.of()
+            );
+        });
+
+        EnrichmentJobRequest request = new EnrichmentJobRequest(
+                "parallel-dataset.csv",
+                null,
+                "PERSON",
+                Map.of("nameColumn", "Name"),
+                List.of(
+                        Map.of("Name", "User 1"),
+                        Map.of("Name", "User 2"),
+                        Map.of("Name", "User 3"),
+                        Map.of("Name", "User 4")
+                )
+        );
+
+        EnrichmentJobResponse submitted = enrichmentService.createAndSubmitJob(request);
+        assertNotNull(submitted);
+
+        // Wait for workers to complete 4 rows
+        Thread.sleep(800);
+
+        EnrichmentJobResponse completedJob = enrichmentService.getJob(submitted.jobId()).orElseThrow();
+        assertEquals(4, completedJob.totalRows());
+        assertEquals(4, completedJob.completedRows());
+        assertEquals(0, completedJob.failedRows());
+        assertEquals(4, completedJob.rowResults().size());
+        assertTrue(maxConcurrentSeen.get() >= 2, "Expected at least 2 threads executing concurrently, saw: " + maxConcurrentSeen.get());
+        assertTrue(maxConcurrentSeen.get() <= 3, "Expected at most bounded concurrency (3) threads executing, saw: " + maxConcurrentSeen.get());
+    }
+
+    @Test
+    @DisplayName("Should support cancelling an in-flight job")
+    void shouldCancelInFlightJob() {
+        EnrichmentJobRequest request = new EnrichmentJobRequest(
+                "cancel-test.csv",
+                null,
+                "PERSON",
+                Map.of("nameColumn", "Name"),
+                List.of(Map.of("Name", "User A"))
+        );
+
+        EnrichmentJobResponse submitted = enrichmentService.createAndSubmitJob(request);
+        boolean cancelled = enrichmentService.cancelJob(submitted.jobId());
+        assertTrue(cancelled);
+
+        EnrichmentJobResponse job = enrichmentService.getJob(submitted.jobId()).orElseThrow();
+        assertEquals("CANCELLED", job.status());
     }
 }

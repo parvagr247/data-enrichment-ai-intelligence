@@ -34,6 +34,7 @@ public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService
     private final AiServiceClient aiServiceClient;
     private final EntityPersistenceService persistenceService;
     private final ExecutorService enrichmentJobExecutor;
+    private final com.subdual.dataset_service.service.executor.EnrichmentTaskExecutor enrichmentTaskExecutor;
 
     private final Map<String, JobState> activeJobs = new ConcurrentHashMap<>();
 
@@ -41,16 +42,19 @@ public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService
         String jobId;
         String datasetName;
         String userRequirement;
-        String status;
+        volatile String status;
         int totalRows;
-        int completedRows;
-        int failedRows;
-        int progress;
+        java.util.concurrent.atomic.AtomicInteger completedRows = new java.util.concurrent.atomic.AtomicInteger(0);
+        java.util.concurrent.atomic.AtomicInteger failedRows = new java.util.concurrent.atomic.AtomicInteger(0);
+        java.util.concurrent.atomic.AtomicInteger partialRows = new java.util.concurrent.atomic.AtomicInteger(0);
+        java.util.concurrent.atomic.AtomicInteger processingRows = new java.util.concurrent.atomic.AtomicInteger(0);
+        volatile int progress;
         Instant createdAt;
         Instant completedAt;
         Long durationMs;
-        List<RowEnrichmentResult> rowResults = Collections.synchronizedList(new ArrayList<>());
+        Map<Integer, RowEnrichmentResult> rowResultsMap = new ConcurrentHashMap<>();
         String errorMessage;
+        volatile boolean cancelled = false;
     }
 
     @Override
@@ -64,10 +68,32 @@ public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService
         state.userRequirement = request.userRequirement();
         state.status = "PROCESSING";
         state.totalRows = totalRows;
-        state.completedRows = 0;
-        state.failedRows = 0;
         state.progress = 0;
         state.createdAt = Instant.now();
+
+        if (request.rows() != null) {
+            for (int i = 0; i < request.rows().size(); i++) {
+                Map<String, String> row = request.rows().get(i);
+                String name = extractMappedValue(row, request.columnMapping(), "nameColumn");
+                String url = extractMappedValue(row, request.columnMapping(), "urlColumn");
+                String displayName = (name != null && !name.isBlank()) ? name : (url != null && !url.isBlank() ? url : "Row " + (i + 1));
+                state.rowResultsMap.put(i, new RowEnrichmentResult(
+                        jobId + "-row-" + i,
+                        i,
+                        row,
+                        "QUEUED",
+                        displayName,
+                        url != null ? url : "",
+                        request.defaultEntityType() != null ? request.defaultEntityType() : "PERSON",
+                        Map.of(),
+                        List.of(),
+                        List.of(),
+                        0.0,
+                        List.of(),
+                        null
+                ));
+            }
+        }
 
         activeJobs.put(jobId, state);
 
@@ -103,10 +129,24 @@ public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService
         return processSingleRow("single-" + System.currentTimeMillis(), 0, row, mapping, entityType, requirement, targetFields);
     }
 
+    @Override
+    public boolean cancelJob(String jobId) {
+        JobState state = activeJobs.get(jobId);
+        if (state != null && "PROCESSING".equalsIgnoreCase(state.status)) {
+            state.cancelled = true;
+            state.status = "CANCELLED";
+            state.completedAt = Instant.now();
+            log.info("Cancelled dataset enrichment job '{}'", jobId);
+            return true;
+        }
+        return false;
+    }
+
     private void executeJobAsync(JobState state, EnrichmentJobRequest request) {
         long startMs = System.currentTimeMillis();
         try {
-            log.info("Starting enrichment job '{}' ({} rows), requirement='{}'", state.jobId, state.totalRows, state.userRequirement);
+            log.info("Starting enrichment job '{}' ({} rows, concurrency={}), requirement='{}'",
+                    state.jobId, state.totalRows, enrichmentTaskExecutor.getConcurrency(), state.userRequirement);
 
             AiServiceClient.RequirementCallResponse reqResponse = aiServiceClient.interpretRequirement(
                     request.userRequirement(),
@@ -116,54 +156,97 @@ public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService
             List<String> targetFields = reqResponse != null ? reqResponse.requestedFields() : List.of();
 
             List<Map<String, String>> rows = request.rows() != null ? request.rows() : List.of();
+            List<java.util.concurrent.CompletableFuture<Void>> futures = new ArrayList<>();
+
             for (int i = 0; i < rows.size(); i++) {
-                Map<String, String> row = rows.get(i);
-                String rowId = state.jobId + "-row-" + i;
+                final int rowIndex = i;
+                final Map<String, String> row = rows.get(i);
+                final String rowId = state.jobId + "-row-" + rowIndex;
 
-                try {
-                    RowEnrichmentResult result = processSingleRow(
-                            rowId,
-                            i,
-                            row,
-                            request.columnMapping(),
-                            request.defaultEntityType(),
-                            request.userRequirement(),
-                            targetFields
-                    );
-                    state.rowResults.add(result);
-
-                    if ("FAILED".equalsIgnoreCase(result.status())) {
-                        state.failedRows++;
-                    } else {
-                        state.completedRows++;
+                java.util.concurrent.CompletableFuture<Void> future = enrichmentTaskExecutor.submitTask(() -> {
+                    if (state.cancelled) {
+                        return null;
                     }
-                } catch (Exception ex) {
-                    log.error("Failed enriching row {} in job {}: {}", i, state.jobId, ex.getMessage());
-                    state.failedRows++;
-                    state.rowResults.add(new RowEnrichmentResult(
-                            rowId,
-                            i,
-                            row,
-                            "FAILED",
-                            "Unknown",
-                            "",
-                            request.defaultEntityType(),
-                            Map.of(),
-                            targetFields,
-                            List.of(),
-                            0.0,
-                            List.of(),
-                            ex.getMessage()
-                    ));
-                }
+                    state.processingRows.incrementAndGet();
+                    RowEnrichmentResult current = state.rowResultsMap.get(rowIndex);
+                    if (current != null) {
+                        state.rowResultsMap.put(rowIndex, new RowEnrichmentResult(
+                                current.rowId(),
+                                rowIndex,
+                                current.originalData(),
+                                "PROCESSING",
+                                current.displayName(),
+                                current.canonicalUrl(),
+                                current.entityType(),
+                                current.attributes(),
+                                current.unresolvedFields(),
+                                current.conflicts(),
+                                current.confidence(),
+                                current.sources(),
+                                null
+                        ));
+                    }
 
-                state.progress = (int) Math.round(((double) (i + 1) / Math.max(1, state.totalRows)) * 100);
+                    try {
+                        RowEnrichmentResult result = processSingleRow(
+                                rowId,
+                                rowIndex,
+                                row,
+                                request.columnMapping(),
+                                request.defaultEntityType(),
+                                request.userRequirement(),
+                                targetFields
+                        );
+                        state.rowResultsMap.put(rowIndex, result);
+
+                        if ("FAILED".equalsIgnoreCase(result.status())) {
+                            state.failedRows.incrementAndGet();
+                        } else if ("PARTIAL".equalsIgnoreCase(result.status())) {
+                            state.partialRows.incrementAndGet();
+                            state.completedRows.incrementAndGet();
+                        } else {
+                            state.completedRows.incrementAndGet();
+                        }
+                    } catch (Exception ex) {
+                        log.error("Failed enriching row {} in job {}: {}", rowIndex, state.jobId, ex.getMessage());
+                        state.failedRows.incrementAndGet();
+                        state.rowResultsMap.put(rowIndex, new RowEnrichmentResult(
+                                rowId,
+                                rowIndex,
+                                row,
+                                "FAILED",
+                                "Unknown",
+                                "",
+                                request.defaultEntityType(),
+                                Map.of(),
+                                targetFields,
+                                List.of(),
+                                0.0,
+                                List.of(),
+                                ex.getMessage()
+                        ));
+                    } finally {
+                        state.processingRows.decrementAndGet();
+                        int processed = state.completedRows.get() + state.failedRows.get();
+                        state.progress = (int) Math.round(((double) processed / Math.max(1, state.totalRows)) * 100);
+                    }
+                    return null;
+                });
+                futures.add(future);
             }
 
-            state.status = (state.failedRows == state.totalRows && state.totalRows > 0) ? "FAILED" : "COMPLETED";
+            java.util.concurrent.CompletableFuture.allOf(futures.toArray(new java.util.concurrent.CompletableFuture[0])).join();
+
+            if (state.cancelled) {
+                state.status = "CANCELLED";
+            } else {
+                int failed = state.failedRows.get();
+                state.status = (failed == state.totalRows && state.totalRows > 0) ? "FAILED" : "COMPLETED";
+            }
             state.completedAt = Instant.now();
             state.durationMs = System.currentTimeMillis() - startMs;
-            log.info("Completed enrichment job '{}' in {} ms (completed={}, failed={})", state.jobId, state.durationMs, state.completedRows, state.failedRows);
+            log.info("Completed enrichment job '{}' in {} ms (completed={}, partial={}, failed={})",
+                    state.jobId, state.durationMs, state.completedRows.get(), state.partialRows.get(), state.failedRows.get());
         } catch (Exception ex) {
             log.error("Fatal error during enrichment job {}: {}", state.jobId, ex.getMessage(), ex);
             state.status = "FAILED";
@@ -404,19 +487,22 @@ public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService
     }
 
     private EnrichmentJobResponse toJobResponse(JobState s) {
+        List<RowEnrichmentResult> sortedResults = s.rowResultsMap.values().stream()
+                .sorted(java.util.Comparator.comparingInt(RowEnrichmentResult::rowIndex))
+                .toList();
         return new EnrichmentJobResponse(
                 s.jobId,
                 s.datasetName,
                 s.status,
                 s.userRequirement,
                 s.totalRows,
-                s.completedRows,
-                s.failedRows,
+                s.completedRows.get(),
+                s.failedRows.get(),
                 s.progress,
                 s.createdAt != null ? s.createdAt.toString() : null,
                 s.completedAt != null ? s.completedAt.toString() : null,
                 s.durationMs,
-                new ArrayList<>(s.rowResults),
+                sortedResults,
                 s.errorMessage
         );
     }

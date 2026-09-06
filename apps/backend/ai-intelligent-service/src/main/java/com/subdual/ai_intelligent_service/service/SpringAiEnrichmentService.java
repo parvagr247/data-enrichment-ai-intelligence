@@ -129,7 +129,7 @@ public class SpringAiEnrichmentService implements EnrichmentAIService {
 
     private RequirementInterpretationResponse buildDefaultScope(String entityType) {
         List<String> defaultFields = switch (entityType) {
-            case "PERSON" -> List.of("currentOrganization", "currentRole", "education", "skills", "location");
+            case "PERSON" -> List.of("currentOrganization", "currentRole", "experience", "education", "skills", "projects", "activity", "location");
             case "ORGANIZATION" -> List.of("description", "industry", "headquarters", "products", "employeeCount");
             case "PRODUCT" -> List.of("description", "vendor", "features", "pricing", "license");
             case "REPOSITORY" -> List.of("description", "owner", "license", "language", "stars");
@@ -148,11 +148,20 @@ public class SpringAiEnrichmentService implements EnrichmentAIService {
         if (lower.contains("role") || lower.contains("title") || lower.contains("position") || lower.contains("job")) {
             fields.add("currentRole");
         }
+        if (lower.contains("experience") || lower.contains("career") || lower.contains("history") || lower.contains("employment") || lower.contains("background")) {
+            fields.add("experience");
+        }
         if (lower.contains("education") || lower.contains("degree") || lower.contains("university") || lower.contains("college") || lower.contains("studied")) {
             fields.add("education");
         }
-        if (lower.contains("skill") || lower.contains("tech") || lower.contains("stack") || lower.contains("expertise")) {
+        if (lower.contains("skill") || lower.contains("tech") || lower.contains("stack") || lower.contains("expertise") || lower.contains("proficiency")) {
             fields.add("skills");
+        }
+        if (lower.contains("project") || lower.contains("portfolio") || lower.contains("github") || lower.contains("repo") || lower.contains("code")) {
+            fields.add("projects");
+        }
+        if (lower.contains("activity") || lower.contains("post") || lower.contains("article") || lower.contains("publication") || lower.contains("speaking")) {
+            fields.add("activity");
         }
         if (lower.contains("location") || lower.contains("headquarter") || lower.contains("based") || lower.contains("city") || lower.contains("country")) {
             fields.add("location");
@@ -377,7 +386,22 @@ public class SpringAiEnrichmentService implements EnrichmentAIService {
             if ((clean.equals("currentorganization") || clean.equals("company")) && (candidate.equals("currentorganization") || candidate.equals("organization") || candidate.equals("company"))) {
                 return entry.getValue();
             }
-            if ((clean.equals("currentrole") || clean.equals("role") || clean.equals("position")) && (candidate.equals("currentrole") || candidate.equals("role") || candidate.equals("position"))) {
+            if ((clean.equals("currentrole") || clean.equals("role") || clean.equals("position") || clean.equals("title")) && (candidate.equals("currentrole") || candidate.equals("role") || candidate.equals("position") || candidate.equals("title"))) {
+                return entry.getValue();
+            }
+            if ((clean.equals("experience") || clean.equals("workexperience") || clean.equals("employment")) && (candidate.equals("experience") || candidate.equals("workexperience") || candidate.equals("employment"))) {
+                return entry.getValue();
+            }
+            if ((clean.equals("skills") || clean.equals("technologies") || clean.equals("skill")) && (candidate.equals("skills") || candidate.equals("technologies") || candidate.equals("skill"))) {
+                return entry.getValue();
+            }
+            if ((clean.equals("projects") || clean.equals("project") || clean.equals("portfolio")) && (candidate.equals("projects") || candidate.equals("project") || candidate.equals("portfolio"))) {
+                return entry.getValue();
+            }
+            if ((clean.equals("activity") || clean.equals("activities") || clean.equals("posts") || clean.equals("publications")) && (candidate.equals("activity") || candidate.equals("activities") || candidate.equals("posts") || candidate.equals("publications"))) {
+                return entry.getValue();
+            }
+            if ((clean.equals("education") || clean.equals("academic")) && (candidate.equals("education") || candidate.equals("academic"))) {
                 return entry.getValue();
             }
         }

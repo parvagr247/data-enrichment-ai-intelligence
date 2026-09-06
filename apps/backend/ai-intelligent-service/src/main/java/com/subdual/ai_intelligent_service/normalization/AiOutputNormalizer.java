@@ -46,6 +46,10 @@ public final class AiOutputNormalizer {
             return "UNKNOWN";
         }
 
+        if ((cleaned.startsWith("[") && cleaned.endsWith("]")) || (cleaned.startsWith("{") && cleaned.endsWith("}"))) {
+            return cleaned;
+        }
+
         if (cleaned.contains(",") || cleaned.contains(";")) {
             return deduplicateList(cleaned);
         }

@@ -94,9 +94,13 @@ public class EvidenceExtractor {
         return List.of(
                 new com.subdual.research_service.extraction.extractor.field.RoleFieldExtractor(),
                 new com.subdual.research_service.extraction.extractor.field.OrganizationFieldExtractor(),
+                new com.subdual.research_service.extraction.extractor.field.ExperienceFieldExtractor(),
                 new com.subdual.research_service.extraction.extractor.field.EducationFieldExtractor(),
-                new com.subdual.research_service.extraction.extractor.field.LocationFieldExtractor(),
-                new com.subdual.research_service.extraction.extractor.field.TechFieldExtractor()
+                new com.subdual.research_service.extraction.extractor.field.SkillFieldExtractor(),
+                new com.subdual.research_service.extraction.extractor.field.TechFieldExtractor(),
+                new com.subdual.research_service.extraction.extractor.field.ActivityFieldExtractor(),
+                new com.subdual.research_service.extraction.extractor.field.ProjectFieldExtractor(),
+                new com.subdual.research_service.extraction.extractor.field.LocationFieldExtractor()
         );
     }
 
