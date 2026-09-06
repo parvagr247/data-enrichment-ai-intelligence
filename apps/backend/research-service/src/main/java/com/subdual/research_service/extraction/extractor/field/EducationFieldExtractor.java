@@ -1,6 +1,5 @@
 package com.subdual.research_service.extraction.extractor.field;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.subdual.research_service.api.dto.EvidenceTuple;
 import com.subdual.research_service.discovery.ranking.SourceTypeClassifier;
 import com.subdual.research_service.extraction.document.ExtractedDocument;
@@ -24,8 +23,6 @@ import java.util.regex.Pattern;
  */
 @Component
 public class EducationFieldExtractor implements FieldExtractor {
-
-    private static final ObjectMapper MAPPER = new ObjectMapper();
 
     // Matches: "graduated from MIT with a degree in Computer Science" or "holds a Master of Science in AI from Stanford"
     private static final Pattern EDU_FULL_PATTERN = Pattern.compile(
@@ -119,26 +116,42 @@ public class EducationFieldExtractor implements FieldExtractor {
             return null;
         }
 
-        try {
-            String jsonValue = MAPPER.writeValueAsString(educationList);
-            SourceType type = SourceTypeClassifier.classify(doc.url(), target != null ? target.canonicalUrl() : null);
-            SourceReliability rel = SourceTypeClassifier.determineReliability(type);
-            ConfidenceTier tier = (rel == SourceReliability.HIGH) ? ConfidenceTier.HIGH : ConfidenceTier.MEDIUM;
-
-            return new EvidenceTuple(
-                    jsonValue,
-                    doc.url(),
-                    primaryQuote != null ? primaryQuote : "Education record extracted",
-                    tier,
-                    List.of(doc.url()),
-                    false,
-                    null,
-                    type.name(),
-                    "FIELD_SPECIFIC_EDU_EXTRACTOR"
-            );
-        } catch (Exception ex) {
-            return null;
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < educationList.size(); i++) {
+            Map<String, Object> edu = educationList.get(i);
+            if (i > 0) sb.append(" | ");
+            String deg = (String) edu.get("degree");
+            String field = (String) edu.get("field");
+            String inst = (String) edu.get("institution");
+            String start = (String) edu.get("startDate");
+            String end = (String) edu.get("endDate");
+            if (deg != null) {
+                sb.append(deg);
+                if (field != null) sb.append(" in ").append(field);
+                sb.append(" at ");
+            }
+            sb.append(inst);
+            if (start != null || end != null) {
+                sb.append(" (").append(start != null ? start : "?").append(" - ").append(end != null ? end : "").append(")");
+            }
         }
+        String formattedValue = sb.toString();
+
+        SourceType type = SourceTypeClassifier.classify(doc.url(), target != null ? target.canonicalUrl() : null);
+        SourceReliability rel = SourceTypeClassifier.determineReliability(type);
+        ConfidenceTier tier = (rel == SourceReliability.HIGH) ? ConfidenceTier.HIGH : ConfidenceTier.MEDIUM;
+
+        return new EvidenceTuple(
+                formattedValue,
+                doc.url(),
+                primaryQuote != null ? primaryQuote : "Education record extracted",
+                tier,
+                List.of(doc.url()),
+                false,
+                null,
+                type.name(),
+                "FIELD_SPECIFIC_EDU_EXTRACTOR"
+        );
     }
 
     private boolean isValidInstitution(String institution) {

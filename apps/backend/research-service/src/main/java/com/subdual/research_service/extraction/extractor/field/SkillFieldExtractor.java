@@ -1,6 +1,5 @@
 package com.subdual.research_service.extraction.extractor.field;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.subdual.research_service.api.dto.EvidenceTuple;
 import com.subdual.research_service.discovery.ranking.SourceTypeClassifier;
 import com.subdual.research_service.extraction.document.ExtractedDocument;
@@ -25,8 +24,6 @@ import java.util.regex.Pattern;
  */
 @Component
 public class SkillFieldExtractor implements FieldExtractor {
-
-    private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private static final Pattern SKILL_LABEL_PATTERN = Pattern.compile(
             "(?i)(?:Skills|Tech Stack|Expertise|Proficiencies|Core Competencies):\\s*([A-Za-z0-9+#.,/\\s-]{3,120})(?:[\\n\\r.;]|$)"
@@ -111,27 +108,22 @@ public class SkillFieldExtractor implements FieldExtractor {
             return null;
         }
 
-        try {
-            List<String> list = new ArrayList<>(normalizedSkills);
-            String jsonValue = MAPPER.writeValueAsString(list);
-            SourceType type = SourceTypeClassifier.classify(doc.url(), target != null ? target.canonicalUrl() : null);
-            SourceReliability rel = SourceTypeClassifier.determineReliability(type);
-            ConfidenceTier tier = (rel == SourceReliability.HIGH) ? ConfidenceTier.HIGH : ConfidenceTier.MEDIUM;
+        String formattedValue = String.join(", ", normalizedSkills);
+        SourceType type = SourceTypeClassifier.classify(doc.url(), target != null ? target.canonicalUrl() : null);
+        SourceReliability rel = SourceTypeClassifier.determineReliability(type);
+        ConfidenceTier tier = (rel == SourceReliability.HIGH) ? ConfidenceTier.HIGH : ConfidenceTier.MEDIUM;
 
-            return new EvidenceTuple(
-                    jsonValue,
-                    doc.url(),
-                    primaryQuote != null ? primaryQuote : "Identified technical skills in source",
-                    tier,
-                    List.of(doc.url()),
-                    false,
-                    null,
-                    type.name(),
-                    "SKILL_FIELD_EXTRACTOR"
-            );
-        } catch (Exception ex) {
-            return null;
-        }
+        return new EvidenceTuple(
+                formattedValue,
+                doc.url(),
+                primaryQuote != null ? primaryQuote : "Identified technical skills in source",
+                tier,
+                List.of(doc.url()),
+                false,
+                null,
+                type.name(),
+                "SKILL_FIELD_EXTRACTOR"
+        );
     }
 
     public static String normalizeSkill(String raw) {

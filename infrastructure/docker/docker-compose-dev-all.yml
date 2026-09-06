@@ -48,6 +48,7 @@ services:
       RESEARCH_MAX_CONTENT_LENGTH: ${RESEARCH_MAX_CONTENT_LENGTH:-50000}
     volumes:
       - maven_cache:/root/.m2
+      - ../../apps/backend/research-service/pom.xml:/app/pom.xml
       - ../../apps/backend/research-service/src:/app/src
     develop:
       watch:
@@ -72,9 +73,11 @@ services:
     environment:
       SERVER_PORT: 9742
       SPRING_APPLICATION_NAME: ai-intelligent-service
+      AI_MOCK_MODE: ${AI_MOCK_MODE:-false}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-mock-key}
     volumes:
       - maven_cache:/root/.m2
+      - ../../apps/backend/ai-intelligent-service/pom.xml:/app/pom.xml
       - ../../apps/backend/ai-intelligent-service/src:/app/src
     develop:
       watch:
@@ -109,6 +112,7 @@ services:
         condition: service_healthy
     volumes:
       - maven_cache:/root/.m2
+      - ../../apps/backend/dataset-service/pom.xml:/app/pom.xml
       - ../../apps/backend/dataset-service/src:/app/src
     develop:
       watch:

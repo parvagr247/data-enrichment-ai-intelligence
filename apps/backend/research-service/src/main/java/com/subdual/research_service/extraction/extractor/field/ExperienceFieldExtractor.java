@@ -1,6 +1,5 @@
 package com.subdual.research_service.extraction.extractor.field;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.subdual.research_service.api.dto.EvidenceTuple;
 import com.subdual.research_service.discovery.ranking.SourceTypeClassifier;
 import com.subdual.research_service.extraction.document.ExtractedDocument;
@@ -24,8 +23,6 @@ import java.util.regex.Pattern;
  */
 @Component
 public class ExperienceFieldExtractor implements FieldExtractor {
-
-    private static final ObjectMapper MAPPER = new ObjectMapper();
 
     // Matches: "Staff Engineer at Stripe (2021 - Present)" or "Software Engineer at Google from 2018 to 2021"
     private static final Pattern EXP_DATE_PATTERN = Pattern.compile(
@@ -133,26 +130,34 @@ public class ExperienceFieldExtractor implements FieldExtractor {
             return null;
         }
 
-        try {
-            String jsonValue = MAPPER.writeValueAsString(experiences);
-            SourceType type = SourceTypeClassifier.classify(doc.url(), target != null ? target.canonicalUrl() : null);
-            SourceReliability rel = SourceTypeClassifier.determineReliability(type);
-            ConfidenceTier tier = (rel == SourceReliability.HIGH) ? ConfidenceTier.HIGH : ConfidenceTier.MEDIUM;
-
-            return new EvidenceTuple(
-                    jsonValue,
-                    doc.url(),
-                    primaryQuote != null ? primaryQuote : "Document experience section",
-                    tier,
-                    List.of(doc.url()),
-                    false,
-                    null,
-                    type.name(),
-                    "STRUCTURED_EXPERIENCE_EXTRACTOR"
-            );
-        } catch (Exception ex) {
-            return null;
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < experiences.size(); i++) {
+            Map<String, Object> exp = experiences.get(i);
+            if (i > 0) sb.append(" | ");
+            sb.append(exp.get("role")).append(" at ").append(exp.get("organization"));
+            String start = (String) exp.get("startDate");
+            String end = (String) exp.get("endDate");
+            if (start != null || end != null) {
+                sb.append(" (").append(start != null ? start : "?").append(" - ").append(end != null ? end : "Present").append(")");
+            }
         }
+        String formattedValue = sb.toString();
+
+        SourceType type = SourceTypeClassifier.classify(doc.url(), target != null ? target.canonicalUrl() : null);
+        SourceReliability rel = SourceTypeClassifier.determineReliability(type);
+        ConfidenceTier tier = (rel == SourceReliability.HIGH) ? ConfidenceTier.HIGH : ConfidenceTier.MEDIUM;
+
+        return new EvidenceTuple(
+                formattedValue,
+                doc.url(),
+                primaryQuote != null ? primaryQuote : "Document experience section",
+                tier,
+                List.of(doc.url()),
+                false,
+                null,
+                type.name(),
+                "STRUCTURED_EXPERIENCE_EXTRACTOR"
+        );
     }
 
     private boolean isValidPosition(String role, String org) {

@@ -1,6 +1,5 @@
 package com.subdual.research_service.extraction.extractor.field;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.subdual.research_service.api.dto.EvidenceTuple;
 import com.subdual.research_service.discovery.ranking.SourceTypeClassifier;
 import com.subdual.research_service.extraction.document.ExtractedDocument;
@@ -27,8 +26,6 @@ import java.util.regex.Pattern;
  */
 @Component
 public class ActivityFieldExtractor implements FieldExtractor {
-
-    private static final ObjectMapper MAPPER = new ObjectMapper();
 
     // Matches: "Posted: ...", "Published article: ...", "Author: ..."
     private static final Pattern AUTHORED_POST_PATTERN = Pattern.compile(
@@ -123,32 +120,29 @@ public class ActivityFieldExtractor implements FieldExtractor {
             return null;
         }
 
-        Map<String, Object> activityModel = new LinkedHashMap<>();
-        activityModel.put("recentPosts", recentPosts);
-        activityModel.put("themes", new ArrayList<>(themes));
-        activityModel.put("technologies", new ArrayList<>(mentionedTech));
-        activityModel.put("notableProjects", List.of());
-
-        try {
-            String jsonValue = MAPPER.writeValueAsString(activityModel);
-            SourceType type = SourceTypeClassifier.classify(doc.url(), target != null ? target.canonicalUrl() : null);
-            SourceReliability rel = SourceTypeClassifier.determineReliability(type);
-            ConfidenceTier tier = (rel == SourceReliability.HIGH) ? ConfidenceTier.HIGH : ConfidenceTier.MEDIUM;
-
-            return new EvidenceTuple(
-                    jsonValue,
-                    doc.url(),
-                    primaryQuote != null ? primaryQuote : "Public professional activity extracted",
-                    tier,
-                    List.of(doc.url()),
-                    false,
-                    null,
-                    type.name(),
-                    "ACTIVITY_FIELD_EXTRACTOR"
-            );
-        } catch (Exception ex) {
-            return null;
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < recentPosts.size(); i++) {
+            Map<String, Object> post = recentPosts.get(i);
+            if (i > 0) sb.append(" | ");
+            sb.append("[").append(post.get("type")).append("] ").append(post.get("title"));
         }
+        String formattedValue = sb.toString();
+
+        SourceType type = SourceTypeClassifier.classify(doc.url(), target != null ? target.canonicalUrl() : null);
+        SourceReliability rel = SourceTypeClassifier.determineReliability(type);
+        ConfidenceTier tier = (rel == SourceReliability.HIGH) ? ConfidenceTier.HIGH : ConfidenceTier.MEDIUM;
+
+        return new EvidenceTuple(
+                formattedValue,
+                doc.url(),
+                primaryQuote != null ? primaryQuote : "Public professional activity extracted",
+                tier,
+                List.of(doc.url()),
+                false,
+                null,
+                type.name(),
+                "ACTIVITY_FIELD_EXTRACTOR"
+        );
     }
 
     private void extractThemesAndTech(String text, Set<String> themes, Set<String> tech) {
