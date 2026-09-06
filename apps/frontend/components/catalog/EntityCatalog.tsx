@@ -3,8 +3,10 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { EntitySummaryResponse, EntityDetailResponse } from "@/types/dataset";
 import { datasetService } from "@/services/datasetService";
+import { useAuth } from "@/context/AuthContext";
 
 export function EntityCatalog() {
+  const { user } = useAuth();
   const [entities, setEntities] = useState<EntitySummaryResponse[]>([]);
   const [selectedEntity, setSelectedEntity] = useState<EntityDetailResponse | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
@@ -12,21 +14,29 @@ export function EntityCatalog() {
   const [error, setError] = useState<string | null>(null);
 
   const fetchCatalog = useCallback(async () => {
+    if (!user) {
+      setEntities([]);
+      return;
+    }
     try {
       setIsLoading(true);
       setError(null);
       const data = await datasetService.fetchSavedEntities();
-      setEntities(data);
+      setEntities(Array.isArray(data) ? data : []);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to load saved entity catalog");
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
-    fetchCatalog();
-  }, [fetchCatalog]);
+    if (user) {
+      fetchCatalog();
+    } else {
+      setEntities([]);
+    }
+  }, [user, fetchCatalog]);
 
   const loadEntityDetail = async (entityId: string) => {
     try {

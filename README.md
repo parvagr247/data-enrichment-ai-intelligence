@@ -19,6 +19,7 @@ flowchart TB
     end
 
     subgraph BusinessServices ["Isolated Business Services"]
+        Auth["auth-service<br/>(:9739)"]
         Dataset["dataset-service<br/>(:9743)"]
         Research["research-service<br/>(:9741)"]
         AI["ai-intelligent-service<br/>(:9742)"]
@@ -28,6 +29,7 @@ flowchart TB
 
     Client -->|Web UI| Gateway
     Client -->|Direct UI Access| Client
+    Gateway -->|/api/v1/auth/**| Auth
     Gateway -->|/api/v1/enrichment/**| Dataset
     Gateway -->|/api/v1/entities/**| Dataset
     Gateway -->|/api/v1/research/**| Research
@@ -37,6 +39,7 @@ flowchart TB
     BusinessServices -.->|Heartbeat & Register| Discovery
     Gateway -.->|Discover Routes| Discovery
 
+    Auth -->|User Schema & BCrypt| MySQL
     Dataset -->|Parallel Row Research| Research
     Dataset -->|Profile Assessment| AI
     Research -->|Grounded Fact Extraction| AI
@@ -47,13 +50,14 @@ flowchart TB
 
 | Service | Port | Scope | Technology | Purpose |
 | :--- | :--- | :--- | :--- | :--- |
-| **`frontend`** | `3000` | **Public Host** | Next.js 15 / React / Tailwind | Interactive spreadsheet upload, live SSE execution dashboard, evidence modal |
-| **`api-gateway`** | `9738` | **Public Host** | Spring Cloud Gateway WebMvc | Single ingress point, reverse proxy, `X-API-Key` auth, CORS, security headers |
+| **`frontend`** | `3000` | **Public Host** | Next.js 15 / React / Tailwind | Interactive spreadsheet upload, live SSE execution dashboard, evidence modal, auth pages |
+| **`api-gateway`** | `9738` | **Public Host** | Spring Cloud Gateway WebMvc | Ingress point, reverse proxy, JWT Bearer auth, anti-spoofing header injection, CORS |
 | **`config-server`** | `9736` | Internal-only | Spring Cloud Config Server | Centralized file-based (`native`) YAML configurations from `config/` |
 | **`discovery-server`** | `9737` | Internal-only | Spring Cloud Eureka Server | Dynamic service registry and health awareness |
+| **`auth-service`** | `9739` | Internal-only | Spring Boot 4.1.1 / Java 25 | User registration, authentication, BCrypt, HMAC-SHA256 JWT tokens |
 | **`research-service`** | `9741` | Internal-only | Spring Boot 4.1.1 / Java 25 | Web research, scraper guardrails, verbatim extraction, multi-source corroboration |
 | **`ai-intelligent-service`** | `9742` | Internal-only | Spring Boot 4.1.1 / Java 25 | Spring AI (Gemini), prompt templates, zero-hallucination validation, fallback |
-| **`dataset-service`** | `9743` | Internal-only | Spring Boot 4.1.1 / Java 25 | Batch dataset ingestion, bounded async workers (3), SSE streaming, JPA persistence |
+| **`dataset-service`** | `9743` | Internal-only | Spring Boot 4.1.1 / Java 25 | Batch dataset ingestion, bounded async workers (3), SSE streaming, user-scoped JPA persistence |
 | **`mysql`** | `3306` | Internal-only | MySQL 8.0+ | Relational schema persistence with Flyway migrations |
 
 ---

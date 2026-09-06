@@ -30,19 +30,12 @@ import { ResearchProfileModal } from "@/components/results/ResearchProfileModal"
 import { DatasetExport } from "@/components/results/DatasetExport";
 import { SingleEntityResearch } from "@/components/single/SingleEntityResearch";
 import { EntityCatalog } from "@/components/catalog/EntityCatalog";
+import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 
 type WorkflowStep = "UPLOAD" | "PREVIEW" | "MAPPING" | "CONFIG" | "RUNNING" | "RESULTS";
 
 export default function Home() {
-  const { user, loading, logout } = useAuth();
-  const router = useRouter();
-
-  useEffect(() => {
-    if (!loading && !user) {
-      router.push("/login");
-    }
-  }, [loading, user, router]);
-
+  const { user, logout } = useAuth();
   const [activeTab, setActiveTab] = useState<"batch" | "single" | "catalog">("batch");
 
   // Workflow State
@@ -597,32 +590,15 @@ export default function Home() {
     });
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex items-center justify-center">
-        <div className="flex items-center gap-3 text-zinc-500 dark:text-zinc-400">
-          <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-          </svg>
-          <span className="text-sm font-medium">Authenticating...</span>
-        </div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return null;
-  }
-
-  const userInitials = user.name
+  const userInitials = user?.name
     ? user.name.trim().split(' ').length >= 2
       ? (user.name.trim().split(' ')[0][0] + user.name.trim().split(' ')[1][0]).toUpperCase()
       : user.name.slice(0, 2).toUpperCase()
     : 'U';
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 p-4 md:p-8">
+    <ProtectedRoute>
+      <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 p-4 md:p-8">
       <div className="max-w-6xl mx-auto space-y-6">
         {/* Platform Header */}
         <header className="flex flex-col md:flex-row md:items-center md:justify-between pb-4 border-b border-zinc-200 dark:border-zinc-800 gap-4">
@@ -660,10 +636,10 @@ export default function Home() {
                 </div>
                 <div className="text-left hidden sm:block">
                   <div className="text-xs font-medium text-zinc-900 dark:text-zinc-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400">
-                    {user.name}
+                    {user?.name || 'User'}
                   </div>
                   <div className="text-[10px] text-zinc-500 dark:text-zinc-400 max-w-[120px] truncate">
-                    {user.email}
+                    {user?.email || ''}
                   </div>
                 </div>
               </Link>
@@ -868,5 +844,6 @@ export default function Home() {
         {activeTab === "catalog" && <EntityCatalog />}
       </div>
     </div>
+    </ProtectedRoute>
   );
 }

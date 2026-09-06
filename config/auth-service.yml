@@ -18,6 +18,8 @@ spring:
   flyway:
     enabled: ${SPRING_FLYWAY_ENABLED:true}
     baseline-on-migrate: true
+    baseline-version: 0
+    table: flyway_schema_history_auth
     locations: classpath:db/migration
 
 jwt:

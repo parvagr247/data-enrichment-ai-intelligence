@@ -77,7 +77,9 @@ export const datasetService = {
       onError?: (error: any) => void;
     }
   ): () => void {
-    const url = `${ENV.DATASET_SERVICE_URL}/api/v1/enrichment/jobs/${encodeURIComponent(jobId)}/events`;
+    const token = typeof window !== 'undefined' ? localStorage.getItem('enrichment_auth_token') : null;
+    const tokenParam = token ? `?token=${encodeURIComponent(token)}` : '';
+    const url = `${ENV.DATASET_SERVICE_URL}/api/v1/enrichment/jobs/${encodeURIComponent(jobId)}/events${tokenParam}`;
     let eventSource: EventSource | null = null;
 
     try {

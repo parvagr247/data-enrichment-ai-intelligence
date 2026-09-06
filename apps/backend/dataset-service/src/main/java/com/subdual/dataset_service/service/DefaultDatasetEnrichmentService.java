@@ -196,6 +196,11 @@ public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService
 
     @Override
     public RowEnrichmentResult enrichSingle(SingleEnrichmentRequest request) {
+        return enrichSingle(request, null);
+    }
+
+    @Override
+    public RowEnrichmentResult enrichSingle(SingleEnrichmentRequest request, String userId) {
         Map<String, String> row = request.row();
         Map<String, String> mapping = request.columnMapping();
         String entityType = request.entityType();
@@ -204,7 +209,7 @@ public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService
         AiServiceClient.RequirementCallResponse reqResponse = aiServiceClient.interpretRequirement(requirement, entityType, row);
         List<String> targetFields = reqResponse != null ? reqResponse.requestedFields() : List.of();
 
-        return processSingleRow("single-" + System.currentTimeMillis(), 0, row, mapping, entityType, requirement, targetFields, null, "worker-sync", System.currentTimeMillis());
+        return processSingleRow("single-" + System.currentTimeMillis(), 0, row, mapping, entityType, requirement, targetFields, null, "worker-sync", System.currentTimeMillis(), userId);
     }
 
     @Override
@@ -469,7 +474,8 @@ public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService
                                 targetFields,
                                 state.jobId,
                                 workerId,
-                                startedAtMs
+                                startedAtMs,
+                                state.userId
                         );
                         state.rowResultsMap.put(rowIndex, result);
 
@@ -595,7 +601,8 @@ public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService
             List<String> targetFields,
             String jobId,
             String workerId,
-            long startedAtMs
+            long startedAtMs,
+            String explicitUserId
     ) {
         String firstName = extractMappedValue(rawRow, mapping, "firstNameColumn");
         String lastName = extractMappedValue(rawRow, mapping, "lastNameColumn");
@@ -994,7 +1001,9 @@ public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService
 
         try {
             JobState jobState = jobId != null ? activeJobs.get(jobId) : null;
-            String rowUserId = jobState != null ? jobState.userId : null;
+            String rowUserId = (explicitUserId != null && !explicitUserId.isBlank())
+                    ? explicitUserId
+                    : (jobState != null ? jobState.userId : null);
             persistenceService.persistOrUpdate(new PersistEntityRequest(
                     entityId,
                     displayName,

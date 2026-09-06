@@ -29,7 +29,11 @@ public interface DatasetEnrichmentService {
 
     List<EnrichmentJobResponse> listJobs(String userId);
 
-    RowEnrichmentResult enrichSingle(SingleEnrichmentRequest request);
+    default RowEnrichmentResult enrichSingle(SingleEnrichmentRequest request) {
+        return enrichSingle(request, null);
+    }
+
+    RowEnrichmentResult enrichSingle(SingleEnrichmentRequest request, String userId);
 
     default boolean cancelJob(String jobId) {
         return cancelJob(jobId, null);

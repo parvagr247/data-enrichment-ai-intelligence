@@ -63,7 +63,7 @@ class UserIsolationAndOwnershipTest {
     }
 
     @Test
-    @DisplayName("Entity Persistence: Persisting with userId binds entity to that user")
+    @DisplayName("Entity Persistence: Persisting with userId binds entity and scopes entity ID")
     void persistEntity_bindsUserId() {
         PersistEntityRequest request = new PersistEntityRequest(
                 "ent-1",
@@ -74,8 +74,10 @@ class UserIsolationAndOwnershipTest {
                 Map.of()
         );
 
+        String expectedScopedId = persistenceService.resolveScopedEntityId("ent-1", "user-alice");
+
         EnrichedEntity entityWithUser = EnrichedEntity.builder()
-                .entityId("ent-1")
+                .entityId(expectedScopedId)
                 .displayName("Entity One")
                 .entityType("ORGANIZATION")
                 .canonicalUrl("https://example.com/ent1")
@@ -84,20 +86,21 @@ class UserIsolationAndOwnershipTest {
                 .updatedAt(Instant.now())
                 .build();
 
-        when(entityRepository.findById("ent-1")).thenReturn(Optional.empty());
+        when(entityRepository.findByEntityIdAndUserId(expectedScopedId, "user-alice")).thenReturn(Optional.empty());
         when(entityRepository.save(any(EnrichedEntity.class))).thenAnswer(invocation -> {
             EnrichedEntity e = invocation.getArgument(0);
             assertThat(e.getUserId()).isEqualTo("user-alice");
+            assertThat(e.getEntityId()).isEqualTo(expectedScopedId);
             return entityWithUser;
         });
 
         EntityDetailResponse response = persistenceService.persistOrUpdate(request, "user-alice");
         assertThat(response).isNotNull();
-        assertThat(response.entityId()).isEqualTo("ent-1");
+        assertThat(response.entityId()).isEqualTo(expectedScopedId);
     }
 
     @Test
-    @DisplayName("IDOR Protection: User B cannot retrieve User A's entity")
+    @DisplayName("IDOR Protection: User B cannot retrieve User A's entity via findById")
     void findById_preventsCrossUserAccess() {
         EnrichedEntity aliceEntity = EnrichedEntity.builder()
                 .entityId("ent-alice")
@@ -109,7 +112,8 @@ class UserIsolationAndOwnershipTest {
                 .updatedAt(Instant.now())
                 .build();
 
-        when(entityRepository.findById("ent-alice")).thenReturn(Optional.of(aliceEntity));
+        when(entityRepository.findByEntityIdAndUserId("ent-alice", "user-alice")).thenReturn(Optional.of(aliceEntity));
+        when(entityRepository.findByEntityIdAndUserId("ent-alice", "user-bob")).thenReturn(Optional.empty());
 
         // Alice accessing her own entity -> Success
         Optional<EntityDetailResponse> aliceAccess = persistenceService.findById("ent-alice", "user-alice");
@@ -118,6 +122,59 @@ class UserIsolationAndOwnershipTest {
         // Bob attempting to access Alice's entity -> Denied (empty / 404)
         Optional<EntityDetailResponse> bobAccess = persistenceService.findById("ent-alice", "user-bob");
         assertThat(bobAccess).isEmpty();
+
+        // Unauthenticated access -> Denied
+        Optional<EntityDetailResponse> unauthAccess = persistenceService.findById("ent-alice", null);
+        assertThat(unauthAccess).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Data Isolation: Entity Catalog never leaks legacy unowned records or other users' data")
+    void listAll_strictlyFiltersByUserId() {
+        EnrichedEntity aliceEntity = EnrichedEntity.builder()
+                .entityId("ent-alice")
+                .displayName("Alice Entity")
+                .entityType("PERSON")
+                .canonicalUrl("https://example.com/alice")
+                .userId("user-alice")
+                .createdAt(Instant.now())
+                .updatedAt(Instant.now())
+                .build();
+
+        when(entityRepository.findByUserId(org.mockito.ArgumentMatchers.eq("user-alice"), any(org.springframework.data.domain.Sort.class)))
+                .thenReturn(List.of(aliceEntity));
+        when(entityRepository.findByUserId(org.mockito.ArgumentMatchers.eq("user-bob"), any(org.springframework.data.domain.Sort.class)))
+                .thenReturn(List.of());
+
+        // Alice lists her catalog -> only Alice entity
+        List<com.subdual.dataset_service.dto.EntitySummaryResponse> aliceList = persistenceService.listAll("user-alice");
+        assertThat(aliceList).hasSize(1);
+        assertThat(aliceList.get(0).entityId()).isEqualTo("ent-alice");
+
+        // Bob lists his catalog -> 0 entities (no legacy records, no Alice records)
+        List<com.subdual.dataset_service.dto.EntitySummaryResponse> bobList = persistenceService.listAll("user-bob");
+        assertThat(bobList).isEmpty();
+
+        // Unauthenticated list call -> 0 entities
+        List<com.subdual.dataset_service.dto.EntitySummaryResponse> unauthList = persistenceService.listAll(null);
+        assertThat(unauthList).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Cross-User Deduplication: Same canonical URL produces distinct scoped IDs for different users")
+    void crossUserDeduplication_generatesDistinctScopedIds() {
+        String canonicalHash = "08a16bfa8f06bc536d02f59b295b32c88c1dc198a8487e0abe0d5b86888040c1";
+
+        String aliceScopedId = persistenceService.resolveScopedEntityId(canonicalHash, "user-alice");
+        String bobScopedId = persistenceService.resolveScopedEntityId(canonicalHash, "user-bob");
+
+        assertThat(aliceScopedId).isNotNull().hasSize(64);
+        assertThat(bobScopedId).isNotNull().hasSize(64);
+        assertThat(aliceScopedId).isNotEqualTo(bobScopedId);
+
+        // Same user produces identical ID (enabling idempotence / upsert within their own catalog)
+        String aliceScopedIdAgain = persistenceService.resolveScopedEntityId(canonicalHash, "user-alice");
+        assertThat(aliceScopedIdAgain).isEqualTo(aliceScopedId);
     }
 
     @Test

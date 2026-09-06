@@ -44,10 +44,11 @@ public class EntityController {
             @PathVariable String entityId,
             @RequestHeader(value = "X-User-Id", required = false) String userId
     ) {
-        Optional<EntityDetailResponse> opt = (userId != null && !userId.isBlank())
-                ? persistenceService.findById(entityId, userId)
-                : persistenceService.findById(entityId);
-        return opt.map(ResponseEntity::ok)
+        if (userId == null || userId.isBlank()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        return persistenceService.findById(entityId, userId)
+                .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
 
@@ -57,15 +58,14 @@ public class EntityController {
             @RequestParam(required = false) Integer size,
             @RequestHeader(value = "X-User-Id", required = false) String userId
     ) {
+        if (userId == null || userId.isBlank()) {
+            return ResponseEntity.ok(List.of());
+        }
         if (page != null || size != null) {
             int p = page != null ? page : 0;
             int s = size != null ? size : 20;
-            return ResponseEntity.ok((userId != null && !userId.isBlank())
-                    ? persistenceService.list(p, s, userId)
-                    : persistenceService.list(p, s));
+            return ResponseEntity.ok(persistenceService.list(p, s, userId));
         }
-        return ResponseEntity.ok((userId != null && !userId.isBlank())
-                ? persistenceService.listAll(userId)
-                : persistenceService.listAll());
+        return ResponseEntity.ok(persistenceService.listAll(userId));
     }
 }

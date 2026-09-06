@@ -1,34 +1,13 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
+import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 
-export default function AccountPage() {
-  const { user, loading, logout } = useAuth();
-  const router = useRouter();
+function AccountContent() {
+  const { user, logout } = useAuth();
   const [copied, setCopied] = useState(false);
-
-  useEffect(() => {
-    if (!loading && !user) {
-      router.push('/login');
-    }
-  }, [loading, user, router]);
-
-  if (loading || !user) {
-    return (
-      <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex items-center justify-center">
-        <div className="flex items-center gap-3 text-zinc-500">
-          <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-          </svg>
-          <span className="text-sm">Loading user account...</span>
-        </div>
-      </div>
-    );
-  }
 
   const copyUserId = () => {
     if (user?.id) {
@@ -38,7 +17,7 @@ export default function AccountPage() {
     }
   };
 
-  const getInitials = (name: string) => {
+  const getInitials = (name?: string) => {
     if (!name) return 'U';
     const parts = name.trim().split(' ');
     if (parts.length >= 2) {
@@ -47,7 +26,7 @@ export default function AccountPage() {
     return name.slice(0, 2).toUpperCase();
   };
 
-  const formattedDate = user.createdAt
+  const formattedDate = user?.createdAt
     ? new Date(user.createdAt).toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'long',
@@ -84,11 +63,11 @@ export default function AccountPage() {
         <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 p-6 md:p-8 shadow-sm">
           <div className="flex flex-col sm:flex-row sm:items-center gap-5 pb-6 border-b border-zinc-200 dark:border-zinc-800">
             <div className="w-16 h-16 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold text-2xl shadow-lg shadow-indigo-500/20">
-              {getInitials(user.name)}
+              {getInitials(user?.name)}
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{user.name}</h1>
-              <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-0.5">{user.email}</p>
+              <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{user?.name || 'User'}</h1>
+              <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-0.5">{user?.email}</p>
             </div>
           </div>
 
@@ -99,15 +78,17 @@ export default function AccountPage() {
               </span>
               <div className="mt-1 flex items-center gap-2">
                 <code className="text-xs bg-zinc-100 dark:bg-zinc-800 px-2.5 py-1.5 rounded text-zinc-800 dark:text-zinc-200 font-mono select-all break-all">
-                  {user.id}
+                  {user?.id || '—'}
                 </code>
-                <button
-                  type="button"
-                  onClick={copyUserId}
-                  className="px-2.5 py-1.5 text-xs font-medium text-zinc-700 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded transition-colors"
-                >
-                  {copied ? 'Copied!' : 'Copy'}
-                </button>
+                {user?.id && (
+                  <button
+                    type="button"
+                    onClick={copyUserId}
+                    className="px-2.5 py-1.5 text-xs font-medium text-zinc-700 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded transition-colors"
+                  >
+                    {copied ? 'Copied!' : 'Copy'}
+                  </button>
+                )}
               </div>
               <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1.5">
                 All dataset jobs and entity extractions are isolated and owned by this ID.
@@ -144,5 +125,13 @@ export default function AccountPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function AccountPage() {
+  return (
+    <ProtectedRoute>
+      <AccountContent />
+    </ProtectedRoute>
   );
 }

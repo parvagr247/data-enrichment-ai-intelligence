@@ -67,15 +67,20 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return;
         }
 
-        // 4. Validate Bearer token on protected endpoints
+        // 4. Validate Bearer token on protected endpoints (via Authorization header or query parameter for EventSource SSE)
+        String token = null;
         String authHeader = request.getHeader("Authorization");
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            log.warn("Unauthorized request to path='{}': Missing or invalid Authorization header", path);
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            token = authHeader.substring(7).trim();
+        } else if (request.getParameter("token") != null && !request.getParameter("token").isBlank()) {
+            token = request.getParameter("token").trim();
+        }
+
+        if (token == null || token.isEmpty()) {
+            log.warn("Unauthorized request to path='{}': Missing or invalid Authorization token", path);
             sendUnauthorized(response, path, "Missing or invalid Authorization header");
             return;
         }
-
-        String token = authHeader.substring(7).trim();
         try {
             Claims claims = Jwts.parser()
                     .verifyWith(signingKey)

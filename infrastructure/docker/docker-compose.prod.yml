@@ -8,6 +8,12 @@
 #
 # All internal microservices (auth, research, ai, dataset, mysql, config, eureka)
 # are strictly private inside the internal Docker bridge network ("enrichment-network").
+#
+# Image Resolution:
+#   - CI/CD & Registry: Set IMAGE_PREFIX to Artifact Registry repository path
+#     (e.g., us-central1-docker.pkg.dev/project-id/repo-name/)
+#   - Versioning: Set IMAGE_TAG to immutable Git commit SHA (e.g., a1b2c3d)
+#   - Local default: Falls back to enrichment-<service>:latest
 # ==============================================================================
 
 name: data-enrichment-production
@@ -42,6 +48,7 @@ services:
   # 2. Centralized Configuration Server (Internal Only :9736)
   # ----------------------------------------------------------------------------
   config-server:
+    image: ${IMAGE_PREFIX:-}enrichment-config-server:${IMAGE_TAG:-latest}
     build:
       context: ../../apps/backend/config-server
       dockerfile: Dockerfile
@@ -68,6 +75,7 @@ services:
   # 3. Service Discovery Server / Eureka (Internal Only :9737)
   # ----------------------------------------------------------------------------
   discovery-server:
+    image: ${IMAGE_PREFIX:-}enrichment-discovery-server:${IMAGE_TAG:-latest}
     build:
       context: ../../apps/backend/discovery-server
       dockerfile: Dockerfile
@@ -94,6 +102,7 @@ services:
   # 4. Authentication Service (Internal Only :9739)
   # ----------------------------------------------------------------------------
   auth-service:
+    image: ${IMAGE_PREFIX:-}enrichment-auth-service:${IMAGE_TAG:-latest}
     build:
       context: ../../apps/backend/auth-service
       dockerfile: Dockerfile
@@ -129,6 +138,7 @@ services:
   # 5. AI Intelligent Service (Internal Only :9742)
   # ----------------------------------------------------------------------------
   ai-intelligent-service:
+    image: ${IMAGE_PREFIX:-}enrichment-ai-intelligent-service:${IMAGE_TAG:-latest}
     build:
       context: ../../apps/backend/ai-intelligent-service
       dockerfile: Dockerfile
@@ -160,6 +170,7 @@ services:
   # 6. Research Service (Internal Only :9741)
   # ----------------------------------------------------------------------------
   research-service:
+    image: ${IMAGE_PREFIX:-}enrichment-research-service:${IMAGE_TAG:-latest}
     build:
       context: ../../apps/backend/research-service
       dockerfile: Dockerfile
@@ -200,6 +211,7 @@ services:
   # 7. Dataset Service (Internal Only :9743)
   # ----------------------------------------------------------------------------
   dataset-service:
+    image: ${IMAGE_PREFIX:-}enrichment-dataset-service:${IMAGE_TAG:-latest}
     build:
       context: ../../apps/backend/dataset-service
       dockerfile: Dockerfile
@@ -240,6 +252,7 @@ services:
   # 8. API Gateway (Primary External Entrypoint :9738)
   # ----------------------------------------------------------------------------
   api-gateway:
+    image: ${IMAGE_PREFIX:-}enrichment-api-gateway:${IMAGE_TAG:-latest}
     build:
       context: ../../apps/backend/api-gateway
       dockerfile: Dockerfile
@@ -277,6 +290,7 @@ services:
   # 9. Frontend Dashboard (External Entrypoint :3000)
   # ----------------------------------------------------------------------------
   frontend:
+    image: ${IMAGE_PREFIX:-}enrichment-frontend:${IMAGE_TAG:-latest}
     build:
       context: ../../apps/frontend
       dockerfile: Dockerfile

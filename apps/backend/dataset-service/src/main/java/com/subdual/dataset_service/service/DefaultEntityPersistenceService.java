@@ -16,7 +16,11 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -36,7 +40,8 @@ public class DefaultEntityPersistenceService implements EntityPersistenceService
 
     @Override
     public EntityDetailResponse persistOrUpdate(PersistEntityRequest request, String userId) {
-        EnrichedEntity entity = findOrCreateEntity(request.entityId());
+        String effectiveEntityId = resolveScopedEntityId(request.entityId(), userId);
+        EnrichedEntity entity = findOrCreateEntity(effectiveEntityId, userId);
         if (userId != null && !userId.isBlank()) {
             entity.setUserId(userId);
         }
@@ -48,7 +53,29 @@ public class DefaultEntityPersistenceService implements EntityPersistenceService
         return toDetailResponse(saved);
     }
 
-    private EnrichedEntity findOrCreateEntity(String entityId) {
+    public String resolveScopedEntityId(String rawEntityId, String userId) {
+        if (userId == null || userId.isBlank() || rawEntityId == null || rawEntityId.isBlank()) {
+            return rawEntityId;
+        }
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            byte[] hash = md.digest((userId.trim() + ":" + rawEntityId.trim()).getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(hash);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 digest unavailable", e);
+        }
+    }
+
+    private EnrichedEntity findOrCreateEntity(String entityId, String userId) {
+        if (userId != null && !userId.isBlank()) {
+            return entityRepository.findByEntityIdAndUserId(entityId, userId)
+                    .orElseGet(() -> EnrichedEntity.builder()
+                            .entityId(entityId)
+                            .userId(userId)
+                            .sources(new ArrayList<>())
+                            .attributes(new ArrayList<>())
+                            .build());
+        }
         return entityRepository.findById(entityId)
                 .orElseGet(() -> EnrichedEntity.builder()
                         .entityId(entityId)
@@ -127,31 +154,27 @@ public class DefaultEntityPersistenceService implements EntityPersistenceService
     @Override
     @Transactional(readOnly = true)
     public Optional<EntityDetailResponse> findById(String entityId, String userId) {
-        Optional<EnrichedEntity> entityOpt = entityRepository.findById(entityId);
-        if (entityOpt.isEmpty()) {
+        if (userId == null || userId.isBlank()) {
             return Optional.empty();
         }
-        EnrichedEntity entity = entityOpt.get();
-        if (userId != null && !userId.isBlank() && entity.getUserId() != null && !entity.getUserId().equals(userId)) {
-            // IDOR Protection: Prevent User B from inspecting User A's entity details
-            return Optional.empty();
-        }
-        return Optional.of(toDetailResponse(entity));
+        return entityRepository.findByEntityIdAndUserId(entityId, userId)
+                .map(this::toDetailResponse);
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<EntitySummaryResponse> listAll() {
-        return listAll(null);
+        return List.of();
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<EntitySummaryResponse> listAll(String userId) {
+        if (userId == null || userId.isBlank()) {
+            return List.of();
+        }
         Sort sort = Sort.by(Sort.Direction.DESC, "updatedAt");
-        List<EnrichedEntity> list = (userId != null && !userId.isBlank())
-                ? entityRepository.findByUserId(userId, sort)
-                : entityRepository.findAll(sort);
+        List<EnrichedEntity> list = entityRepository.findByUserId(userId, sort);
 
         return list.stream()
                 .map(this::toSummaryResponse)
@@ -161,16 +184,17 @@ public class DefaultEntityPersistenceService implements EntityPersistenceService
     @Override
     @Transactional(readOnly = true)
     public List<EntitySummaryResponse> list(int page, int size) {
-        return list(page, size, null);
+        return List.of();
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<EntitySummaryResponse> list(int page, int size, String userId) {
+        if (userId == null || userId.isBlank()) {
+            return List.of();
+        }
         Pageable pageable = buildPageRequest(page, size);
-        return ((userId != null && !userId.isBlank())
-                ? entityRepository.findByUserId(userId, pageable)
-                : entityRepository.findAll(pageable))
+        return entityRepository.findByUserId(userId, pageable)
                 .map(this::toSummaryResponse)
                 .getContent();
     }

@@ -1,17 +1,18 @@
 # API Reference
 
-This document provides a comprehensive catalog of all REST API endpoints provided by the three Spring Boot microservices.
+This document provides a comprehensive catalog of all REST API endpoints provided by the Spring Boot microservices.
 
 ---
 
 ## 1. API Gateway & Ingress Layer (`:9738`)
 
-All client interactions (including the Next.js Frontend) route through the **API Gateway** on Port `9738`. The Gateway acts as the single unified entry point, enforcing reverse proxy routing, optional API key authentication, strict security headers, and centralized CORS.
+All client interactions (including the Next.js Frontend) route through the **API Gateway** on Port `9738`. The Gateway acts as the single unified entry point, enforcing reverse proxy routing, JWT Bearer authentication, anti-spoofing header normalization, optional API key checks, strict security headers, and centralized CORS.
 
 ### Gateway Routing Table
 
 | Ingress Path Pattern | Destination Microservice | Purpose |
 | :--- | :--- | :--- |
+| `/api/v1/auth/**` | `auth-service:9739` | User registration, authentication, token issuance, profile |
 | `/api/v1/research/**` | `research-service:9741` | Synchronous & async entity research pipelines |
 | `/api/v1/sources/**` | `research-service:9741` | Discovered source retrieval & verification |
 | `/api/v1/ai/**` | `ai-intelligent-service:9742` | Requirement parsing, data cleansing, LLM grounding |
@@ -22,22 +23,27 @@ All client interactions (including the Next.js Frontend) route through the **API
 
 ### Authentication & Ingress Security
 
-* **API Key Header**: `X-API-Key: <key>`
-* **Configuration**: Set via `GATEWAY_API_KEY` environment variable.
-  * **Production Mode**: When `GATEWAY_API_KEY` is non-empty, any request omitting or supplying an incorrect `X-API-Key` is rejected with `401 Unauthorized`.
-  * **Development Mode**: If `GATEWAY_API_KEY` is blank/unset, authentication is bypassed (open-access mode) for frictionless local development.
-* **Public Exceptions**: The following endpoints bypass authentication unconditionally:
-  * `/actuator/health` and `/actuator/info`
-  * HTTP `OPTIONS` requests (CORS preflight)
+1. **JWT Bearer Token Authentication**:
+   * Header: `Authorization: Bearer <jwt>`
+   * Validates tokens signed with HMAC-SHA256 (`jwt.secret`).
+   * **Anti-Spoofing Architecture**: External clients cannot spoof user identity. `HeaderMapRequestWrapper` intercepts all incoming requests, strips any client-supplied `X-User-Id` or `X-User-Email` headers, and injects verified `X-User-Id` and `X-User-Email` headers downstream only after verifying token validity.
+2. **Public Whitelisted Endpoints**:
+   * `POST /api/v1/auth/register`
+   * `POST /api/v1/auth/login`
+   * `/actuator/health` and `/actuator/info`
+   * HTTP `OPTIONS` requests (CORS preflight)
+3. **Optional API Key Check**:
+   * Header: `X-API-Key: <key>`
+   * Configured via `GATEWAY_API_KEY`. When non-empty, checks that `X-API-Key` matches.
 
 ### Gateway Unauthorized Response (`401 Unauthorized`)
 ```json
 {
-  "timestamp": "2026-09-06T19:59:21.823Z",
+  "type": "about:blank",
+  "title": "Unauthorized",
   "status": 401,
-  "error": "Unauthorized",
-  "message": "Invalid or missing API key",
-  "path": "/api/v1/entities"
+  "detail": "Missing or invalid Bearer token",
+  "instance": "/api/v1/enrichment/jobs"
 }
 ```
 
@@ -54,14 +60,98 @@ Every HTTP response mediated through the gateway includes:
 
 | Service | Host Port | Internal Port | Primary Role |
 | :--- | :--- | :--- | :--- |
-| **`api-gateway`** | `9738` | `9738` | Ingress gateway, reverse proxy, CORS, and security |
+| **`api-gateway`** | `9738` | `9738` | Ingress gateway, reverse proxy, JWT auth, anti-spoofing, CORS |
+| **`auth-service`** | Internal | `9739` | User accounts, BCrypt passwords, HMAC-SHA256 JWT tokens |
 | **`research-service`** | Internal | `9741` | Research execution, web scraping, and evidence collection |
 | **`ai-intelligent-service`** | Internal | `9742` | Requirement interpretation, input cleansing, and grounded fact extraction |
 | **`dataset-service`** | Internal | `9743` | Batch enrichment jobs, row-level tracking, and MySQL entity persistence |
 
 ---
 
-## 2. Research Service (`:9741`)
+## 3. Auth Service (`:9739`)
+
+### `POST /api/v1/auth/register`
+Registers a new user account and returns a signed JWT token.
+
+* **Public**: Yes
+* **Headers**: `Content-Type: application/json`
+* **Request Body**:
+```json
+{
+  "name": "Alex Mercer",
+  "email": "alex@example.com",
+  "password": "strongPassword123"
+}
+```
+* **Success Response (`201 Created`)**:
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiJ9...",
+  "user": {
+    "id": "c1f72a44-8d4e-4f3b-8219-c6e8bb2e97aa",
+    "name": "Alex Mercer",
+    "email": "alex@example.com",
+    "createdAt": "2026-09-06T20:15:30Z"
+  }
+}
+```
+* **Error Responses**:
+  * `400 Bad Request`: Validation failure (empty field or invalid email).
+  * `409 Conflict`: Email already registered.
+
+### `POST /api/v1/auth/login`
+Authenticates user credentials and issues a JWT token.
+
+* **Public**: Yes
+* **Headers**: `Content-Type: application/json`
+* **Request Body**:
+```json
+{
+  "email": "alex@example.com",
+  "password": "strongPassword123"
+}
+```
+* **Success Response (`200 OK`)**:
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiJ9...",
+  "user": {
+    "id": "c1f72a44-8d4e-4f3b-8219-c6e8bb2e97aa",
+    "name": "Alex Mercer",
+    "email": "alex@example.com",
+    "createdAt": "2026-09-06T20:15:30Z"
+  }
+}
+```
+* **Error Response (`401 Unauthorized`)**:
+```json
+{
+  "type": "about:blank",
+  "title": "Unauthorized",
+  "status": 401,
+  "detail": "Invalid email or password",
+  "instance": "/api/v1/auth/login"
+}
+```
+
+### `GET /api/v1/auth/me`
+Retrieves the profile of the currently authenticated user.
+
+* **Public**: No (requires Bearer token or Gateway forwarded `X-User-Id` / `X-User-Email`)
+* **Headers**: `Authorization: Bearer <token>`
+* **Success Response (`200 OK`)**:
+```json
+{
+  "id": "c1f72a44-8d4e-4f3b-8219-c6e8bb2e97aa",
+  "name": "Alex Mercer",
+  "email": "alex@example.com",
+  "createdAt": "2026-09-06T20:15:30Z"
+}
+```
+
+---
+
+## 4. Research Service (`:9741`)
 
 ### `POST /api/v1/research`
 Executes synchronous end-to-end research for an entity.
@@ -129,7 +219,7 @@ Polls status and result of a background research job.
 
 ---
 
-## 3. AI Intelligent Service (`:9742`)
+## 5. AI Intelligent Service (`:9742`)
 
 ### `POST /api/v1/ai/requirement`
 Interprets natural language user requirements into structured search guidance.
@@ -206,7 +296,14 @@ Extracts structured factual attributes from scraped text strictly backed by verb
 
 ---
 
-## 4. Dataset Service (`:9743`)
+## 6. Dataset Service (`:9743`)
+
+The Dataset Service orchestrates multi-row batch execution and entity persistence. All endpoints accept an optional or injected `X-User-Id` header (automatically populated by the API Gateway after JWT validation) to enforce tenant isolation and IDOR protection.
+
+### Data Ownership & IDOR Protection
+* **User Scoping**: When `X-User-Id` is present, batch jobs (`JobState`) and persisted entities are bound to that `userId`.
+* **IDOR Prevention**: Calling `GET /api/v1/enrichment/jobs/{jobId}`, `GET .../events`, or `POST .../cancel` on a job owned by another user returns `404 Not Found` (or `403 Forbidden`).
+* **Unowned Compatibility**: Requests without `X-User-Id` or legacy records (`user_id IS NULL`) remain accessible to ensure non-breaking backwards compatibility.
 
 ### `POST /api/v1/enrichment/jobs`
 Submits a batch enrichment job across multiple rows.
@@ -296,7 +393,7 @@ Retrieves full details of a saved entity including all multi-source corroborated
 
 ---
 
-## 5. V2 Unified Intelligence & Ingestion Endpoints
+## 7. V2 Unified Intelligence & Ingestion Endpoints
 
 V2 introduces modular dataset ingestion with format sniffing, data quality profiling, and AI requirement planning.
 All V2 endpoints support the `X-Correlation-ID` header for distributed tracing and return RFC 7807 Problem Detail responses with enriched metadata (`code`, `requestId`, `timestamp`, `details`).

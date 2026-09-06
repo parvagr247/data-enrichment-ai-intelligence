@@ -79,9 +79,14 @@ public class EnrichmentJobController {
     }
 
     @PostMapping(value = "/single", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<RowEnrichmentResult> enrichSingle(@Valid @RequestBody SingleEnrichmentRequest request) {
-        log.info("Executing synchronous single row enrichment");
-        RowEnrichmentResult response = datasetEnrichmentService.enrichSingle(request);
+    public ResponseEntity<RowEnrichmentResult> enrichSingle(
+            @Valid @RequestBody SingleEnrichmentRequest request,
+            @org.springframework.web.bind.annotation.RequestHeader(value = "X-User-Id", required = false) String userId
+    ) {
+        log.info("Executing synchronous single row enrichment for user '{}'", userId);
+        RowEnrichmentResult response = (userId != null && !userId.isBlank())
+                ? datasetEnrichmentService.enrichSingle(request, userId)
+                : datasetEnrichmentService.enrichSingle(request);
         return ResponseEntity.ok(response);
     }
 }
