@@ -83,4 +83,17 @@ class ResearchRequestValidatorTest {
         ResearchRequest request = new ResearchRequest(null, EntityType.PERSON, "Jane Doe");
         assertThatCode(() -> validator.validate(request)).doesNotThrowAnyException();
     }
+
+    @Test
+    @DisplayName("Should accept markdown bracketed URL and unwrap it properly")
+    void shouldAcceptMarkdownBracketedUrl() {
+        ResearchRequest request = new ResearchRequest(
+                "[https://www.linkedin.com/in/krati-mittal](https://www.linkedin.com/in/krati-mittal)",
+                EntityType.PERSON,
+                "Krati Mittal"
+        );
+        assertThatCode(() -> validator.validate(request)).doesNotThrowAnyException();
+        org.assertj.core.api.Assertions.assertThat(request.url())
+                .isEqualTo("https://www.linkedin.com/in/krati-mittal");
+    }
 }

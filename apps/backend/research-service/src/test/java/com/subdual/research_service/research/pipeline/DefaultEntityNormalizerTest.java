@@ -75,4 +75,71 @@ class DefaultEntityNormalizerTest {
         assertThatThrownBy(() -> normalizer.normalize(null))
                 .isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    @DisplayName("Should resolve composite display name from firstName and lastName")
+    void shouldResolveCompositeDisplayName() {
+        ResearchRequest request = new ResearchRequest(
+                null,
+                EntityType.PERSON,
+                null,
+                "MNIT Jaipur",
+                "Lead",
+                java.util.List.of(),
+                com.subdual.research_service.research.model.ResearchDepth.NORMAL,
+                Map.of(),
+                null,
+                "Vardhan",
+                "Bhati",
+                null,
+                "vardhan@example.com",
+                "Jaipur, India"
+        );
+
+        ResearchTarget target = normalizer.normalize(request);
+
+        assertThat(target.displayName()).isEqualTo("Vardhan Bhati");
+        assertThat(target.firstName()).isEqualTo("Vardhan");
+        assertThat(target.lastName()).isEqualTo("Bhati");
+        assertThat(target.email()).isEqualTo("vardhan@example.com");
+        assertThat(target.location()).isEqualTo("Jaipur, India");
+        assertThat(target.organization()).isEqualTo("MNIT Jaipur");
+        assertThat(target.role()).isEqualTo("Lead");
+    }
+
+    @Test
+    @DisplayName("Should generate distinct entity IDs for two people with same name in different organizations")
+    void shouldDistinguishSameNameEntitiesAcrossDifferentOrgs() {
+        ResearchRequest rahulGoogle = new ResearchRequest(
+                null,
+                EntityType.PERSON,
+                "Rahul Sharma",
+                "Google",
+                "Staff SWE",
+                java.util.List.of(),
+                com.subdual.research_service.research.model.ResearchDepth.NORMAL,
+                Map.of(),
+                null
+        );
+
+        ResearchRequest rahulMsft = new ResearchRequest(
+                null,
+                EntityType.PERSON,
+                "Rahul Sharma",
+                "Microsoft",
+                "Principal Architect",
+                java.util.List.of(),
+                com.subdual.research_service.research.model.ResearchDepth.NORMAL,
+                Map.of(),
+                null
+        );
+
+        ResearchTarget target1 = normalizer.normalize(rahulGoogle);
+        ResearchTarget target2 = normalizer.normalize(rahulMsft);
+
+        assertThat(target1.displayName()).isEqualTo("Rahul Sharma");
+        assertThat(target2.displayName()).isEqualTo("Rahul Sharma");
+        assertThat(target1.canonicalUrl()).isNotEqualTo(target2.canonicalUrl());
+        assertThat(target1.entityId()).isNotEqualTo(target2.entityId());
+    }
 }

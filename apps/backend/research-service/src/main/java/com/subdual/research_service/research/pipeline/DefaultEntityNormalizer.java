@@ -25,11 +25,11 @@ public class DefaultEntityNormalizer implements EntityNormalizer {
         
         String rawUrl = request.url() != null ? request.url().trim() : "";
         EntityType type = resolveEntityType(request.entityType(), rawUrl);
-        String displayName = normalizeDisplayName(request.name(), rawUrl);
+        String displayName = resolveCompositeDisplayName(request, rawUrl);
 
-        String canonicalUrl = resolveCanonicalUrl(rawUrl, type, displayName);
+        String canonicalUrl = resolveCanonicalUrl(rawUrl, type, displayName, request.organization());
         String entityId = computeEntityId(canonicalUrl);
-        Map<String, Object> metadata = buildTargetMetadata(request);
+        Map<String, Object> metadata = buildTargetMetadata(request, displayName);
 
         return new ResearchTarget(rawUrl, canonicalUrl, entityId, type, displayName, metadata);
     }
@@ -55,10 +55,65 @@ public class DefaultEntityNormalizer implements EntityNormalizer {
         return EntityType.OTHER;
     }
 
-    private Map<String, Object> buildTargetMetadata(ResearchRequest request) {
+    public String resolveCompositeDisplayName(ResearchRequest request, String fallbackUrl) {
+        if (request == null) return (fallbackUrl != null && !fallbackUrl.isBlank()) ? fallbackUrl : "unnamed";
+
+        String fullName = sanitizeToken(request.fullName());
+        if (fullName != null && !fullName.isBlank()) {
+            return fullName;
+        }
+
+        String firstName = sanitizeToken(request.firstName());
+        String lastName = sanitizeToken(request.lastName());
+        if (firstName != null && !firstName.isBlank() && lastName != null && !lastName.isBlank()) {
+            return firstName + " " + lastName;
+        }
+        if (firstName != null && !firstName.isBlank()) {
+            return firstName;
+        }
+        if (lastName != null && !lastName.isBlank()) {
+            return lastName;
+        }
+
+        String legacyName = sanitizeToken(request.name());
+        if (legacyName != null && !legacyName.isBlank()) {
+            return legacyName;
+        }
+
+        return (fallbackUrl != null && !fallbackUrl.isBlank()) ? fallbackUrl : "unnamed";
+    }
+
+    private String sanitizeToken(String token) {
+        if (token == null) return null;
+        String s = token.trim();
+        if (s.equalsIgnoreCase("null") || s.equalsIgnoreCase("undefined")) {
+            return null;
+        }
+        s = s.replaceAll("\\s+", " ").trim();
+        return s.isBlank() ? null : s;
+    }
+
+    private Map<String, Object> buildTargetMetadata(ResearchRequest request, String displayName) {
         java.util.Map<String, Object> metadata = new java.util.LinkedHashMap<>();
         if (request.metadata() != null) {
             metadata.putAll(request.metadata());
+        }
+        if (request.firstName() != null && !request.firstName().isBlank()) {
+            metadata.put("firstName", request.firstName().trim());
+        }
+        if (request.lastName() != null && !request.lastName().isBlank()) {
+            metadata.put("lastName", request.lastName().trim());
+        }
+        if (request.fullName() != null && !request.fullName().isBlank()) {
+            metadata.put("fullName", request.fullName().trim());
+        } else if (displayName != null && !displayName.isBlank() && !displayName.startsWith("http")) {
+            metadata.put("fullName", displayName);
+        }
+        if (request.email() != null && !request.email().isBlank()) {
+            metadata.put("email", request.email().trim());
+        }
+        if (request.location() != null && !request.location().isBlank()) {
+            metadata.put("location", request.location().trim());
         }
         if (request.organization() != null && !request.organization().isBlank()) {
             metadata.put("organization", request.organization().trim());
@@ -78,11 +133,12 @@ public class DefaultEntityNormalizer implements EntityNormalizer {
         return Map.copyOf(metadata);
     }
 
-    private String resolveCanonicalUrl(String rawUrl, EntityType type, String displayName) {
+    private String resolveCanonicalUrl(String rawUrl, EntityType type, String displayName, String organization) {
         if (!rawUrl.isBlank()) return canonicalizeUrl(rawUrl);
         
         String slug = generateUrnSlug(displayName);
-        return "urn:entity:" + type.name().toLowerCase(Locale.ROOT) + ":" + (slug.isEmpty() ? "unnamed" : slug);
+        String orgSlug = (organization != null && !organization.isBlank()) ? ":" + generateUrnSlug(organization) : "";
+        return "urn:entity:" + type.name().toLowerCase(Locale.ROOT) + ":" + (slug.isEmpty() ? "unnamed" : slug) + orgSlug;
     }
 
     private String generateUrnSlug(String displayName) {
@@ -93,8 +149,18 @@ public class DefaultEntityNormalizer implements EntityNormalizer {
 
     public String canonicalizeUrl(String rawUrl) {
         if (rawUrl == null || rawUrl.isBlank()) return "";
+        String unwrapped = com.subdual.research_service.util.UrlNormalizer.unwrapLink(rawUrl);
+        if (unwrapped.isBlank()) return "";
         try {
-            URI uri = URI.create(rawUrl.trim());
+            int hashIdx = unwrapped.indexOf('#');
+            if (hashIdx >= 0) {
+                unwrapped = unwrapped.substring(0, hashIdx);
+            }
+            unwrapped = unwrapped.replace(" ", "%20");
+            if (!unwrapped.contains("://")) {
+                unwrapped = "https://" + unwrapped;
+            }
+            URI uri = URI.create(unwrapped);
             String scheme = uri.getScheme() != null ? uri.getScheme().toLowerCase(Locale.ROOT) : "https";
             String host = uri.getHost() != null ? uri.getHost().toLowerCase(Locale.ROOT) : "";
             if (com.subdual.research_service.util.UrlNormalizer.isLinkedInInternational(host)) {
@@ -106,7 +172,7 @@ public class DefaultEntityNormalizer implements EntityNormalizer {
 
             return scheme + "://" + host + portPart + path + query;
         } catch (Exception e) {
-            return rawUrl.trim();
+            return unwrapped.trim();
         }
     }
 

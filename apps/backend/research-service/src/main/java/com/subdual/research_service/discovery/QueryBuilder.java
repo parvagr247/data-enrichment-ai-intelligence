@@ -15,6 +15,8 @@ import java.util.Locale;
 @Component
 public class QueryBuilder {
 
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(QueryBuilder.class);
+
     public List<String> buildDiscoveryQueries(ResearchTarget target) {
         if (!isValidTarget(target)) {
             return List.of();
@@ -38,8 +40,11 @@ public class QueryBuilder {
 
         List<ResearchQuery> queries = new ArrayList<>();
         String name = hasDistinctDisplayName(target) ? target.displayName().trim() : "";
+        String org = findContextValue(target, "organization", "company", "employer", "current_organization");
+        String role = findContextValue(target, "role", "title", "position", "currentrole", "headline");
+        String location = findContextValue(target, "location", "city", "country", "headquarters", "based_in");
 
-        // Primary Query: Identity-anchored discovery query
+        // Query 1: Identity / Profile-Anchored Query (URL / Domain / Slug)
         String primary = buildDiscoveryQuery(target);
         if (!primary.isBlank()) {
             queries.add(new ResearchQuery(
@@ -49,13 +54,74 @@ public class QueryBuilder {
             ));
         }
 
-        // Strategy A: EXACT_NAME_AND_ORG
-        String org = findContextValue(target, "organization", "company", "employer", "current_organization");
+        // Query 2: Exact Name + Organization
         if (!name.isBlank() && org != null && !org.isBlank()) {
             queries.add(new ResearchQuery(
                     "\"" + name + "\" \"" + org.trim() + "\"",
                     QueryIntent.ORGANIZATION,
                     QueryStrategy.EXACT_NAME_AND_ORG
+            ));
+        }
+
+        // Query 3: Exact Name + Organization + Role
+        if (!name.isBlank() && org != null && !org.isBlank() && role != null && !role.isBlank()) {
+            queries.add(new ResearchQuery(
+                    "\"" + name + "\" \"" + org.trim() + "\" \"" + role.trim() + "\"",
+                    QueryIntent.ROLE,
+                    QueryStrategy.NAME_AND_INTENT
+            ));
+        }
+
+        // Strategy E: Specific Target Field Queries (NAME_AND_FIELD)
+        if (!name.isBlank() && target.targetFields() != null) {
+            String slug = extractIdentitySlug(target);
+            for (String field : target.targetFields()) {
+                QueryIntent intent = mapFieldToIntent(field);
+                String fieldTerm = normalizeFieldForQuery(field);
+                String queryText;
+                if (org != null && !org.isBlank()) {
+                    queryText = "\"" + name + "\" \"" + org.trim() + "\" " + fieldTerm;
+                } else if (!slug.isBlank()) {
+                    queryText = "\"" + name + "\" " + slug + " " + fieldTerm;
+                } else if (target.seedRole() != null && !target.seedRole().isBlank() && intent != QueryIntent.ROLE) {
+                    queryText = "\"" + name + "\" \"" + target.seedRole().trim() + "\" " + fieldTerm;
+                } else if (!name.contains(" ")) {
+                    queryText = "\"" + name + "\" " + resolveTypeKeyword(target.entityType()) + " " + fieldTerm;
+                } else {
+                    queryText = "\"" + name + "\" " + fieldTerm;
+                }
+                queries.add(new ResearchQuery(
+                        queryText,
+                        intent,
+                        QueryStrategy.NAME_AND_FIELD
+                ));
+            }
+        }
+
+        // Query 4: Exact Name + Role
+        if (!name.isBlank() && role != null && !role.isBlank()) {
+            queries.add(new ResearchQuery(
+                    "\"" + name + "\" \"" + role.trim() + "\"",
+                    QueryIntent.ROLE,
+                    QueryStrategy.NAME_AND_INTENT
+            ));
+        }
+
+        // Query 5: Exact Name + Organization + Platform/Context
+        if (!name.isBlank() && org != null && !org.isBlank()) {
+            queries.add(new ResearchQuery(
+                    "\"" + name + "\" \"" + org.trim() + "\" LinkedIn",
+                    QueryIntent.IDENTITY,
+                    QueryStrategy.CANONICAL_DOMAIN
+            ));
+        }
+
+        // Query 6: Exact Name + Location
+        if (!name.isBlank() && location != null && !location.isBlank()) {
+            queries.add(new ResearchQuery(
+                    "\"" + name + "\" \"" + location.trim() + "\"",
+                    QueryIntent.IDENTITY,
+                    QueryStrategy.NAME_AND_INTENT
             ));
         }
 
@@ -88,19 +154,6 @@ public class QueryBuilder {
             ));
         }
 
-        // Strategy E: NAME_AND_FIELD
-        if (!name.isBlank() && target.targetFields() != null) {
-            for (String field : target.targetFields()) {
-                QueryIntent intent = mapFieldToIntent(field);
-                String fieldTerm = normalizeFieldForQuery(field);
-                queries.add(new ResearchQuery(
-                        "\"" + name + "\" " + fieldTerm,
-                        intent,
-                        QueryStrategy.NAME_AND_FIELD
-                ));
-            }
-        }
-
         // Strategy F: CANONICAL_DOMAIN
         if (hasValidHttpUrl(target)) {
             queries.add(new ResearchQuery(
@@ -110,11 +163,17 @@ public class QueryBuilder {
             ));
         }
 
-        return queries.stream()
+        List<ResearchQuery> filtered = queries.stream()
                 .filter(q -> q.queryText() != null && !q.queryText().isBlank())
                 .distinct()
-                .limit(8)
+                .limit(12)
                 .toList();
+
+        for (ResearchQuery q : filtered) {
+            log.info("[Pipeline: DISCOVERY] Generated query: '{}' (Strategy: {})", q.queryText(), q.strategy());
+        }
+
+        return filtered;
     }
 
     public List<ResearchQuery> buildAdaptiveResearchQueries(ResearchTarget target, List<String> missingFields) {
@@ -259,8 +318,20 @@ public class QueryBuilder {
     }
 
     private String buildNamedAdaptiveQuery(ResearchTarget target, String name, String fieldTerm) {
-        if (target.seedOrganization() != null && !target.seedOrganization().isBlank()) {
-            return "\"" + name + "\" " + fieldTerm + " \"" + target.seedOrganization().trim() + "\"";
+        String org = findContextValue(target, "organization", "company", "employer", "current_organization");
+        if (org != null && !org.isBlank()) {
+            return "\"" + name + "\" \"" + org.trim() + "\" " + fieldTerm;
+        }
+        String slug = extractIdentitySlug(target);
+        if (!slug.isBlank()) {
+            return "\"" + name + "\" " + slug + " " + fieldTerm;
+        }
+        String role = findContextValue(target, "role", "title", "position", "currentrole");
+        if (role != null && !role.isBlank()) {
+            return "\"" + name + "\" \"" + role.trim() + "\" " + fieldTerm;
+        }
+        if (!name.contains(" ")) {
+            return "\"" + name + "\" " + resolveTypeKeyword(target.entityType()) + " " + fieldTerm;
         }
         return "\"" + name + "\" " + fieldTerm;
     }
@@ -373,5 +444,31 @@ public class QueryBuilder {
             return "Java OR \"Spring Boot\" OR backend OR architecture";
         }
         return String.join(" OR ", keywords);
+    }
+
+    public String extractIdentitySlug(ResearchTarget target) {
+        if (target == null) {
+            return "";
+        }
+        String url = target.canonicalUrl() != null && !target.canonicalUrl().isBlank() ? target.canonicalUrl() : target.rawUrl();
+        if (url == null || url.isBlank() || !url.contains("://")) {
+            return "";
+        }
+        try {
+            URI uri = URI.create(url);
+            String path = uri.getPath();
+            if (path == null || path.isBlank() || path.equals("/")) {
+                return "";
+            }
+            String clean = path.replaceAll("^/|/$", "");
+            String[] segments = clean.split("/");
+            if (segments.length > 0) {
+                String last = segments[segments.length - 1].trim();
+                if (!last.isBlank() && !last.equalsIgnoreCase("in") && !last.equalsIgnoreCase("company") && !last.equalsIgnoreCase("profile")) {
+                    return last;
+                }
+            }
+        } catch (Exception ignored) {}
+        return "";
     }
 }

@@ -30,8 +30,12 @@ public class ResearchRequestValidator {
         if (url == null || url.isBlank()) {
             return false;
         }
+        String cleanUrl = com.subdual.research_service.util.UrlNormalizer.unwrapLink(url);
+        if (cleanUrl.isBlank()) {
+            return false;
+        }
         try {
-            URI uri = URI.create(url.trim());
+            URI uri = URI.create(cleanUrl.trim());
             String scheme = uri.getScheme();
             if (scheme == null || (!"http".equalsIgnoreCase(scheme) && !"https".equalsIgnoreCase(scheme))) {
                 return false;

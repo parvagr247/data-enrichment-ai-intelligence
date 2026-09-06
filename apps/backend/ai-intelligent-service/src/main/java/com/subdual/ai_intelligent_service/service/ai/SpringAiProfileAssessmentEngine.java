@@ -17,6 +17,8 @@ import com.subdual.ai_intelligent_service.profile.model.ResearchFinding.FindingT
 import com.subdual.ai_intelligent_service.profile.model.ResearchProfile;
 import com.subdual.ai_intelligent_service.profile.model.ResearchProfile.ActivityItem;
 import com.subdual.ai_intelligent_service.profile.model.ResearchProfile.ExperienceItem;
+import com.subdual.ai_intelligent_service.exception.AiErrorClassifier;
+import com.subdual.ai_intelligent_service.exception.AiErrorClassifier.AiClassification;
 import com.subdual.ai_intelligent_service.profile.model.ResearchProfile.ProjectItem;
 import com.subdual.ai_intelligent_service.prompt.PromptTemplateService;
 import lombok.extern.slf4j.Slf4j;
@@ -89,8 +91,21 @@ public class SpringAiProfileAssessmentEngine implements ProfileAssessmentEngine 
                     return parsed;
                 }
             } catch (Exception ex) {
-                log.warn("[AI_MODEL_RETRY] model='{}' provider='google-genai' stage='PROFILE_ASSESSMENT' entity='{}' attempt={}/{} error='{}'",
-                        properties.model(), request.displayName(), retries + 1, MAX_RETRIES + 1, ex.getMessage());
+                AiClassification classification = AiErrorClassifier.classify(ex);
+                if (classification.isRetryable() && retries < MAX_RETRIES) {
+                    log.warn("[AI_MODEL_RETRY] model='{}' provider='google-genai' stage='PROFILE_ASSESSMENT' entity='{}' attempt={}/{} category='{}' retryable=true error='{}'",
+                            properties.model(), request.displayName(), retries + 1, MAX_RETRIES + 1, classification.category(), classification.sanitizedMessage());
+                    try {
+                        Thread.sleep((retries + 1) * 500L);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        break;
+                    }
+                } else {
+                    log.warn("[AI_MODEL_ABORT] model='{}' provider='google-genai' stage='PROFILE_ASSESSMENT' entity='{}' category='{}' httpStatus={} non-retryable error: {}",
+                            properties.model(), request.displayName(), classification.category(), classification.httpStatusCode(), classification.sanitizedMessage());
+                    break;
+                }
             }
             retries++;
         }

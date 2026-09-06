@@ -159,4 +159,24 @@ class DatasetIngestionServiceTest {
         assertTrue(report.detectedEntityColumns().contains("FullName"));
         assertTrue(report.detectedUrlColumns().contains("Repo"));
     }
+
+    @Test
+    @DisplayName("Should detect composite name roles and recommend composite mapping")
+    void shouldDetectCompositeNameRolesAndRecommendCompositeMapping() {
+        String csv = """
+                First Name,Last Name,URL Link,Company Name,Position
+                Vardhan,Bhati,https://www.linkedin.com/in/vardhan-bhati-33b537326,Entrepreneurship Development Cell MNIT Jaipur,Lead
+                Krati,Mittal,https://www.linkedin.com/in/krati-mittal,JRNI,Lead Engineer
+                """;
+
+        ByteArrayInputStream in = new ByteArrayInputStream(csv.getBytes(StandardCharsets.UTF_8));
+        DatasetProfileReport report = ingestionService.ingestAndProfile(in, "composite.csv");
+
+        assertNotNull(report);
+        assertEquals("First Name", report.recommendedMapping().get("firstNameColumn"));
+        assertEquals("Last Name", report.recommendedMapping().get("lastNameColumn"));
+        assertEquals("URL Link", report.recommendedMapping().get("urlColumn"));
+        assertEquals("Company Name", report.recommendedMapping().get("organizationColumn"));
+        assertEquals("Position", report.recommendedMapping().get("roleColumn"));
+    }
 }

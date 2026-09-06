@@ -189,10 +189,14 @@ class DatasetEnrichmentServiceTest {
         assertNotNull(submitted);
         assertNotNull(submitted.jobId());
 
-        // Wait brief moment for singleThreadExecutor to complete 2 rows
-        Thread.sleep(600);
-
+        // Wait for executor to complete 2 rows
+        long deadline = System.currentTimeMillis() + 3000;
         EnrichmentJobResponse completedJob = enrichmentService.getJob(submitted.jobId()).orElseThrow();
+        while (completedJob.completedRows() + completedJob.failedRows() < 2 && System.currentTimeMillis() < deadline) {
+            Thread.sleep(50);
+            completedJob = enrichmentService.getJob(submitted.jobId()).orElseThrow();
+        }
+
         assertEquals(2, completedJob.totalRows());
         assertEquals(1, completedJob.completedRows());
         assertEquals(1, completedJob.failedRows());
@@ -247,9 +251,13 @@ class DatasetEnrichmentServiceTest {
         assertNotNull(submitted);
 
         // Wait for workers to complete 4 rows
-        Thread.sleep(800);
-
+        long deadline = System.currentTimeMillis() + 4000;
         EnrichmentJobResponse completedJob = enrichmentService.getJob(submitted.jobId()).orElseThrow();
+        while (completedJob.completedRows() + completedJob.failedRows() < 4 && System.currentTimeMillis() < deadline) {
+            Thread.sleep(50);
+            completedJob = enrichmentService.getJob(submitted.jobId()).orElseThrow();
+        }
+
         assertEquals(4, completedJob.totalRows());
         assertEquals(4, completedJob.completedRows());
         assertEquals(0, completedJob.failedRows());
@@ -539,5 +547,133 @@ class DatasetEnrichmentServiceTest {
         assertNotNull(result);
         assertEquals("INSUFFICIENT_EVIDENCE", result.status());
         assertTrue(result.message().contains("insufficient grounded evidence"));
+    }
+
+    @Test
+    @DisplayName("Should correctly build composite name with sanitization")
+    void shouldBuildCompositeNameWithSanitization() {
+        // Case A: First + Last
+        assertEquals("Vardhan Bhati", DefaultDatasetEnrichmentService.buildCompositeName("Vardhan", "Bhati", null, null));
+
+        // Case B: Extra whitespace & casing
+        assertEquals("Krati Mittal", DefaultDatasetEnrichmentService.buildCompositeName("  Krati  ", " Mittal ", null, null));
+
+        // Case C: Full name present takes precedence
+        assertEquals("Vardhan Bhati", DefaultDatasetEnrichmentService.buildCompositeName("Vardhan", "Bhati", "Vardhan Bhati", null));
+
+        // Case D: First Name only
+        assertEquals("Vardhan", DefaultDatasetEnrichmentService.buildCompositeName("Vardhan", null, null, null));
+
+        // Case E: Last Name only
+        assertEquals("Bhati", DefaultDatasetEnrichmentService.buildCompositeName(null, "Bhati", null, null));
+
+        // Case F: "null" / "undefined" string sanitization
+        assertEquals("Vardhan", DefaultDatasetEnrichmentService.buildCompositeName("Vardhan", "null", null, null));
+        assertEquals("Bhati", DefaultDatasetEnrichmentService.buildCompositeName("undefined", "Bhati", null, null));
+        assertNull(DefaultDatasetEnrichmentService.buildCompositeName("null", "undefined", null, null));
+
+        // Case G: Legacy fallback
+        assertEquals("Legacy Name", DefaultDatasetEnrichmentService.buildCompositeName(null, null, null, "Legacy Name"));
+    }
+
+    @Test
+    @DisplayName("Should extract composite identity anchors and pass complete context to research client")
+    void shouldExtractCompositeIdentityAndPassToResearchClient() {
+        when(aiServiceClient.interpretRequirement(anyString(), anyString(), any()))
+                .thenReturn(new AiServiceClient.RequirementCallResponse(
+                        List.of("currentRole", "skills"),
+                        "Target role and skills",
+                        false
+                ));
+
+        org.mockito.ArgumentCaptor<ResearchServiceClient.ResearchCallRequest> captor =
+                org.mockito.ArgumentCaptor.forClass(ResearchServiceClient.ResearchCallRequest.class);
+
+        when(researchServiceClient.executeResearch(captor.capture()))
+                .thenReturn(new ResearchServiceClient.ResearchCallResponse(
+                        "COMPLETED",
+                        "ent-vardhan-1",
+                        new ResearchServiceClient.ResearchCallResult(
+                                "Vardhan Bhati",
+                                "PERSON",
+                                "https://www.linkedin.com/in/vardhan-bhati-33b537326",
+                                Map.of("currentRole", new ResearchServiceClient.EvidenceTupleDto(
+                                        "Lead",
+                                        "https://www.linkedin.com/in/vardhan-bhati-33b537326",
+                                        "Lead at EDC MNIT",
+                                        "HIGH",
+                                        List.of("https://www.linkedin.com/in/vardhan-bhati-33b537326"),
+                                        false
+                                ))
+                        ),
+                        List.of(),
+                        100,
+                        List.of()
+                ));
+
+        when(aiServiceClient.synthesizeEnrichment(any()))
+                .thenReturn(new AiServiceClient.SynthesisCallResponse(
+                        "Vardhan Bhati",
+                        "PERSON",
+                        "https://www.linkedin.com/in/vardhan-bhati-33b537326",
+                        Map.of(
+                                "currentOrganization", new AiServiceClient.AttributeResultCallDto(
+                                        "currentOrganization",
+                                        "MNIT Jaipur",
+                                        "mnit jaipur",
+                                        "HIGH",
+                                        "VERIFIED",
+                                        List.of("https://www.linkedin.com/in/vardhan-bhati-33b537326"),
+                                        "Works at MNIT Jaipur",
+                                        "Verified"
+                                )
+                        ),
+                        List.of(),
+                        List.of(),
+                        0.95,
+                        "mock-model",
+                        50
+                ));
+
+        SingleEnrichmentRequest request = new SingleEnrichmentRequest(
+                Map.of(
+                        "First Name", "Vardhan",
+                        "Last Name", "Bhati",
+                        "URL Link", "https://www.linkedin.com/in/vardhan-bhati-33b537326",
+                        "Company Name", "MNIT Jaipur / Entrepreneurship Development Cell",
+                        "Position", "Lead",
+                        "Email", "vardhan@example.com",
+                        "Location", "Jaipur, India"
+                ),
+                Map.of(
+                        "firstNameColumn", "First Name",
+                        "lastNameColumn", "Last Name",
+                        "urlColumn", "URL Link",
+                        "organizationColumn", "Company Name",
+                        "roleColumn", "Position",
+                        "emailColumn", "Email",
+                        "locationColumn", "Location"
+                ),
+                "PERSON",
+                "Identify Engineering Leaders"
+        );
+
+        RowEnrichmentResult result = enrichmentService.enrichSingle(request);
+
+        assertNotNull(result);
+        assertEquals("COMPLETED", result.status());
+        assertEquals("Vardhan Bhati", result.displayName());
+
+        ResearchServiceClient.ResearchCallRequest capturedRequest = captor.getValue();
+        assertNotNull(capturedRequest);
+        assertEquals("Vardhan Bhati", capturedRequest.name());
+        assertEquals("Vardhan", capturedRequest.firstName());
+        assertEquals("Bhati", capturedRequest.lastName());
+        assertEquals("Vardhan Bhati", capturedRequest.fullName());
+        assertEquals("https://www.linkedin.com/in/vardhan-bhati-33b537326", capturedRequest.url());
+        assertEquals("MNIT Jaipur / Entrepreneurship Development Cell", capturedRequest.organization());
+        assertEquals("Lead", capturedRequest.role());
+        assertEquals("vardhan@example.com", capturedRequest.email());
+        assertEquals("Jaipur, India", capturedRequest.location());
     }
 }

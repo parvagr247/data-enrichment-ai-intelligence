@@ -175,4 +175,86 @@ class EntityResolverTest {
         assertThat(result.score()).isEqualTo(0.98);
         assertThat(result.matchedSignals()).contains("ANCHOR_URL_MATCH: https://github.com/torvalds/linux");
     }
+
+    @Test
+    @DisplayName("Case D: Should treat first-name-only target as AMBIGUOUS without corroborating signals")
+    void shouldTreatFirstNameOnlyAsAmbiguous() {
+        ResearchTarget target = new ResearchTarget(
+                "",
+                "",
+                "id-vardhan-single",
+                EntityType.PERSON,
+                "Vardhan"
+        );
+        ExtractedDocument doc = new ExtractedDocument(
+                "https://random-blog.com/vardhan-article",
+                "Article by Vardhan",
+                null,
+                null,
+                "Vardhan writes about technology trends in 2026.",
+                Instant.now()
+        );
+
+        EntityResolver.ResolutionResult result = resolver.resolve(target, doc);
+
+        assertThat(result.matched()).isFalse();
+        assertThat(result.status()).isEqualTo(EntityResolver.MatchStatus.AMBIGUOUS);
+        assertThat(result.confidence()).isEqualTo(ConfidenceTier.LOW);
+        assertThat(result.reason()).contains("First-name only match without corroborating identity signals");
+    }
+
+    @Test
+    @DisplayName("Case H: Should reject conflicting LinkedIn profile slug on same multi-tenant platform")
+    void shouldRejectConflictingProfileSlug() {
+        ResearchTarget target = new ResearchTarget(
+                "https://www.linkedin.com/in/vardhan-bhati-33b537326",
+                "https://linkedin.com/in/vardhan-bhati-33b537326",
+                "id-vardhan-target",
+                EntityType.PERSON,
+                "Vardhan Bhati"
+        );
+        // Candidate is another person on LinkedIn with a different slug
+        ExtractedDocument doc = new ExtractedDocument(
+                "https://www.linkedin.com/in/vardhan-bhati-other-12345",
+                "Vardhan Bhati - Senior Consultant",
+                null,
+                null,
+                "Vardhan Bhati profile and background details.",
+                Instant.now()
+        );
+
+        EntityResolver.ResolutionResult result = resolver.resolve(target, doc);
+
+        assertThat(result.matched()).isFalse();
+        assertThat(result.status()).isEqualTo(EntityResolver.MatchStatus.NOT_MATCHED);
+        assertThat(result.confidence()).isEqualTo(ConfidenceTier.LOW);
+        assertThat(result.reason()).contains("Conflicting entity identity signals detected");
+    }
+
+    @Test
+    @DisplayName("Case H: Should reject source with conflicting organization in title")
+    void shouldRejectConflictingOrganizationInTitle() {
+        ResearchTarget target = new ResearchTarget(
+                "",
+                "",
+                "id-vardhan-org",
+                EntityType.PERSON,
+                "Vardhan Bhati",
+                java.util.Map.of("organization", "Company A")
+        );
+        ExtractedDocument doc = new ExtractedDocument(
+                "https://techcorp.com/team/vardhan",
+                "Vardhan Bhati - Company B",
+                null,
+                null,
+                "Vardhan Bhati is a software architect at Company B.",
+                Instant.now()
+        );
+
+        EntityResolver.ResolutionResult result = resolver.resolve(target, doc);
+
+        assertThat(result.matched()).isFalse();
+        assertThat(result.confidence()).isEqualTo(ConfidenceTier.LOW);
+        assertThat(result.reason()).contains("Conflicting entity identity signals detected");
+    }
 }

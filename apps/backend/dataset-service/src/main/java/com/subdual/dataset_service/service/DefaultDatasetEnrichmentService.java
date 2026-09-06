@@ -118,9 +118,13 @@ public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService
         if (request.rows() != null) {
             for (int i = 0; i < request.rows().size(); i++) {
                 Map<String, String> row = request.rows().get(i);
+                String firstName = extractMappedValue(row, request.columnMapping(), "firstNameColumn");
+                String lastName = extractMappedValue(row, request.columnMapping(), "lastNameColumn");
+                String fullName = extractMappedValue(row, request.columnMapping(), "fullNameColumn");
                 String name = extractMappedValue(row, request.columnMapping(), "nameColumn");
+                String compositeName = buildCompositeName(firstName, lastName, fullName, name);
                 String url = extractMappedValue(row, request.columnMapping(), "urlColumn");
-                String displayName = (name != null && !name.isBlank()) ? name : (url != null && !url.isBlank() ? url : "Row " + (i + 1));
+                String displayName = (compositeName != null && !compositeName.isBlank()) ? compositeName : (url != null && !url.isBlank() ? url : "Row " + (i + 1));
                 state.rowResultsMap.put(i, new RowEnrichmentResult(
                         jobId + "-row-" + i,
                         i,
@@ -554,15 +558,22 @@ public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService
             String workerId,
             long startedAtMs
     ) {
+        String firstName = extractMappedValue(rawRow, mapping, "firstNameColumn");
+        String lastName = extractMappedValue(rawRow, mapping, "lastNameColumn");
+        String fullName = extractMappedValue(rawRow, mapping, "fullNameColumn");
         String name = extractMappedValue(rawRow, mapping, "nameColumn");
+        String compositeName = buildCompositeName(firstName, lastName, fullName, name);
+
         String url = extractMappedValue(rawRow, mapping, "urlColumn");
         String org = extractMappedValue(rawRow, mapping, "organizationColumn");
         String role = extractMappedValue(rawRow, mapping, "roleColumn");
+        String email = extractMappedValue(rawRow, mapping, "emailColumn");
+        String location = extractMappedValue(rawRow, mapping, "locationColumn");
 
         String rawType = extractMappedValue(rawRow, mapping, "entityTypeColumn");
         String entityType = (rawType != null && !rawType.isBlank()) ? rawType.trim().toUpperCase(Locale.ROOT) : defaultEntityType;
 
-        if ((name == null || name.isBlank()) && (url == null || url.isBlank())) {
+        if ((compositeName == null || compositeName.isBlank()) && (url == null || url.isBlank())) {
             return new RowEnrichmentResult(
                     rowId,
                     rowIndex,
@@ -585,8 +596,11 @@ public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService
             );
         }
 
-        String displayName = name != null ? name : "Unknown";
+        String displayName = (compositeName != null && !compositeName.isBlank()) ? compositeName : "Unknown";
         String canonicalUrl = url != null ? url : "";
+
+        log.info("[Pipeline: IDENTITY] Row #{} Constructed identity: fullName='{}', firstName='{}', lastName='{}', profileUrl='{}', organization='{}', role='{}', email='{}', location='{}'",
+                rowIndex, displayName, firstName, lastName, canonicalUrl, org, role, email, location);
 
         // 1. Discover Sources via Research Service
         emitExecutionEvent(
@@ -608,15 +622,26 @@ public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService
             if (rawRow != null) {
                 metadata.putAll(rawRow);
             }
+            if (firstName != null && !firstName.isBlank()) metadata.put("firstName", firstName);
+            if (lastName != null && !lastName.isBlank()) metadata.put("lastName", lastName);
+            if (fullName != null && !fullName.isBlank()) metadata.put("fullName", fullName);
+            if (email != null && !email.isBlank()) metadata.put("email", email);
+            if (location != null && !location.isBlank()) metadata.put("location", location);
+
             researchResp = researchServiceClient.executeResearch(new ResearchServiceClient.ResearchCallRequest(
                     url,
                     entityType,
-                    name,
+                    displayName,
                     org,
                     role,
                     targetFields,
                     requirement,
-                    metadata
+                    metadata,
+                    firstName,
+                    lastName,
+                    fullName != null ? fullName : displayName,
+                    email,
+                    location
             ));
         } catch (Exception ex) {
             log.warn("Research call failed for row {}: {}", rowIndex, ex.getMessage());
@@ -982,9 +1007,32 @@ public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService
         String mappedCol = mapping.get(columnKey);
         if (mappedCol != null && row.containsKey(mappedCol)) {
             String val = row.get(mappedCol);
-            return (val != null && !val.isBlank()) ? val.trim() : null;
+            if (val != null && !val.isBlank()) {
+                val = val.trim();
+                if ("urlColumn".equals(columnKey)) {
+                    val = unwrapLink(val);
+                }
+                return (val != null && !val.isBlank()) ? val : null;
+            }
         }
         return null;
+    }
+
+    private String unwrapLink(String url) {
+        if (url == null || url.isBlank()) return url;
+        String s = url.trim();
+        if (s.startsWith("[") && s.contains("](") && s.endsWith(")")) {
+            int openParen = s.indexOf("](");
+            s = s.substring(openParen + 2, s.length() - 1).trim();
+        } else if (s.startsWith("[") && s.endsWith("]")) {
+            s = s.substring(1, s.length() - 1).trim();
+        } else if (s.startsWith("<") && s.endsWith(">")) {
+            s = s.substring(1, s.length() - 1).trim();
+        }
+        if ((s.startsWith("\"") && s.endsWith("\"")) || (s.startsWith("'") && s.endsWith("'"))) {
+            s = s.substring(1, s.length() - 1).trim();
+        }
+        return s;
     }
 
     private EnrichmentJobResponse toJobResponse(JobState s) {
@@ -1009,6 +1057,43 @@ public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService
                 s.degradedRows.get(),
                 s.partialRows.get()
         );
+    }
+
+    public static String buildCompositeName(String firstName, String lastName, String fullName, String legacyName) {
+        String cleanFull = sanitizeNameToken(fullName);
+        if (cleanFull != null && !cleanFull.isBlank()) {
+            return cleanFull;
+        }
+
+        String cleanFirst = sanitizeNameToken(firstName);
+        String cleanLast = sanitizeNameToken(lastName);
+
+        if (cleanFirst != null && !cleanFirst.isBlank() && cleanLast != null && !cleanLast.isBlank()) {
+            return cleanFirst + " " + cleanLast;
+        }
+        if (cleanFirst != null && !cleanFirst.isBlank()) {
+            return cleanFirst;
+        }
+        if (cleanLast != null && !cleanLast.isBlank()) {
+            return cleanLast;
+        }
+
+        String cleanLegacy = sanitizeNameToken(legacyName);
+        if (cleanLegacy != null && !cleanLegacy.isBlank()) {
+            return cleanLegacy;
+        }
+
+        return null;
+    }
+
+    private static String sanitizeNameToken(String token) {
+        if (token == null) return null;
+        String s = token.trim();
+        if (s.equalsIgnoreCase("null") || s.equalsIgnoreCase("undefined")) {
+            return null;
+        }
+        s = s.replaceAll("\\s+", " ").trim();
+        return s.isBlank() ? null : s;
     }
 
     private Instant parseInstantSafe(String raw) {

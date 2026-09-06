@@ -49,4 +49,35 @@ class EvidenceMergerTest {
         assertThat(role.conflictDescription()).contains("Conflict detected between");
         assertThat(role.conflictDescription()).contains("Software Engineer").contains("Real Estate Agent");
     }
+
+    @Test
+    @DisplayName("Should cap search snippet evidence confidence at MEDIUM even if HIGH tier provided")
+    void shouldCapSearchSnippetEvidenceAtMediumConfidence() {
+        Map<String, EvidenceTuple> attrs = new LinkedHashMap<>();
+
+        merger.mergeAttribute(attrs, "role", "Software Engineer", "https://site-snippet.com", "John is a Software Engineer", ConfidenceTier.HIGH, "SEARCH_ENGINE", "SEARCH_SNIPPET");
+
+        EvidenceTuple role = attrs.get("role");
+        assertThat(role).isNotNull();
+        assertThat(role.confidence()).isEqualTo(ConfidenceTier.MEDIUM);
+        assertThat(role.extractionMethod()).isEqualTo("SEARCH_SNIPPET");
+    }
+
+    @Test
+    @DisplayName("Should prioritize DIRECT_SOURCE over SEARCH_SNIPPET when evidence values conflict")
+    void shouldPrioritizeDirectSourceOverSearchSnippet() {
+        Map<String, EvidenceTuple> attrs = new LinkedHashMap<>();
+
+        // Snippet claims Real Estate Agent first
+        merger.mergeAttribute(attrs, "role", "Real Estate Agent", "https://snippet-source.com", "Real Estate Agent", ConfidenceTier.MEDIUM, "SEARCH_ENGINE", "SEARCH_SNIPPET");
+
+        // Direct webpage claims Principal Engineer
+        merger.mergeAttribute(attrs, "role", "Principal Engineer", "https://personal-blog.com/about", "Principal Engineer at Google", ConfidenceTier.HIGH, "DIRECT_PAGE", "DIRECT_SOURCE");
+
+        EvidenceTuple role = attrs.get("role");
+        assertThat(role).isNotNull();
+        assertThat(role.value()).isEqualTo("Principal Engineer");
+        assertThat(role.sourceUrl()).isEqualTo("https://personal-blog.com/about");
+        assertThat(role.conflictDetected()).isTrue();
+    }
 }

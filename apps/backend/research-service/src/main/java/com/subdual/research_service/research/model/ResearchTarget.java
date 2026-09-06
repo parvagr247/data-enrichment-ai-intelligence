@@ -41,6 +41,46 @@ public record ResearchTarget(
         return seedRole();
     }
 
+    public String firstName() {
+        if (metadata != null && metadata.containsKey("firstName")) {
+            Object val = metadata.get("firstName");
+            return val != null ? val.toString().trim() : null;
+        }
+        return null;
+    }
+
+    public String lastName() {
+        if (metadata != null && metadata.containsKey("lastName")) {
+            Object val = metadata.get("lastName");
+            return val != null ? val.toString().trim() : null;
+        }
+        return null;
+    }
+
+    public String fullName() {
+        if (metadata != null && metadata.containsKey("fullName")) {
+            Object val = metadata.get("fullName");
+            return val != null ? val.toString().trim() : null;
+        }
+        return null;
+    }
+
+    public String email() {
+        if (metadata != null && metadata.containsKey("email")) {
+            Object val = metadata.get("email");
+            return val != null ? val.toString().trim() : null;
+        }
+        return null;
+    }
+
+    public String location() {
+        if (metadata != null && metadata.containsKey("location")) {
+            Object val = metadata.get("location");
+            return val != null ? val.toString().trim() : null;
+        }
+        return null;
+    }
+
     public List<String> targetFields() {
         if (metadata != null && metadata.containsKey("targetFields")) {
             Object obj = metadata.get("targetFields");

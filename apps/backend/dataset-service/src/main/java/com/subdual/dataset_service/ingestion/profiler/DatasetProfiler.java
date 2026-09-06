@@ -60,6 +60,19 @@ public class DatasetProfiler {
                     detectedEntityCols.add(col);
                     recommendedMapping.putIfAbsent("nameColumn", col);
                 }
+                case FULL_NAME -> {
+                    detectedEntityCols.add(col);
+                    recommendedMapping.putIfAbsent("fullNameColumn", col);
+                    recommendedMapping.putIfAbsent("nameColumn", col);
+                }
+                case FIRST_NAME -> {
+                    detectedEntityCols.add(col);
+                    recommendedMapping.putIfAbsent("firstNameColumn", col);
+                }
+                case LAST_NAME -> {
+                    detectedEntityCols.add(col);
+                    recommendedMapping.putIfAbsent("lastNameColumn", col);
+                }
                 case URL, LINKEDIN_URL -> {
                     detectedUrlCols.add(col);
                     recommendedMapping.putIfAbsent("urlColumn", col);
@@ -72,17 +85,24 @@ public class DatasetProfiler {
                     existingEnrichedCols.add(col);
                     recommendedMapping.putIfAbsent("roleColumn", col);
                 }
+                case EMAIL -> {
+                    recommendedMapping.putIfAbsent("emailColumn", col);
+                }
+                case LOCATION -> {
+                    existingEnrichedCols.add(col);
+                    recommendedMapping.putIfAbsent("locationColumn", col);
+                }
                 case REPOSITORY_URL -> {
                     detectedUrlCols.add(col);
                     recommendedMapping.putIfAbsent("urlColumn", col);
                 }
-                case LOCATION, EDUCATION, SKILLS -> existingEnrichedCols.add(col);
+                case EDUCATION, SKILLS -> existingEnrichedCols.add(col);
                 default -> {}
             }
         }
 
         // 2. Detect lightweight field conflicts across rows with identical name
-        List<String> conflicts = detectLightweightConflicts(rows, recommendedMapping.get("nameColumn"), recommendedMapping.get("organizationColumn"));
+        List<String> conflicts = detectLightweightConflicts(rows, recommendedMapping);
 
         // 3. Calculate explainable quality score (0 to 100)
         QualityAssessment quality = calculateQualityScore(totalRows, columnProfiles, recommendedMapping, rawDataset.malformedRows().size(), rawDataset.duplicateRowIndices().size(), conflicts.size());
@@ -109,15 +129,31 @@ public class DatasetProfiler {
         );
     }
 
-    private List<String> detectLightweightConflicts(List<Map<String, String>> rows, String nameCol, String orgCol) {
-        if (nameCol == null || orgCol == null) return List.of();
+    private List<String> detectLightweightConflicts(List<Map<String, String>> rows, Map<String, String> mapping) {
+        if (mapping == null) return List.of();
+        String nameCol = mapping.get("nameColumn");
+        String fullCol = mapping.get("fullNameColumn");
+        String firstCol = mapping.get("firstNameColumn");
+        String lastCol = mapping.get("lastNameColumn");
+        String orgCol = mapping.get("organizationColumn");
+
+        if (orgCol == null) return List.of();
+        if (nameCol == null && fullCol == null && (firstCol == null && lastCol == null)) return List.of();
 
         List<String> conflicts = new ArrayList<>();
         Map<String, Set<String>> nameToOrgs = new HashMap<>();
         Map<String, String> normToOriginal = new HashMap<>();
 
         for (Map<String, String> row : rows) {
-            String name = row.get(nameCol);
+            String name = null;
+            if (fullCol != null && row.get(fullCol) != null && !row.get(fullCol).isBlank()) {
+                name = row.get(fullCol).trim();
+            } else if (firstCol != null && lastCol != null && row.get(firstCol) != null && row.get(lastCol) != null) {
+                name = (row.get(firstCol).trim() + " " + row.get(lastCol).trim()).trim();
+            } else if (nameCol != null && row.get(nameCol) != null && !row.get(nameCol).isBlank()) {
+                name = row.get(nameCol).trim();
+            }
+
             String org = row.get(orgCol);
             if (name != null && !name.isBlank() && org != null && !org.isBlank()) {
                 String normName = name.trim().toLowerCase(Locale.ROOT);
@@ -155,14 +191,15 @@ public class DatasetProfiler {
         List<String> factors = new ArrayList<>();
 
         // Factor 1: Identifier Presence (Up to 50 pts)
-        boolean hasName = mapping.containsKey("nameColumn");
+        boolean hasName = mapping.containsKey("nameColumn") || mapping.containsKey("fullNameColumn")
+                || (mapping.containsKey("firstNameColumn") && mapping.containsKey("lastNameColumn"));
         boolean hasUrl = mapping.containsKey("urlColumn");
         if (hasName && hasUrl) {
             score += 50.0;
             factors.add("Both Name and URL identifier columns detected (+50)");
         } else if (hasName || hasUrl) {
             score += 35.0;
-            factors.add("Single primary identifier detected (+35)");
+            factors.add("Identity anchor columns detected (+35)");
         } else {
             factors.add("No primary identifier detected (0)");
         }

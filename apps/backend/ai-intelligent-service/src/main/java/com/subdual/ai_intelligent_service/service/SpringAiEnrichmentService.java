@@ -11,6 +11,7 @@ import com.subdual.ai_intelligent_service.dto.InputCleansingRequest;
 import com.subdual.ai_intelligent_service.dto.InputCleansingResponse;
 import com.subdual.ai_intelligent_service.dto.RequirementInterpretationRequest;
 import com.subdual.ai_intelligent_service.dto.RequirementInterpretationResponse;
+import com.subdual.ai_intelligent_service.exception.AiErrorClassifier;
 import com.subdual.ai_intelligent_service.normalization.AiOutputNormalizer;
 import com.subdual.ai_intelligent_service.prompt.PromptTemplates;
 import lombok.extern.slf4j.Slf4j;
@@ -61,7 +62,9 @@ public class SpringAiEnrichmentService implements EnrichmentAIService {
                 String responseText = chatModel.call(new Prompt(promptText)).getResult().getOutput().getText();
                 return parseRequirementResponse(responseText);
             } catch (Exception ex) {
-                log.warn("Spring AI requirement interpretation failed ({}), falling back to deterministic extraction", ex.getMessage());
+                var c = AiErrorClassifier.classify(ex);
+                log.warn("Spring AI requirement interpretation failed [category='{}', status={}, reason='{}'], falling back to deterministic extraction",
+                        c.category(), c.httpStatusCode(), c.sanitizedMessage());
             }
         }
 
@@ -112,7 +115,9 @@ public class SpringAiEnrichmentService implements EnrichmentAIService {
                     return result;
                 }
             } catch (Exception ex) {
-                log.warn("Spring AI enrichment synthesis failed ({}), falling back to deterministic synthesis", ex.getMessage());
+                var c = AiErrorClassifier.classify(ex);
+                log.warn("Spring AI enrichment synthesis failed [category='{}', status={}, reason='{}'], falling back to deterministic synthesis",
+                        c.category(), c.httpStatusCode(), c.sanitizedMessage());
             }
         }
 

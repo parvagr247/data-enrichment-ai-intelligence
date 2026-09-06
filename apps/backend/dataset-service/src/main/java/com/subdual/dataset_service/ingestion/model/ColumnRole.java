@@ -5,6 +5,9 @@ package com.subdual.dataset_service.ingestion.model;
  */
 public enum ColumnRole {
     NAME,
+    FIRST_NAME,
+    LAST_NAME,
+    FULL_NAME,
     URL,
     LINKEDIN_URL,
     COMPANY,

@@ -20,10 +20,56 @@ public final class UrlNormalizer {
     private static final Pattern LINKEDIN_SUBDOMAIN_PATTERN =
             Pattern.compile("^[a-z]{2,3}\\.linkedin\\.com$", Pattern.CASE_INSENSITIVE);
 
+    private static final Pattern MARKDOWN_LINK_PATTERN =
+            Pattern.compile("^\\[.*?\\]\\((https?://[^\\s\\)]+|[^\\s\\)]+)\\)$", Pattern.CASE_INSENSITIVE);
+
     private UrlNormalizer() {}
 
     /**
+     * Unwraps Markdown links [label](url), angle brackets <url>, square brackets [url], or quotes.
+     */
+    public static String unwrapLink(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return "";
+        }
+        String input = raw.trim();
+
+        // 1. Markdown link pattern: [label](targetUrl) or [targetUrl](targetUrl)
+        java.util.regex.Matcher m = MARKDOWN_LINK_PATTERN.matcher(input);
+        if (m.matches()) {
+            input = m.group(1).trim();
+        }
+
+        // 2. Enclosed in quotes: "url" or 'url'
+        if ((input.startsWith("\"") && input.endsWith("\"")) || (input.startsWith("'") && input.endsWith("'"))) {
+            if (input.length() >= 2) {
+                input = input.substring(1, input.length() - 1).trim();
+            }
+        }
+
+        // 3. Enclosed in angle brackets: <url>
+        if (input.startsWith("<") && input.endsWith(">")) {
+            if (input.length() >= 2) {
+                input = input.substring(1, input.length() - 1).trim();
+            }
+        }
+
+        // 4. Enclosed in square brackets without markdown parentheses: [url]
+        if (input.startsWith("[") && input.endsWith("]")) {
+            if (input.length() >= 2) {
+                input = input.substring(1, input.length() - 1).trim();
+            }
+        }
+
+        // 5. Remove any remaining stray leading/trailing brackets, quotes, or parens
+        input = input.replaceAll("^[\\[\\(<\"']+", "").replaceAll("[\\]\\)>\"']+$", "").trim();
+
+        return input;
+    }
+
+    /**
      * Normalizes a URL:
+     * - unwraps Markdown links [label](url), brackets, and quotes
      * - defaults missing scheme to https
      * - normalizes scheme to lowercase (http/https)
      * - strips www. and international LinkedIn country subdomains (e.g. in.linkedin.com -> linkedin.com)
@@ -32,13 +78,18 @@ public final class UrlNormalizer {
      * - removes tracking query parameters (utm_*, ref_*, fbclid, etc.)
      * - sorts remaining query parameters
      * - strips fragment (#...)
+     * - guarantees idempotency: normalize(normalize(url)).equals(normalize(url))
      */
     public static String normalize(String rawUrl) {
         if (rawUrl == null || rawUrl.isBlank()) {
             return "";
         }
 
-        String input = rawUrl.trim();
+        String input = unwrapLink(rawUrl);
+        if (input.isBlank()) {
+            return "";
+        }
+
         int hashIdx = input.indexOf('#');
         if (hashIdx >= 0) {
             input = input.substring(0, hashIdx);

@@ -14,6 +14,8 @@ import java.util.Set;
 @Component
 public class EntityResolver {
 
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(EntityResolver.class);
+
     private static final Set<String> MULTI_TENANT_HOSTS = Set.of(
             "linkedin.com", "github.com", "gitlab.com", "twitter.com", "x.com",
             "facebook.com", "instagram.com", "youtube.com", "medium.com", "wikipedia.org"
@@ -64,6 +66,13 @@ public class EntityResolver {
     }
 
     public ResolutionResult resolve(ResearchTarget target, ExtractedDocument document) {
+        ResolutionResult result = executeResolution(target, document);
+        log.info("[Pipeline: ENTITY_RESOLUTION] Candidate='{}' Decision='{}' Reason='{}' Score={}",
+                document != null ? document.url() : "null", result.status(), result.reason(), result.score());
+        return result;
+    }
+
+    private ResolutionResult executeResolution(ResearchTarget target, ExtractedDocument document) {
         if (!isValidResolutionInput(target, document)) {
             return new ResolutionResult(ConfidenceTier.UNKNOWN, MatchStatus.NOT_MATCHED, false, "Missing target or document", 0.0, java.util.List.of("NO_INPUT"));
         }
@@ -119,6 +128,9 @@ public class EntityResolver {
         }
 
         if (titleMatched) {
+            if (isSingleTokenName(target) && !hasCorroboratingSignals(targetSlug, target, document)) {
+                return new ResolutionResult(ConfidenceTier.LOW, MatchStatus.AMBIGUOUS, false, "Ambiguous: First-name only match without corroborating identity signals", 0.30, java.util.List.of("AMBIGUOUS_FIRST_NAME_ONLY"));
+            }
             if (isAnchoredPersonTarget(target) && !hasCorroboratingSignals(targetSlug, target, document)) {
                 return new ResolutionResult(ConfidenceTier.LOW, MatchStatus.AMBIGUOUS, false, "Rejected: Name-only match without corroborating identity signals", 0.35, java.util.List.of("REJECTED_UNNOTICED_SIGNALS"));
             }
@@ -187,13 +199,17 @@ public class EntityResolver {
     }
 
     private boolean isConflictingEntity(ResearchTarget target, ExtractedDocument document) {
+        if (hasConflictingProfileSlug(target, document)) {
+            return true;
+        }
+
         String lowerText = extractFullDocumentText(document);
 
         if (hasConflictingProfession(lowerText, target)) {
             return true;
         }
 
-        return hasConflictingOrganization(lowerText, target);
+        return hasConflictingOrganization(lowerText, document.title(), target);
     }
 
     private String extractFullDocumentText(ExtractedDocument document) {
@@ -217,14 +233,127 @@ public class EntityResolver {
         return true;
     }
 
-    private boolean hasConflictingOrganization(String lowerText, ResearchTarget target) {
+    private boolean hasConflictingProfileSlug(ResearchTarget target, ExtractedDocument document) {
+        if (target == null || document == null || document.url() == null) return false;
+        String targetUrl = target.canonicalUrl() != null && !target.canonicalUrl().isBlank() ? target.canonicalUrl() : target.rawUrl();
+        if (targetUrl == null || targetUrl.isBlank()) return false;
+
+        String docUrl = document.url();
+        String targetSlug = extractProfileSlug(targetUrl);
+        String docSlug = extractProfileSlug(docUrl);
+
+        if (targetSlug != null && docSlug != null) {
+            String targetHost = extractHostFromUrl(targetUrl);
+            String docHost = extractHostFromUrl(docUrl);
+            if (!targetHost.isBlank() && targetHost.equalsIgnoreCase(docHost)) {
+                return !targetSlug.equalsIgnoreCase(docSlug);
+            }
+        }
+        return false;
+    }
+
+    private String extractProfileSlug(String url) {
+        if (url == null || url.isBlank()) return null;
+        try {
+            String clean = com.subdual.research_service.util.UrlNormalizer.unwrapLink(url);
+            URI uri = URI.create(clean);
+            String host = uri.getHost() != null ? uri.getHost().replaceFirst("^www\\.", "").toLowerCase(Locale.ROOT) : "";
+            String path = uri.getPath();
+            if (path == null) return null;
+
+            if (host.contains("linkedin.com") && path.contains("/in/")) {
+                int idx = path.indexOf("/in/");
+                String sub = path.substring(idx + 4).replaceAll("^/+|/+$", "");
+                int slash = sub.indexOf('/');
+                return slash > 0 ? sub.substring(0, slash) : sub;
+            }
+            if (host.contains("github.com") && !path.isBlank()) {
+                String sub = path.replaceAll("^/+|/+$", "");
+                String[] parts = sub.split("/");
+                if (parts.length >= 1 && !parts[0].isBlank() && !isIgnoredSegment(parts[0])) {
+                    return parts[0];
+                }
+            }
+        } catch (Exception ignored) {}
+        return null;
+    }
+
+    private String extractHostFromUrl(String url) {
+        if (url == null || url.isBlank()) return "";
+        try {
+            URI uri = URI.create(com.subdual.research_service.util.UrlNormalizer.unwrapLink(url));
+            String host = uri.getHost();
+            if (host == null) return "";
+            host = host.replaceFirst("^www\\.", "").toLowerCase(Locale.ROOT);
+            if (com.subdual.research_service.util.UrlNormalizer.isLinkedInInternational(host)) {
+                return "linkedin.com";
+            }
+            return host;
+        } catch (Exception ignored) {
+            return "";
+        }
+    }
+
+    private boolean isSingleTokenName(ResearchTarget target) {
+        if (target == null || target.displayName() == null) return false;
+        String name = target.displayName().trim();
+        return !name.contains(" ") && !name.contains("-");
+    }
+
+    private boolean hasConflictingOrganization(String lowerText, String docTitle, ResearchTarget target) {
         if (target == null || target.seedOrganization() == null || target.seedOrganization().isBlank()) {
             return false;
         }
 
         String seedOrg = target.seedOrganization().toLowerCase(Locale.ROOT);
-        if (!lowerText.contains(seedOrg)) {
-            return lowerText.contains("d. e. shaw") || lowerText.contains("deshaw") || lowerText.contains("iit delhi");
+        String normSeedOrg = OrganizationNormalizer.normalize(target.seedOrganization()).toLowerCase(Locale.ROOT);
+
+        if (lowerText.contains(seedOrg) || (!normSeedOrg.isBlank() && lowerText.contains(normSeedOrg))) {
+            return false;
+        }
+
+        if (target.metadata() != null && target.metadata().containsKey("conflictingOrganizations")) {
+            Object obj = target.metadata().get("conflictingOrganizations");
+            if (obj instanceof java.util.Collection<?> col) {
+                for (Object item : col) {
+                    if (item != null) {
+                        String conflictOrg = item.toString().toLowerCase(Locale.ROOT).trim();
+                        if (!conflictOrg.isBlank() && lowerText.contains(conflictOrg)) {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+
+        if (docTitle != null && !docTitle.isBlank() && target.displayName() != null) {
+            String lowerTitle = docTitle.toLowerCase(Locale.ROOT);
+            String lowerName = target.displayName().toLowerCase(Locale.ROOT);
+            if (lowerTitle.contains(lowerName)) {
+                for (String sep : new String[]{" - ", " | ", " @ ", " at "}) {
+                    int idx = lowerTitle.indexOf(sep);
+                    if (idx > 0) {
+                        String suffix = lowerTitle.substring(idx + sep.length()).trim();
+                        if (!suffix.isBlank() && !suffix.contains(seedOrg) && !normSeedOrg.isEmpty() && !suffix.contains(normSeedOrg)) {
+                            if (suffix.length() >= 3 && !isGenericTitleSuffix(suffix, target)) {
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private boolean isGenericTitleSuffix(String suffix, ResearchTarget target) {
+        String s = suffix.toLowerCase(Locale.ROOT);
+        if (s.contains("linkedin") || s.contains("profile") || s.contains("overview") || s.contains("about") || s.contains("home") || s.contains("posts")) {
+            return true;
+        }
+        if (target.seedRole() != null && s.contains(target.seedRole().toLowerCase(Locale.ROOT))) {
+            return true;
         }
         return false;
     }
@@ -395,6 +524,10 @@ public class EntityResolver {
 
         boolean isPerson = target.entityType() == EntityType.PERSON;
         boolean hasContext = matchesMetadataSignals(target, document);
+
+        if (isSingleTokenName(target) && !hasContext) {
+            return new ResolutionResult(ConfidenceTier.LOW, MatchStatus.AMBIGUOUS, false, "Ambiguous: First-name only match without corroborating identity signals", 0.30, java.util.List.of("AMBIGUOUS_FIRST_NAME_ONLY"));
+        }
 
         if (isPerson && !hasContext && hasAnchorOrMetadata(target)) {
             return new ResolutionResult(ConfidenceTier.LOW, MatchStatus.AMBIGUOUS, false, "Ambiguous: Name-only match without corroborating identity signals", 0.35, java.util.List.of("AMBIGUOUS_NAME_ONLY"));

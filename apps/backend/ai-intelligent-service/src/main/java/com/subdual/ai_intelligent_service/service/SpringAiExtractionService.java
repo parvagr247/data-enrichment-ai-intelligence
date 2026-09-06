@@ -6,6 +6,8 @@ import com.subdual.ai_intelligent_service.configuration.AiProperties;
 import com.subdual.ai_intelligent_service.dto.ExtractedFact;
 import com.subdual.ai_intelligent_service.dto.ExtractionRequest;
 import com.subdual.ai_intelligent_service.dto.ExtractionResponse;
+import com.subdual.ai_intelligent_service.exception.AiErrorClassifier;
+import com.subdual.ai_intelligent_service.exception.AiErrorClassifier.AiClassification;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.prompt.Prompt;
@@ -76,18 +78,49 @@ public class SpringAiExtractionService implements ExtractionService {
     }
 
     private ExtractionExecution executeExtraction(ExtractionRequest request) {
+        long startTime = System.currentTimeMillis();
         if (!isMockMode() && chatModel != null) {
-            try {
-                Map<String, ExtractedFact> facts = extractViaSpringAi(request);
-                return new ExtractionExecution(facts, properties.model());
-            } catch (Exception ex) {
-                log.warn("Spring AI extraction failed ({}), falling back to deterministic extraction", ex.getMessage());
-                return new ExtractionExecution(extractDeterministically(request), "deterministic-fallback");
+            int maxRetries = 2;
+            int attempt = 0;
+            while (attempt <= maxRetries) {
+                attempt++;
+                try {
+                    Map<String, ExtractedFact> facts = extractViaSpringAi(request);
+                    long durationMs = System.currentTimeMillis() - startTime;
+                    log.info("[AI_EXTRACTION] entity='{}' source='{}' model='{}' provider='google-genai' status='SUCCESS' factsExtracted={} durationMs={}",
+                            request.entityName(), request.sourceUrl(), properties.model(), facts.size(), durationMs);
+                    return new ExtractionExecution(facts, properties.model());
+                } catch (Exception ex) {
+                    AiClassification classification = AiErrorClassifier.classify(ex);
+                    long durationMs = System.currentTimeMillis() - startTime;
+                    boolean isDailyQuotaExhausted = classification.sanitizedMessage().toLowerCase(java.util.Locale.ROOT).contains("free_tier_requests")
+                            || classification.sanitizedMessage().toLowerCase(java.util.Locale.ROOT).contains("generaterequestsperday");
+                    if (classification.isRetryable() && !isDailyQuotaExhausted && attempt <= maxRetries) {
+                        log.warn("[AI_EXTRACTION] entity='{}' source='{}' model='{}' attempt={}/{} errorCategory='{}' retryable=true retrying in {}ms (reason: {})",
+                                request.entityName(), request.sourceUrl(), properties.model(), attempt, maxRetries + 1,
+                                classification.category(), attempt * 500L, classification.sanitizedMessage());
+                        try {
+                            Thread.sleep(attempt * 500L);
+                        } catch (InterruptedException ie) {
+                            Thread.currentThread().interrupt();
+                            break;
+                        }
+                    } else {
+                        log.warn("[AI_EXTRACTION] entity='{}' source='{}' model='{}' provider='google-genai' status='FALLBACK' category='{}' httpStatus={} reason='{}' fallback='DETERMINISTIC' durationMs={}",
+                                request.entityName(), request.sourceUrl(), properties.model(),
+                                classification.category(), classification.httpStatusCode(), classification.sanitizedMessage(), durationMs);
+                        return new ExtractionExecution(extractDeterministically(request), "deterministic-fallback");
+                    }
+                }
             }
+            return new ExtractionExecution(extractDeterministically(request), "deterministic-fallback");
         }
 
-        log.info("Executing deterministic fact extraction for entity: '{}'", request.entityName());
-        return new ExtractionExecution(extractDeterministically(request), "deterministic-rule-engine");
+        Map<String, ExtractedFact> facts = extractDeterministically(request);
+        long durationMs = System.currentTimeMillis() - startTime;
+        log.info("[AI_EXTRACTION] entity='{}' source='{}' model='deterministic-rule-engine' provider='local' status='SUCCESS' factsExtracted={} durationMs={}",
+                request.entityName(), request.sourceUrl(), facts.size(), durationMs);
+        return new ExtractionExecution(facts, "deterministic-rule-engine");
     }
 
     private boolean isMockMode() {
@@ -100,7 +133,24 @@ public class SpringAiExtractionService implements ExtractionService {
 
     private Map<String, ExtractedFact> extractViaSpringAi(ExtractionRequest request) {
         String promptText = buildPromptText(request);
-        String rawResponse = chatModel.call(new Prompt(promptText)).getResult().getOutput().getText();
+        String rawResponse;
+        try {
+            java.util.concurrent.CompletableFuture<String> future = java.util.concurrent.CompletableFuture.supplyAsync(() ->
+                    chatModel.call(new Prompt(promptText)).getResult().getOutput().getText()
+            );
+            rawResponse = future.get(15, java.util.concurrent.TimeUnit.SECONDS);
+        } catch (java.util.concurrent.ExecutionException ee) {
+            Throwable cause = ee.getCause() != null ? ee.getCause() : ee;
+            if (cause instanceof RuntimeException re) {
+                throw re;
+            }
+            throw new RuntimeException(cause);
+        } catch (java.util.concurrent.TimeoutException te) {
+            throw new java.util.concurrent.CompletionException(new java.net.SocketTimeoutException("Gemini AI extraction timed out after 15 seconds"));
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("Gemini AI extraction interrupted", ie);
+        }
         return parseSpringAiResponse(rawResponse, request);
     }
 

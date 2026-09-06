@@ -40,13 +40,21 @@ public class EvidenceMerger {
             return;
         }
 
+        ConfidenceTier effectiveTier = tier;
+        if ("SEARCH_SNIPPET".equalsIgnoreCase(extractionMethod)) {
+            // Snippets must not be treated as high-confidence direct source evidence
+            if (effectiveTier == ConfidenceTier.HIGH) {
+                effectiveTier = ConfidenceTier.MEDIUM;
+            }
+        }
+
         EvidenceTuple existing = attributes.get(key);
         if (existing == null) {
             attributes.put(key, new EvidenceTuple(
                     value,
                     sourceUrl,
                     snippet,
-                    tier,
+                    effectiveTier,
                     sourceUrl != null ? List.of(sourceUrl) : List.of(),
                     false,
                     null,
@@ -60,7 +68,7 @@ public class EvidenceMerger {
         if (isAgreement(existing.value(), value)) {
             attributes.put(key, corroborateAgreement(existing, value, snippet, sources, sourceType, extractionMethod));
         } else {
-            attributes.put(key, resolveDisagreement(existing, value, sourceUrl, snippet, tier, sources, sourceType, extractionMethod));
+            attributes.put(key, resolveDisagreement(existing, value, sourceUrl, snippet, effectiveTier, sources, sourceType, extractionMethod));
         }
     }
 
@@ -91,6 +99,10 @@ public class EvidenceMerger {
             combinedSnippet += " | Corroborating: " + snippet;
         }
 
+        String mergedMethod = isDirectSource(existing.extractionMethod())
+                ? existing.extractionMethod()
+                : (extractionMethod != null ? extractionMethod : existing.extractionMethod());
+
         return new EvidenceTuple(
                 existing.value(),
                 existing.sourceUrl(),
@@ -100,7 +112,7 @@ public class EvidenceMerger {
                 existing.conflictDetected(),
                 existing.conflictDescription(),
                 existing.sourceType() != null ? existing.sourceType() : sourceType,
-                existing.extractionMethod() != null ? existing.extractionMethod() : extractionMethod
+                mergedMethod
         );
     }
 
@@ -114,7 +126,17 @@ public class EvidenceMerger {
             String sourceType,
             String extractionMethod
     ) {
-        int comp = compareConfidence(tier, existing.confidence());
+        boolean existingIsDirect = isDirectSource(existing.extractionMethod());
+        boolean newIsDirect = isDirectSource(extractionMethod);
+        int comp;
+        if (existingIsDirect && !newIsDirect) {
+            comp = -1; // Existing direct source takes precedence over snippet
+        } else if (!existingIsDirect && newIsDirect) {
+            comp = 1;  // Incoming direct source takes precedence over existing snippet
+        } else {
+            comp = compareConfidence(tier, existing.confidence());
+        }
+
         String conflictDesc = String.format("Conflict detected between '%s' (%s) and '%s' (%s)",
                 existing.value(), existing.sourceUrl(), value, sourceUrl);
 
@@ -129,6 +151,14 @@ public class EvidenceMerger {
                 ? ConfidenceTier.MEDIUM
                 : existing.confidence();
         return new EvidenceTuple(existing.value(), existing.sourceUrl(), conflictSnippet, resolvedTier, sources, true, conflictDesc, existing.sourceType(), existing.extractionMethod());
+    }
+
+    private boolean isDirectSource(String method) {
+        if (method == null || method.isBlank()) {
+            return false;
+        }
+        String m = method.toUpperCase(Locale.ROOT);
+        return m.contains("DIRECT") || m.contains("FULL_PAGE");
     }
 
     private boolean isAgreement(String v1, String v2) {

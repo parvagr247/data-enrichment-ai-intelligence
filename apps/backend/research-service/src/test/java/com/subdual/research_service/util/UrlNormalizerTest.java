@@ -70,4 +70,48 @@ class UrlNormalizerTest {
         assertThat(UrlNormalizer.isSameUrl(u1, u3)).isTrue();
         assertThat(UrlNormalizer.isSameUrl("https://example.com/user1", "https://example.com/user2")).isFalse();
     }
+
+    @Test
+    @DisplayName("Should unwrap Markdown links and preserve canonical URL")
+    void shouldUnwrapMarkdownLinks() {
+        String markdownSelf = "[https://www.linkedin.com/in/krati-mittal](https://www.linkedin.com/in/krati-mittal)";
+        assertThat(UrlNormalizer.normalize(markdownSelf))
+                .isEqualTo("https://linkedin.com/in/krati-mittal");
+
+        String markdownLabeled = "[Krati Mittal](https://www.linkedin.com/in/krati-mittal)";
+        assertThat(UrlNormalizer.normalize(markdownLabeled))
+                .isEqualTo("https://linkedin.com/in/krati-mittal");
+
+        String angleBracketed = "<https://www.linkedin.com/in/krati-mittal>";
+        assertThat(UrlNormalizer.normalize(angleBracketed))
+                .isEqualTo("https://linkedin.com/in/krati-mittal");
+
+        String squareBracketed = "[https://www.linkedin.com/in/krati-mittal]";
+        assertThat(UrlNormalizer.normalize(squareBracketed))
+                .isEqualTo("https://linkedin.com/in/krati-mittal");
+
+        String quoted = "\"https://www.linkedin.com/in/krati-mittal\"";
+        assertThat(UrlNormalizer.normalize(quoted))
+                .isEqualTo("https://linkedin.com/in/krati-mittal");
+    }
+
+    @Test
+    @DisplayName("Should guarantee strict idempotency across all URL formats")
+    void shouldGuaranteeStrictIdempotency() {
+        String[] samples = {
+                "[https://www.linkedin.com/in/krati-mittal](https://www.linkedin.com/in/krati-mittal)",
+                "https://in.linkedin.com/in/krati-mittal/",
+                "http://example.com/profile/?utm_source=twitter&tab=overview",
+                "[Krati Mittal](https://www.linkedin.com/in/krati-mittal?ref=123)",
+                "github.com/torvalds/linux/"
+        };
+
+        for (String sample : samples) {
+            String once = UrlNormalizer.normalize(sample);
+            String twice = UrlNormalizer.normalize(once);
+            assertThat(twice)
+                    .as("normalize(normalize(url)) must equal normalize(url) for: " + sample)
+                    .isEqualTo(once);
+        }
+    }
 }

@@ -19,6 +19,9 @@ export interface EntitySourceDto {
 
 export type ColumnRole =
   | 'NAME'
+  | 'FIRST_NAME'
+  | 'LAST_NAME'
+  | 'FULL_NAME'
   | 'URL'
   | 'LINKEDIN_URL'
   | 'COMPANY'
@@ -66,9 +69,14 @@ export type RawRow = Record<string, string>;
 
 export interface ColumnMapping {
   nameColumn?: string;
+  firstNameColumn?: string;
+  lastNameColumn?: string;
+  fullNameColumn?: string;
   urlColumn?: string;
   organizationColumn?: string;
   roleColumn?: string;
+  emailColumn?: string;
+  locationColumn?: string;
   entityTypeColumn?: string;
   [key: string]: string | undefined;
 }

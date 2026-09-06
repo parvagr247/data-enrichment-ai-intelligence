@@ -52,9 +52,10 @@ public class RestAiExtractionClient implements AiExtractionClient {
     }
 
     private Map<String, AiExtractedFact> executeExtraction(AiExtractionRequest request, String entityName) {
+        long startTime = System.currentTimeMillis();
         try {
-            log.info("[ServiceMesh: AI_EXTRACTION] Requesting fact extraction from {} for entity '{}'",
-                    serviceUrl, entityName);
+            log.info("[AI_EXTRACTION_REQUEST] upstream='{}' entity='{}' source='{}' fields={}",
+                    serviceUrl, entityName, request.sourceUrl(), request.targetFields());
 
             AiExtractionResponse response = restClient.post()
                     .uri("/api/v1/ai/extract")
@@ -68,10 +69,11 @@ public class RestAiExtractionClient implements AiExtractionClient {
                             errorBody = new String(resp.getBody().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
                         } catch (Exception ignored) {}
                         MediaType ct = resp.getHeaders().getContentType();
-                        log.warn("[ServiceMesh: AI_HTTP_ERROR] Upstream {} returned status={} contentType={} body={}",
-                                serviceUrl, resp.getStatusCode(), ct, errorBody);
+                        String safeError = sanitizeErrorBody(errorBody);
+                        log.warn("[AI_EXTRACTION_HTTP_ERROR] upstream='{}' status={} contentType='{}' body='{}'",
+                                serviceUrl, resp.getStatusCode(), ct, safeError);
                         throw new org.springframework.web.client.RestClientResponseException(
-                                "AI service error: " + resp.getStatusCode() + " - " + errorBody,
+                                "AI service error: " + resp.getStatusCode() + " - " + safeError,
                                 resp.getStatusCode().value(),
                                 resp.getStatusText(),
                                 resp.getHeaders(),
@@ -81,17 +83,26 @@ public class RestAiExtractionClient implements AiExtractionClient {
                     })
                     .body(AiExtractionResponse.class);
 
+            long durationMs = System.currentTimeMillis() - startTime;
             if (response != null && response.facts() != null) {
-                log.info("[ServiceMesh: AI_EXTRACTION] Successfully extracted {} facts for entity '{}'",
-                        response.facts().size(), entityName);
+                log.info("[AI_EXTRACTION] entity='{}' source='{}' status='SUCCESS' factsExtracted={} model='{}' durationMs={}",
+                        entityName, request.sourceUrl(), response.facts().size(),
+                        response.modelUsed() != null ? response.modelUsed() : "unknown", durationMs);
                 return response.facts();
             }
         } catch (Exception ex) {
-            log.warn("[ServiceMesh: AI_EXTRACTION_SKIPPED] AI extraction request to {} failed: {}",
-                    serviceUrl, ex.getMessage());
+            long durationMs = System.currentTimeMillis() - startTime;
+            log.warn("[AI_EXTRACTION] entity='{}' source='{}' status='SKIPPED' reason='{}' durationMs={}",
+                    entityName, request.sourceUrl(), ex.getMessage(), durationMs);
         }
 
         return Collections.emptyMap();
+    }
+
+    private static String sanitizeErrorBody(String raw) {
+        if (raw == null || raw.isBlank()) return "";
+        return raw.replaceAll("(?i)(?:key|token|password|secret|api[_-]?key)[=:\\s]+([A-Za-z0-9_.-]{8,})", "$1=[REDACTED]")
+                  .replaceAll("(?i)(?:AIza|AQ\\.)[A-Za-z0-9_-]{15,}", "[REDACTED_API_KEY]");
     }
 
     private static RestClient createHttpClient(String serviceUrl, RestClient.Builder restClientBuilder) {

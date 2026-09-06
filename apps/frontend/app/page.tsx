@@ -95,9 +95,14 @@ export default function Home() {
       // Prepopulate column mapping from backend recommended mappings
       const initialMapping: ColumnMapping = {
         nameColumn: report.recommendedMapping?.nameColumn,
+        firstNameColumn: report.recommendedMapping?.firstNameColumn,
+        lastNameColumn: report.recommendedMapping?.lastNameColumn,
+        fullNameColumn: report.recommendedMapping?.fullNameColumn,
         urlColumn: report.recommendedMapping?.urlColumn,
         organizationColumn: report.recommendedMapping?.organizationColumn,
         roleColumn: report.recommendedMapping?.roleColumn,
+        emailColumn: report.recommendedMapping?.emailColumn,
+        locationColumn: report.recommendedMapping?.locationColumn,
       };
       setMapping(initialMapping);
 

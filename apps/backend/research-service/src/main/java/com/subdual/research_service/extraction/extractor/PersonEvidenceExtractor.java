@@ -88,90 +88,91 @@ public class PersonEvidenceExtractor {
     private void extractFromDocument(ResearchTarget target, ExtractedDocument doc, Map<String, EvidenceTuple> attributes) {
         String text = doc.cleanText();
         String url = doc.url();
+        String method = doc.extractionMethod();
 
-        extractRoleAndCompany(text, url, attributes);
-        extractRoleLabel(text, url, attributes);
-        extractCompanyLabel(text, url, attributes);
-        extractLocation(text, url, attributes);
-        extractEducation(text, url, attributes);
-        extractSkills(text, url, attributes);
-        extractExperience(text, url, attributes);
-        extractCorroboratedMetadata(target, text, url, attributes);
+        extractRoleAndCompany(text, url, method, attributes);
+        extractRoleLabel(text, url, method, attributes);
+        extractCompanyLabel(text, url, method, attributes);
+        extractLocation(text, url, method, attributes);
+        extractEducation(text, url, method, attributes);
+        extractSkills(text, url, method, attributes);
+        extractExperience(text, url, method, attributes);
+        extractCorroboratedMetadata(target, text, url, method, attributes);
     }
 
-    private void extractRoleAndCompany(String text, String url, Map<String, EvidenceTuple> attributes) {
+    private void extractRoleAndCompany(String text, String url, String method, Map<String, EvidenceTuple> attributes) {
         Matcher matcher = ROLE_AT_COMPANY_PATTERN.matcher(text);
         if (matcher.find()) {
             String role = matcher.group(1).trim();
             String company = matcher.group(2).trim();
-            evidenceMerger.mergeAttribute(attributes, "role", role, url, "Pattern match: \"" + matcher.group(0) + "\"", ConfidenceTier.HIGH);
-            evidenceMerger.mergeAttribute(attributes, "current_organization", company, url, "Pattern match: \"" + matcher.group(0) + "\"", ConfidenceTier.HIGH);
+            evidenceMerger.mergeAttribute(attributes, "role", role, url, "Pattern match: \"" + matcher.group(0) + "\"", ConfidenceTier.HIGH, null, method);
+            evidenceMerger.mergeAttribute(attributes, "current_organization", company, url, "Pattern match: \"" + matcher.group(0) + "\"", ConfidenceTier.HIGH, null, method);
         }
     }
 
-    private void extractRoleLabel(String text, String url, Map<String, EvidenceTuple> attributes) {
+    private void extractRoleLabel(String text, String url, String method, Map<String, EvidenceTuple> attributes) {
         Matcher matcher = ROLE_LABEL_PATTERN.matcher(text);
         if (matcher.find()) {
             String role = matcher.group(1).trim();
-            evidenceMerger.mergeAttribute(attributes, "role", role, url, "Role label: \"" + matcher.group(0).trim() + "\"", ConfidenceTier.HIGH);
+            evidenceMerger.mergeAttribute(attributes, "role", role, url, "Role label: \"" + matcher.group(0).trim() + "\"", ConfidenceTier.HIGH, null, method);
         }
     }
 
-    private void extractCompanyLabel(String text, String url, Map<String, EvidenceTuple> attributes) {
+    private void extractCompanyLabel(String text, String url, String method, Map<String, EvidenceTuple> attributes) {
         Matcher matcher = COMPANY_LABEL_PATTERN.matcher(text);
         if (matcher.find()) {
             String company = matcher.group(1).trim();
-            evidenceMerger.mergeAttribute(attributes, "current_organization", company, url, "Company label: \"" + matcher.group(0).trim() + "\"", ConfidenceTier.HIGH);
+            evidenceMerger.mergeAttribute(attributes, "current_organization", company, url, "Company label: \"" + matcher.group(0).trim() + "\"", ConfidenceTier.HIGH, null, method);
         }
     }
 
-    private void extractLocation(String text, String url, Map<String, EvidenceTuple> attributes) {
+    private void extractLocation(String text, String url, String method, Map<String, EvidenceTuple> attributes) {
         Matcher labelMatcher = LOCATION_LABEL_PATTERN.matcher(text);
         if (labelMatcher.find()) {
             String location = labelMatcher.group(1).trim();
-            evidenceMerger.mergeAttribute(attributes, "location", location, url, "Location label: \"" + labelMatcher.group(0).trim() + "\"", ConfidenceTier.HIGH);
+            evidenceMerger.mergeAttribute(attributes, "location", location, url, "Location label: \"" + labelMatcher.group(0).trim() + "\"", ConfidenceTier.HIGH, null, method);
             return;
         }
 
         Matcher basedMatcher = LOCATION_BASED_IN_PATTERN.matcher(text);
         if (basedMatcher.find()) {
             String location = basedMatcher.group(1).trim();
-            evidenceMerger.mergeAttribute(attributes, "location", location, url, "Location pattern: \"" + basedMatcher.group(0).trim() + "\"", ConfidenceTier.MEDIUM);
+            evidenceMerger.mergeAttribute(attributes, "location", location, url, "Location pattern: \"" + basedMatcher.group(0).trim() + "\"", ConfidenceTier.MEDIUM, null, method);
         }
     }
 
-    private void extractEducation(String text, String url, Map<String, EvidenceTuple> attributes) {
+    private void extractEducation(String text, String url, String method, Map<String, EvidenceTuple> attributes) {
         Matcher labelMatcher = EDUCATION_LABEL_PATTERN.matcher(text);
         if (labelMatcher.find()) {
             String edu = labelMatcher.group(1).trim();
-            evidenceMerger.mergeAttribute(attributes, "education", edu, url, "Education label: \"" + labelMatcher.group(0).trim() + "\"", ConfidenceTier.HIGH);
+            evidenceMerger.mergeAttribute(attributes, "education", edu, url, "Education label: \"" + labelMatcher.group(0).trim() + "\"", ConfidenceTier.HIGH, null, method);
             return;
         }
 
         Matcher gradMatcher = EDUCATION_GRADUATED_PATTERN.matcher(text);
         if (gradMatcher.find()) {
             String edu = gradMatcher.group(1).trim();
-            evidenceMerger.mergeAttribute(attributes, "education", edu, url, "Education pattern: \"" + gradMatcher.group(0).trim() + "\"", ConfidenceTier.HIGH);
+            evidenceMerger.mergeAttribute(attributes, "education", edu, url, "Education pattern: \"" + gradMatcher.group(0).trim() + "\"", ConfidenceTier.HIGH, null, method);
         }
     }
 
-    private void extractSkills(String text, String url, Map<String, EvidenceTuple> attributes) {
+    private void extractSkills(String text, String url, String method, Map<String, EvidenceTuple> attributes) {
         Matcher matcher = SKILLS_LABEL_PATTERN.matcher(text);
         if (matcher.find()) {
             String skills = matcher.group(1).trim();
-            evidenceMerger.mergeAttribute(attributes, "skills", skills, url, "Skills label: \"" + matcher.group(0).trim() + "\"", ConfidenceTier.HIGH);
+            evidenceMerger.mergeAttribute(attributes, "skills", skills, url, "Skills label: \"" + matcher.group(0).trim() + "\"", ConfidenceTier.HIGH, null, method);
         }
     }
 
-    private void extractExperience(String text, String url, Map<String, EvidenceTuple> attributes) {
+    private void extractExperience(String text, String url, String method, Map<String, EvidenceTuple> attributes) {
         Matcher matcher = EXPERIENCE_LABEL_PATTERN.matcher(text);
         if (matcher.find()) {
             String exp = matcher.group(1).trim();
-            evidenceMerger.mergeAttribute(attributes, "experience", exp, url, "Experience label: \"" + matcher.group(0).trim() + "\"", ConfidenceTier.HIGH);
+            evidenceMerger.mergeAttribute(attributes, "experience", exp, url, "Experience label: \"" + matcher.group(0).trim() + "\"", ConfidenceTier.HIGH, null, method);
         }
     }
 
-    private void extractCorroboratedMetadata(ResearchTarget target, String text, String url, Map<String, EvidenceTuple> attributes) {
+    private void extractCorroboratedMetadata(ResearchTarget target, String text, String url, String method, Map<String, EvidenceTuple> attributes) {
         if (target == null || target.metadata() == null) {
             return;
         }
@@ -183,7 +184,7 @@ public class PersonEvidenceExtractor {
                 if (valStr.length() >= 3 && lowerText.contains(valStr.toLowerCase(Locale.ROOT))) {
                     String attrKey = normalizeMetadataKey(k);
                     if (!attributes.containsKey(attrKey)) {
-                        evidenceMerger.mergeAttribute(attributes, attrKey, valStr, url, "Corroborated by document text: \"" + valStr + "\"", ConfidenceTier.HIGH);
+                        evidenceMerger.mergeAttribute(attributes, attrKey, valStr, url, "Corroborated by document text: \"" + valStr + "\"", ConfidenceTier.HIGH, null, method);
                     }
                 }
             }

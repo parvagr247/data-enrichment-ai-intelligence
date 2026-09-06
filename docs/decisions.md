@@ -86,6 +86,34 @@ This document records the foundational **Architecture Decision Records (ADRs)**,
 
 ---
 
+### ADR 07: AI Error Classification, Bounded Timeouts, and Gemini 3.5 Flash Lite
+* **Status**: Accepted & Active
+* **Context**: Older Gemini models (e.g. `gemini-2.0-flash`) were retired/deprecated by Google GenAI (returning HTTP 404), and transient/rate-limit errors caused repeated retries that hung the research pipeline.
+* **Decision**:
+  1. Transition default production model to active `gemini-3.5-flash-lite`.
+  2. Implement `AiErrorClassifier` to categorize errors into `AUTHENTICATION_FAILURE`, `UNSUPPORTED_MODEL`, `RATE_LIMIT`, `TIMEOUT`, `NETWORK_FAILURE`, `SERVER_ERROR`, `STRUCTURED_PARSING_FAILURE`.
+  3. Enforce safe credential redacting in diagnostic logs (`[REDACTED_API_KEY]`).
+  4. Enforce 15-second bounded execution timeouts on LLM calls with immediate deterministic extraction fallback on permanent failures or daily quota exhaustion.
+* **Consequences**:
+  - *Positive*: Zero unhandled AI exceptions leaking upstream; research pipeline never blocks on external provider outages.
+  - *Positive*: Structured observability via `[AI_EXTRACTION]` logging without credential leakage.
+
+---
+
+### ADR 08: Idempotent URL Normalization and Evidence Quality Tiering
+* **Status**: Accepted & Active
+* **Context**: Markdown-wrapped URLs (e.g. `[https://...](https://...)`) polluted canonical entity IDs, and search provider snippet fallbacks were conflated with direct verified crawl evidence.
+* **Decision**:
+  1. Enforce strict link unwrapping (`unwrapLink`) and scheme normalization across all service boundaries (`ResearchRequest`, `ResearchRequestValidator`, `DefaultEntityNormalizer`, `DefaultDatasetEnrichmentService`), guaranteeing idempotency (`normalize(normalize(x)) == normalize(x)`).
+  2. Define `EvidenceQuality` tiers (`DIRECT_SOURCE`, `SEARCH_SNIPPET`, `OTHER_PROVIDER_RESULT`, `DERIVED_INFERRED`).
+  3. Search snippets used as fallback when direct crawling is blocked (e.g. anti-bot HTTP 999) are capped at `MEDIUM` confidence and yield to `DIRECT_SOURCE` in conflict resolution.
+  4. Anchor common names in discovery queries with known organization, canonical profile URL slugs, or roles.
+* **Consequences**:
+  - *Positive*: Clean entity deduplication and canonical URLs free of markdown artifacts.
+  - *Positive*: Transparent fact provenance distinguishing directly crawled pages from search engine snippets.
+
+---
+
 ## 2. System Evolution History
 
 ```mermaid

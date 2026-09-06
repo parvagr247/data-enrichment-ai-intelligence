@@ -50,9 +50,16 @@ public class ColumnRoleDetector {
         if (cleanHeader.contains("skill") || cleanHeader.contains("techstack") || cleanHeader.contains("technolog")) {
             return ColumnRole.SKILLS;
         }
-        if (cleanHeader.equals("name") || cleanHeader.equals("fullname") || cleanHeader.equals("personname")
-                || cleanHeader.equals("person") || cleanHeader.equals("author") || cleanHeader.equals("founder")
-                || cleanHeader.equals("entityname")) {
+        if (cleanHeader.contains("firstname") || cleanHeader.equals("first") || cleanHeader.contains("givenname") || cleanHeader.contains("forename")) {
+            return ColumnRole.FIRST_NAME;
+        }
+        if (cleanHeader.contains("lastname") || cleanHeader.equals("last") || cleanHeader.contains("surname") || cleanHeader.contains("familyname")) {
+            return ColumnRole.LAST_NAME;
+        }
+        if (cleanHeader.equals("fullname") || cleanHeader.equals("personname") || cleanHeader.equals("entityname")) {
+            return ColumnRole.FULL_NAME;
+        }
+        if (cleanHeader.equals("name") || cleanHeader.equals("person") || cleanHeader.equals("author") || cleanHeader.equals("founder")) {
             return ColumnRole.NAME;
         }
         if (cleanHeader.contains("url") || cleanHeader.contains("website") || cleanHeader.contains("link")
