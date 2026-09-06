@@ -123,4 +123,56 @@ class EntityResolverTest {
         assertThat(result.confidence()).isEqualTo(ConfidenceTier.LOW);
         assertThat(result.matched()).isFalse();
     }
+
+    @Test
+    @DisplayName("Should resolve and match with normalized name when honorific is present")
+    void shouldResolveWithNormalizedName() {
+        ResearchTarget target = new ResearchTarget(
+                "https://example.com/dr-jane-doe",
+                "https://example.com/dr-jane-doe",
+                "id-5",
+                EntityType.PERSON,
+                "Dr. Jane Doe"
+        );
+        ExtractedDocument doc = new ExtractedDocument(
+                "https://example.com/blog/jane-doe-research",
+                "Jane Doe - Research and Innovations",
+                null,
+                null,
+                "Jane Doe discusses AI systems.",
+                Instant.now()
+        );
+
+        EntityResolver.ResolutionResult result = resolver.resolve(target, doc);
+
+        assertThat(result.matched()).isTrue();
+        assertThat(result.score()).isGreaterThanOrEqualTo(0.85);
+        assertThat(result.matchedSignals()).isNotEmpty();
+    }
+
+    @Test
+    @DisplayName("Should populate matched signals audit trail with score between 0.0 and 1.0")
+    void shouldPopulateMatchedSignalsAndScore() {
+        ResearchTarget target = new ResearchTarget(
+                "https://github.com/torvalds/linux",
+                "https://github.com/torvalds/linux",
+                "id-6",
+                EntityType.REPOSITORY,
+                "Linux"
+        );
+        ExtractedDocument doc = new ExtractedDocument(
+                "https://github.com/torvalds/linux",
+                "Linux Kernel Source Tree",
+                null,
+                null,
+                "The Linux kernel source code repository.",
+                Instant.now()
+        );
+
+        EntityResolver.ResolutionResult result = resolver.resolve(target, doc);
+
+        assertThat(result.matched()).isTrue();
+        assertThat(result.score()).isEqualTo(0.98);
+        assertThat(result.matchedSignals()).contains("ANCHOR_URL_MATCH: https://github.com/torvalds/linux");
+    }
 }

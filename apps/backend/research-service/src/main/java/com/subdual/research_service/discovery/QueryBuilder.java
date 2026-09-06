@@ -1,5 +1,8 @@
 package com.subdual.research_service.discovery;
 
+import com.subdual.research_service.discovery.model.QueryIntent;
+import com.subdual.research_service.discovery.model.QueryStrategy;
+import com.subdual.research_service.discovery.model.ResearchQuery;
 import com.subdual.research_service.research.model.EntityType;
 import com.subdual.research_service.research.model.ResearchTarget;
 import org.springframework.stereotype.Component;
@@ -17,11 +20,100 @@ public class QueryBuilder {
             return List.of();
         }
 
-        List<String> queries = new ArrayList<>();
-        addPrimaryQuery(queries, target);
-        addAlternativeQueries(queries, target);
+        List<ResearchQuery> queries = buildRequirementQueries(target);
+        if (queries.isEmpty()) {
+            List<String> fallback = new ArrayList<>();
+            addPrimaryQuery(fallback, target);
+            addAlternativeQueries(fallback, target);
+            return fallback.stream().distinct().limit(5).toList();
+        }
 
-        return queries.stream().distinct().limit(5).toList();
+        return queries.stream().map(ResearchQuery::queryText).distinct().limit(5).toList();
+    }
+
+    public List<ResearchQuery> buildRequirementQueries(ResearchTarget target) {
+        if (!isValidTarget(target)) {
+            return List.of();
+        }
+
+        List<ResearchQuery> queries = new ArrayList<>();
+        String name = hasDistinctDisplayName(target) ? target.displayName().trim() : "";
+
+        // Primary Query: Identity-anchored discovery query
+        String primary = buildDiscoveryQuery(target);
+        if (!primary.isBlank()) {
+            queries.add(new ResearchQuery(
+                    primary,
+                    QueryIntent.IDENTITY,
+                    QueryStrategy.CANONICAL_DOMAIN
+            ));
+        }
+
+        // Strategy A: EXACT_NAME_AND_ORG
+        String org = findContextValue(target, "organization", "company", "employer", "current_organization");
+        if (!name.isBlank() && org != null && !org.isBlank()) {
+            queries.add(new ResearchQuery(
+                    "\"" + name + "\" \"" + org.trim() + "\"",
+                    QueryIntent.ORGANIZATION,
+                    QueryStrategy.EXACT_NAME_AND_ORG
+            ));
+        }
+
+        // Strategy B: NAME_AND_FIELD
+        if (!name.isBlank() && target.targetFields() != null) {
+            for (String field : target.targetFields()) {
+                QueryIntent intent = mapFieldToIntent(field);
+                String fieldTerm = normalizeFieldForQuery(field);
+                queries.add(new ResearchQuery(
+                        "\"" + name + "\" " + fieldTerm,
+                        intent,
+                        QueryStrategy.NAME_AND_FIELD
+                ));
+            }
+        }
+
+        // Strategy C: CANONICAL_DOMAIN
+        if (hasValidHttpUrl(target)) {
+            queries.add(new ResearchQuery(
+                    buildUrlOnlyQuery(target),
+                    QueryIntent.IDENTITY,
+                    QueryStrategy.CANONICAL_DOMAIN
+            ));
+        }
+
+        return queries.stream()
+                .filter(q -> q.queryText() != null && !q.queryText().isBlank())
+                .distinct()
+                .limit(6)
+                .toList();
+    }
+
+    public List<ResearchQuery> buildAdaptiveResearchQueries(ResearchTarget target, List<String> missingFields) {
+        if (missingFields == null || missingFields.isEmpty() || !isValidTarget(target)) {
+            return buildRequirementQueries(target);
+        }
+
+        List<ResearchQuery> queries = new ArrayList<>();
+        for (String field : missingFields) {
+            QueryIntent intent = mapFieldToIntent(field);
+            String queryText = constructAdaptiveQuery(target, normalizeFieldForQuery(field));
+            queries.add(new ResearchQuery(queryText, intent, QueryStrategy.NAME_AND_FIELD));
+        }
+        return queries;
+    }
+
+    public static QueryIntent mapFieldToIntent(String field) {
+        if (field == null) return QueryIntent.GENERAL_PROFILE;
+        String lower = field.toLowerCase(Locale.ROOT).trim();
+        return switch (lower) {
+            case "role", "title", "position", "currentrole" -> QueryIntent.ROLE;
+            case "organization", "company", "employer" -> QueryIntent.ORGANIZATION;
+            case "education", "degree", "university", "college", "alumni" -> QueryIntent.EDUCATION;
+            case "location", "city", "country", "headquarters", "based_in" -> QueryIntent.LOCATION;
+            case "skills", "technologies", "tech_stack", "languages" -> QueryIntent.TECHNOLOGY;
+            case "product", "products", "services" -> QueryIntent.PRODUCT;
+            default -> QueryIntent.GENERAL_PROFILE;
+        };
     }
 
     public String buildAdaptiveQuery(ResearchTarget target, List<String> missingFields) {

@@ -219,3 +219,161 @@ Lists catalog of saved entities from MySQL with pagination.
 
 ### `GET /api/v1/entities/{id}`
 Retrieves full details of a saved entity including all multi-source corroborated attributes and source URLs.
+
+---
+
+## 5. V2 Unified Intelligence & Ingestion Endpoints
+
+V2 introduces modular dataset ingestion with format sniffing, data quality profiling, and AI requirement planning.
+All V2 endpoints support the `X-Correlation-ID` header for distributed tracing and return RFC 7807 Problem Detail responses with enriched metadata (`code`, `requestId`, `timestamp`, `details`).
+
+### `POST /api/v2/datasets/upload` (`dataset-service :9743`)
+Uploads a CSV or Excel (`.xlsx`) dataset. Sniffs delimiters (comma, semicolon, tab), parses quotes and multiline cells, and isolates malformed rows without failing the batch.
+
+* **Headers**: `Content-Type: multipart/form-data`, `Accept: application/json`
+* **Form Data**: `file` (binary CSV or XLSX)
+* **Response `200 OK`**:
+  ```json
+  {
+    "datasetName": "team_members.csv",
+    "headers": ["Full Name", "Company", "Role", "LinkedIn Profile"],
+    "rows": [
+      {
+        "Full Name": "Alice Smith",
+        "Company": "Stripe",
+        "Role": "Staff Engineer",
+        "LinkedIn Profile": "https://www.linkedin.com/in/alicesmith"
+      }
+    ],
+    "malformedRows": [],
+    "totalRowCount": 1
+  }
+  ```
+
+### `POST /api/v2/datasets/profile` (`dataset-service :9743`)
+Analyzes raw dataset schema, detects column roles, calculates field completeness, highlights conflicting identity values, calculates an overall quality score (0–100), and provides recommended column mappings.
+
+* **Request Body**:
+  ```json
+  {
+    "dataset": {
+      "datasetName": "team_members.csv",
+      "headers": ["Full Name", "Company", "Role", "LinkedIn Profile"],
+      "rows": [...]
+    }
+  }
+  ```
+* **Response `200 OK`**:
+  ```json
+  {
+    "datasetName": "team_members.csv",
+    "totalRows": 1,
+    "overallQualityScore": 95,
+    "qualityExplanation": "High quality: 100% average field completeness, 0 data conflicts detected.",
+    "entityColumn": "Full Name",
+    "columnProfiles": [
+      {
+        "columnName": "Full Name",
+        "detectedRole": "NAME",
+        "completenessPercentage": 100.0,
+        "sampleValues": ["Alice Smith"],
+        "uniqueCount": 1
+      },
+      {
+        "columnName": "LinkedIn Profile",
+        "detectedRole": "LINKEDIN_URL",
+        "completenessPercentage": 100.0,
+        "sampleValues": ["https://www.linkedin.com/in/alicesmith"],
+        "uniqueCount": 1
+      }
+    ],
+    "recommendedMappings": {
+      "nameColumn": "Full Name",
+      "urlColumn": "LinkedIn Profile",
+      "organizationColumn": "Company",
+      "roleColumn": "Role"
+    },
+    "conflicts": []
+  }
+  ```
+
+### `POST /api/v2/ai/requirements/plan` (`ai-intelligent-service :9742`)
+Translates unstructured user requirements into a structured, executable `EnrichmentPlan`. Identifies canonical field keys, plans extraction strategies (`PRIMARY_SOURCE`, `SECONDARY_DISCOVERY`, `WEB_SEARCH`), and re-uses existing dataset columns to prevent unnecessary web lookups.
+
+* **Request Body**:
+  ```json
+  {
+    "userRequirement": "Extract employer, educational background, and technical skills",
+    "entityType": "PERSON",
+    "datasetColumns": ["Full Name", "Company", "LinkedIn Profile"]
+  }
+  ```
+* **Response `200 OK`**:
+  ```json
+  {
+    "userGoalSummary": "Enrich 2 requested attributes for PERSON",
+    "plannedFields": [
+      {
+        "fieldKey": "education",
+        "displayName": "Education",
+        "description": "Educational background and degrees",
+        "strategy": "SECONDARY_DISCOVERY",
+        "existingInDataset": false,
+        "priority": 1
+      },
+      {
+        "fieldKey": "skills",
+        "displayName": "Skills",
+        "description": "Technical skills and expertise",
+        "strategy": "SECONDARY_DISCOVERY",
+        "existingInDataset": false,
+        "priority": 2
+      }
+    ],
+    "inferredEntityType": "PERSON",
+    "estimatedSourcesCount": 3
+  }
+  ```
+
+### `POST /api/v1/ai/extract` (`ai-intelligent-service :9742`)
+Extracts structured factual attributes from source text using Spring AI (Gemini 2.5 Flash) with fallback to deterministic heuristic extraction. Verifies that every returned fact is anchored by an exact verbatim quote from the text.
+
+* **Headers**: `Content-Type: application/json`, `Accept: application/json`
+* **Request Body**:
+  ```json
+  {
+    "entityName": "Alex Chen",
+    "entityType": "PERSON",
+    "sourceUrl": "https://example.com/team/alex",
+    "textContent": "Alex Chen is a Staff Infrastructure Engineer at CloudScale Inc located in Seattle, Washington.",
+    "targetFields": ["role", "organization", "location"]
+  }
+  ```
+* **Response `200 OK`**:
+  ```json
+  {
+    "entityName": "Alex Chen",
+    "sourceUrl": "https://example.com/team/alex",
+    "facts": {
+      "role": {
+        "value": "Staff Infrastructure Engineer",
+        "exactQuote": "Alex Chen is a Staff Infrastructure Engineer",
+        "confidenceScore": 0.95
+      },
+      "organization": {
+        "value": "CloudScale Inc",
+        "exactQuote": "at CloudScale Inc",
+        "confidenceScore": 0.95
+      },
+      "location": {
+        "value": "Seattle, Washington",
+        "exactQuote": "located in Seattle, Washington",
+        "confidenceScore": 0.90
+      }
+    },
+    "modelUsed": "gemini-2.5-flash",
+    "executionTimeMs": 142
+  }
+  ```
+
+

@@ -2,6 +2,10 @@
 
 Welcome to the **Data Enrichment & AI Intelligence** platform documentation.
 
+> 📌 **Release Status**:
+> * **[Frozen V1 Baseline (`v1.0.0`)](v1.md)**: Current working, frozen production prototype documentation.
+> * **[Proposed V2 Blueprint](v2/README.md)**: Architectural evolution plan, data model, AI boundaries, reliability strategy, roadmap, and task backlog.
+
 ---
 
 ## 1. System Overview
@@ -81,6 +85,45 @@ Deep dives into the engineering decisions and production patterns implemented in
 
 13. 📡 **[14. Observability, MDC Correlation Tracing & ProblemDetail Diagnostics](learning/14-observability-mdc-tracing-and-diagnostics.md)**  
     *Thread-safe SLF4J MDC correlation tokens (`entityId`, `jobId`), milestone pipeline logging, in-flight warnings accumulator (`ResearchDiagnostics`), and RFC 7807 `ProblemDetail` error responses.*
+
+14. 📥 **[15. Dataset Ingestion & Raw Data Boundaries](learning/15-dataset-ingestion-and-raw-data-boundaries.md)**  
+    *Preserving raw user input immutably, client-side SheetJS boundaries, schema-agnostic ingestion, and isolating parsing errors.*
+
+15. 🔍 **[16. Dataset Schema Detection & Data Profiling](learning/16-dataset-schema-detection-and-profiling.md)**  
+    *Regex-based heuristic column detection (`PERSON_NAME`, `DOMAIN_OR_URL`, `COMPANY_NAME`), data profiling, readiness checking, and user confirmation.*
+
+16. 🧭 **[17. User-Directed Enrichment & Adaptive Research](learning/17-user-directed-enrichment-and-adaptive-research.md)**  
+    *Natural language requirement interpretation via `RequirementInterpretationResponse`, targeted query generation, and early stopping when findings are satisfied.*
+
+17. 🎼 **[18. Dataset Enrichment Orchestration](learning/18-dataset-enrichment-orchestration.md)**  
+    *Dataset row iteration, entity normalization, research triggering, multi-source evidence merging, persistence, and state tracking via `RowEnrichmentResult`.*
+
+18. ⚙️ **[19. Spring AI Abstraction & Structured AI Workflows](learning/19-spring-ai-abstraction-and-structured-ai-workflows.md)**  
+    *Decoupled `ChatModel` interface, system/user prompt engineering, strict JSON schema extraction, markdown fence cleaning, and type-safe DTO mapping.*
+
+19. ⚖️ **[20. Deterministic & AI Hybrid Pipelines](learning/20-deterministic-and-ai-hybrid-pipelines.md)**  
+    *Combining deterministic HTML sanitization, URL normalization, and regex heuristics with LLM synthesis; cost control and offline fallback.*
+
+20. 🌐 **[21. Microservice Boundaries & Orchestration](learning/21-microservice-boundaries-and-orchestration.md)**  
+    *Bounded contexts across `dataset-service`, `research-service`, and `ai-service`; private DTO evolution, HTTP REST orchestration, and fault isolation.*
+
+21. 📜 **[22. Contract-First API Evolution](learning/22-contract-first-api-evolution.md)**  
+    *Explicit JSON media types, RFC 7807 error handling, DTO/entity separation, and safe multi-service contract evolution without breaking clients.*
+
+22. 📈 **[23. Observability for Distributed AI Workflows](learning/23-observability-for-distributed-ai-workflows.md)**  
+    *End-to-end tracing via SLF4J MDC (`jobId`, `entityId`), `ResearchDiagnostics` warning accumulators, execution timers, and structured logging.*
+
+23. 🏛️ **[24. Versioned Architecture & V1 to V2 Evolution](learning/24-versioned-architecture-and-v1-to-v2-evolution.md)**  
+    *Baseline prototype (V1) freeze vs production roadmap (V2): migrating from in-memory maps to database-backed tasks, decoupled representations, and token pre-filtering.*
+
+24. 🚀 **[25. Scalable Dataset Enrichment & Bounded Concurrency](learning/25-scalable-dataset-enrichment.md)**  
+    *Thread pool management (`ThreadPoolExecutor`), backpressure handling (`CallerRunsPolicy`), external rate-limiting mitigation, and batch scaling.*
+
+25. 🛡️ **[26. Evidence-Grounded Data Quality & Auditability](learning/26-evidence-grounded-data-quality.md)**  
+    *Verbatim quote verification, domain-level corroboration, confidence score calculation, and zero-hallucination citation trails for enterprise trust.*
+
+26. 🖥️ **[27. Frontend Workflow for Data Enrichment](learning/27-frontend-workflow-for-data-enrichment.md)**  
+    *The 7-stage interactive workflow: Ingestion $\rightarrow$ Schema Mapping $\rightarrow$ Requirements $\rightarrow$ Execution $\rightarrow$ Inspection $\rightarrow$ Provenance $\rightarrow$ Export.*
 
 ---
 

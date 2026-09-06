@@ -32,7 +32,10 @@ public class GlobalExceptionHandler {
         problemDetail.setType(DEFAULT_TYPE);
         problemDetail.setTitle("Bad Request");
         problemDetail.setInstance(URI.create(INSTANCE_PATH));
-        return problemDetail;
+        problemDetail.setProperty("details", ex.getBindingResult().getFieldErrors().stream()
+                .map(f -> f.getField() + ": " + f.getDefaultMessage())
+                .toList());
+        return enrichProblemDetail(problemDetail, "VALIDATION_ERROR");
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
@@ -48,7 +51,7 @@ public class GlobalExceptionHandler {
         problemDetail.setType(DEFAULT_TYPE);
         problemDetail.setTitle("Bad Request");
         problemDetail.setInstance(URI.create(INSTANCE_PATH));
-        return problemDetail;
+        return enrichProblemDetail(problemDetail, "MALFORMED_PAYLOAD");
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
@@ -59,7 +62,7 @@ public class GlobalExceptionHandler {
         problemDetail.setType(DEFAULT_TYPE);
         problemDetail.setTitle("Bad Request");
         problemDetail.setInstance(URI.create(INSTANCE_PATH));
-        return problemDetail;
+        return enrichProblemDetail(problemDetail, "BAD_REQUEST");
     }
 
     @ExceptionHandler(BusinessRuleException.class)
@@ -70,7 +73,7 @@ public class GlobalExceptionHandler {
         problemDetail.setType(DEFAULT_TYPE);
         problemDetail.setTitle("Bad Request");
         problemDetail.setInstance(URI.create(INSTANCE_PATH));
-        return problemDetail;
+        return enrichProblemDetail(problemDetail, "BUSINESS_RULE_VIOLATION");
     }
 
     @ExceptionHandler(ExternalServiceException.class)
@@ -88,7 +91,7 @@ public class GlobalExceptionHandler {
         problemDetail.setType(DEFAULT_TYPE);
         problemDetail.setTitle(status == HttpStatus.GATEWAY_TIMEOUT ? "Gateway Timeout" : "Bad Gateway");
         problemDetail.setInstance(URI.create(INSTANCE_PATH));
-        return problemDetail;
+        return enrichProblemDetail(problemDetail, status == HttpStatus.GATEWAY_TIMEOUT ? "GATEWAY_TIMEOUT" : "EXTERNAL_SERVICE_ERROR");
     }
 
     private String sanitizeDetail(String rawMessage) {
@@ -109,6 +112,13 @@ public class GlobalExceptionHandler {
         problemDetail.setType(DEFAULT_TYPE);
         problemDetail.setTitle("Internal Server Error");
         problemDetail.setInstance(URI.create(INSTANCE_PATH));
-        return problemDetail;
+        return enrichProblemDetail(problemDetail, "INTERNAL_SERVER_ERROR");
+    }
+
+    private ProblemDetail enrichProblemDetail(ProblemDetail pd, String code) {
+        pd.setProperty("code", code);
+        pd.setProperty("requestId", org.slf4j.MDC.get(com.subdual.research_service.common.filter.CorrelationIdFilter.MDC_KEY));
+        pd.setProperty("timestamp", java.time.Instant.now().toString());
+        return pd;
     }
 }

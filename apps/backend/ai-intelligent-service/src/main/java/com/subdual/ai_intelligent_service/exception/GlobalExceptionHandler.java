@@ -32,6 +32,12 @@ public class GlobalExceptionHandler {
         problemDetail.setType(DEFAULT_TYPE);
         problemDetail.setTitle("Bad Request");
         problemDetail.setInstance(URI.create(path));
+        problemDetail.setProperty("code", "VALIDATION_ERROR");
+        problemDetail.setProperty("requestId", org.slf4j.MDC.get(com.subdual.ai_intelligent_service.configuration.CorrelationIdFilter.MDC_KEY));
+        problemDetail.setProperty("timestamp", java.time.Instant.now().toString());
+        problemDetail.setProperty("details", ex.getBindingResult().getFieldErrors().stream()
+                .map(f -> f.getField() + ": " + f.getDefaultMessage())
+                .toList());
         return problemDetail;
     }
 
@@ -43,6 +49,23 @@ public class GlobalExceptionHandler {
         problemDetail.setType(DEFAULT_TYPE);
         problemDetail.setTitle("Bad Request");
         problemDetail.setInstance(URI.create(path));
+        problemDetail.setProperty("code", "MALFORMED_PAYLOAD");
+        problemDetail.setProperty("requestId", org.slf4j.MDC.get(com.subdual.ai_intelligent_service.configuration.CorrelationIdFilter.MDC_KEY));
+        problemDetail.setProperty("timestamp", java.time.Instant.now().toString());
+        return problemDetail;
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ProblemDetail handleIllegalArgument(IllegalArgumentException ex, jakarta.servlet.http.HttpServletRequest request) {
+        String path = request != null ? request.getRequestURI() : "/api/v1/ai";
+        log.warn("Illegal argument on {}: {}", path, ex.getMessage());
+        ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+        problemDetail.setType(DEFAULT_TYPE);
+        problemDetail.setTitle("Bad Request");
+        problemDetail.setInstance(URI.create(path));
+        problemDetail.setProperty("code", "BAD_REQUEST");
+        problemDetail.setProperty("requestId", org.slf4j.MDC.get(com.subdual.ai_intelligent_service.configuration.CorrelationIdFilter.MDC_KEY));
+        problemDetail.setProperty("timestamp", java.time.Instant.now().toString());
         return problemDetail;
     }
 
@@ -57,6 +80,9 @@ public class GlobalExceptionHandler {
         problemDetail.setType(DEFAULT_TYPE);
         problemDetail.setTitle("Internal Server Error");
         problemDetail.setInstance(URI.create(path));
+        problemDetail.setProperty("code", "INTERNAL_SERVER_ERROR");
+        problemDetail.setProperty("requestId", org.slf4j.MDC.get(com.subdual.ai_intelligent_service.configuration.CorrelationIdFilter.MDC_KEY));
+        problemDetail.setProperty("timestamp", java.time.Instant.now().toString());
         return problemDetail;
     }
 }

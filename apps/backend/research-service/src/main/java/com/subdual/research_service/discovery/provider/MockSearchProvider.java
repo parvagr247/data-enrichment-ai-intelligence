@@ -30,6 +30,11 @@ public class MockSearchProvider implements SearchProvider {
         return applyLimit(candidates, maxResults);
     }
 
+    @Override
+    public String providerName() {
+        return "mock";
+    }
+
     private boolean isQueryBlank(String query) {
         return query == null || query.isBlank();
     }

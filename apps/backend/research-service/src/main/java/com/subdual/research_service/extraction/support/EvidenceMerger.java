@@ -23,21 +23,44 @@ public class EvidenceMerger {
             String snippet,
             ConfidenceTier tier
     ) {
+        mergeAttribute(attributes, key, value, sourceUrl, snippet, tier, null, null);
+    }
+
+    public void mergeAttribute(
+            Map<String, EvidenceTuple> attributes,
+            String key,
+            String value,
+            String sourceUrl,
+            String snippet,
+            ConfidenceTier tier,
+            String sourceType,
+            String extractionMethod
+    ) {
         if (value == null || value.isBlank()) {
             return;
         }
 
         EvidenceTuple existing = attributes.get(key);
         if (existing == null) {
-            attributes.put(key, new EvidenceTuple(value, sourceUrl, snippet, tier));
+            attributes.put(key, new EvidenceTuple(
+                    value,
+                    sourceUrl,
+                    snippet,
+                    tier,
+                    sourceUrl != null ? List.of(sourceUrl) : List.of(),
+                    false,
+                    null,
+                    sourceType,
+                    extractionMethod
+            ));
             return;
         }
 
         List<String> sources = buildCorroboratingSources(existing, sourceUrl);
         if (isAgreement(existing.value(), value)) {
-            attributes.put(key, corroborateAgreement(existing, value, snippet, sources));
+            attributes.put(key, corroborateAgreement(existing, value, snippet, sources, sourceType, extractionMethod));
         } else {
-            attributes.put(key, resolveDisagreement(existing, value, sourceUrl, snippet, tier, sources));
+            attributes.put(key, resolveDisagreement(existing, value, sourceUrl, snippet, tier, sources, sourceType, extractionMethod));
         }
     }
 
@@ -53,7 +76,9 @@ public class EvidenceMerger {
             EvidenceTuple existing,
             String value,
             String snippet,
-            List<String> sources
+            List<String> sources,
+            String sourceType,
+            String extractionMethod
     ) {
         ConfidenceTier current = existing.confidence() != null ? existing.confidence() : ConfidenceTier.LOW;
         ConfidenceTier boostedTier = switch (current) {
@@ -72,7 +97,10 @@ public class EvidenceMerger {
                 combinedSnippet,
                 boostedTier,
                 sources,
-                existing.conflictDetected()
+                existing.conflictDetected(),
+                existing.conflictDescription(),
+                existing.sourceType() != null ? existing.sourceType() : sourceType,
+                existing.extractionMethod() != null ? existing.extractionMethod() : extractionMethod
         );
     }
 
@@ -82,20 +110,25 @@ public class EvidenceMerger {
             String sourceUrl,
             String snippet,
             ConfidenceTier tier,
-            List<String> sources
+            List<String> sources,
+            String sourceType,
+            String extractionMethod
     ) {
         int comp = compareConfidence(tier, existing.confidence());
+        String conflictDesc = String.format("Conflict detected between '%s' (%s) and '%s' (%s)",
+                existing.value(), existing.sourceUrl(), value, sourceUrl);
+
         if (comp > 0) {
             String conflictSnippet = snippet + " (Alternative '" + existing.value() + "' found in " + existing.sourceUrl() + ")";
             ConfidenceTier resolvedTier = tier == ConfidenceTier.HIGH ? ConfidenceTier.MEDIUM : ConfidenceTier.LOW;
-            return new EvidenceTuple(value, sourceUrl, conflictSnippet, resolvedTier, sources, true);
+            return new EvidenceTuple(value, sourceUrl, conflictSnippet, resolvedTier, sources, true, conflictDesc, sourceType, extractionMethod);
         }
 
         String conflictSnippet = existing.evidenceSnippet() + " (Conflict: alternative '" + value + "' reported in " + sourceUrl + ")";
         ConfidenceTier resolvedTier = (comp == 0 && existing.confidence() == ConfidenceTier.HIGH)
                 ? ConfidenceTier.MEDIUM
                 : existing.confidence();
-        return new EvidenceTuple(existing.value(), existing.sourceUrl(), conflictSnippet, resolvedTier, sources, true);
+        return new EvidenceTuple(existing.value(), existing.sourceUrl(), conflictSnippet, resolvedTier, sources, true, conflictDesc, existing.sourceType(), existing.extractionMethod());
     }
 
     private boolean isAgreement(String v1, String v2) {

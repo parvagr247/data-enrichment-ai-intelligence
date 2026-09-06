@@ -268,4 +268,4 @@ Return ResearchResponse with:
 
 ---
 
-**Previous:** [Concept 13: Modular Evidence Extraction, Domain Extractor Decomposition & Entity Resolution](13-modular-evidence-extraction-and-entity-resolution.md)
+**Previous:** [Concept 13: Modular Evidence Extraction, Domain Extractor Decomposition & Entity Resolution](13-modular-evidence-extraction-and-entity-resolution.md) | **Next:** [Concept 15: Dataset Ingestion & Raw Data Boundaries](15-dataset-ingestion-and-raw-data-boundaries.md)

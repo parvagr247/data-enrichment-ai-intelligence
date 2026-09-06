@@ -30,6 +30,25 @@ public class GlobalExceptionHandler {
         problemDetail.setType(DEFAULT_TYPE);
         problemDetail.setTitle("Bad Request");
         problemDetail.setInstance(URI.create(INSTANCE_PATH));
+        problemDetail.setProperty("code", "VALIDATION_ERROR");
+        problemDetail.setProperty("requestId", org.slf4j.MDC.get(com.subdual.dataset_service.common.filter.CorrelationIdFilter.MDC_KEY));
+        problemDetail.setProperty("timestamp", java.time.Instant.now().toString());
+        problemDetail.setProperty("details", ex.getBindingResult().getFieldErrors().stream()
+                .map(f -> f.getField() + ": " + f.getDefaultMessage())
+                .toList());
+        return problemDetail;
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ProblemDetail handleIllegalArgumentException(IllegalArgumentException ex) {
+        log.warn("Illegal argument on {}: {}", INSTANCE_PATH, ex.getMessage());
+        ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+        problemDetail.setType(DEFAULT_TYPE);
+        problemDetail.setTitle("Bad Request");
+        problemDetail.setInstance(URI.create(INSTANCE_PATH));
+        problemDetail.setProperty("code", "BAD_REQUEST");
+        problemDetail.setProperty("requestId", org.slf4j.MDC.get(com.subdual.dataset_service.common.filter.CorrelationIdFilter.MDC_KEY));
+        problemDetail.setProperty("timestamp", java.time.Instant.now().toString());
         return problemDetail;
     }
 
@@ -43,6 +62,9 @@ public class GlobalExceptionHandler {
         problemDetail.setType(DEFAULT_TYPE);
         problemDetail.setTitle("Internal Server Error");
         problemDetail.setInstance(URI.create(INSTANCE_PATH));
+        problemDetail.setProperty("code", "INTERNAL_SERVER_ERROR");
+        problemDetail.setProperty("requestId", org.slf4j.MDC.get(com.subdual.dataset_service.common.filter.CorrelationIdFilter.MDC_KEY));
+        problemDetail.setProperty("timestamp", java.time.Instant.now().toString());
         return problemDetail;
     }
 }

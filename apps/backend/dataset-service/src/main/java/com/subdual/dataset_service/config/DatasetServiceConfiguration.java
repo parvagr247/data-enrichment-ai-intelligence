@@ -16,8 +16,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class DatasetServiceConfiguration {
 
     @Bean
-    public RestClient restClient(RestClient.Builder builder) {
-        return builder.build();
+    public RestClient restClient(RestClient.Builder builder, com.subdual.dataset_service.common.interceptor.CorrelationIdClientInterceptor interceptor) {
+        return builder
+                .requestInterceptor(interceptor)
+                .build();
     }
 
     @Bean

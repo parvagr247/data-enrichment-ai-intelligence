@@ -36,6 +36,7 @@ public class EvidenceExtractor {
     private final ProductEvidenceExtractor productExtractor;
     private final AiEvidenceEnricher aiEvidenceEnricher;
     private final TargetFieldNormalizer targetFieldNormalizer;
+    private final List<com.subdual.research_service.extraction.extractor.field.FieldExtractor> fieldExtractors;
 
     @Autowired
     public EvidenceExtractor(
@@ -46,7 +47,8 @@ public class EvidenceExtractor {
             RepositoryEvidenceExtractor repositoryExtractor,
             ProductEvidenceExtractor productExtractor,
             AiEvidenceEnricher aiEvidenceEnricher,
-            TargetFieldNormalizer targetFieldNormalizer
+            TargetFieldNormalizer targetFieldNormalizer,
+            @Autowired(required = false) List<com.subdual.research_service.extraction.extractor.field.FieldExtractor> fieldExtractors
     ) {
         this.evidenceMerger = evidenceMerger;
         this.commonExtractor = commonExtractor;
@@ -56,6 +58,20 @@ public class EvidenceExtractor {
         this.productExtractor = productExtractor;
         this.aiEvidenceEnricher = aiEvidenceEnricher;
         this.targetFieldNormalizer = targetFieldNormalizer;
+        this.fieldExtractors = fieldExtractors != null ? fieldExtractors : defaultFieldExtractors();
+    }
+
+    public EvidenceExtractor(
+            EvidenceMerger evidenceMerger,
+            CommonEvidenceExtractor commonExtractor,
+            PersonEvidenceExtractor personExtractor,
+            OrganizationEvidenceExtractor organizationExtractor,
+            RepositoryEvidenceExtractor repositoryExtractor,
+            ProductEvidenceExtractor productExtractor,
+            AiEvidenceEnricher aiEvidenceEnricher,
+            TargetFieldNormalizer targetFieldNormalizer
+    ) {
+        this(evidenceMerger, commonExtractor, personExtractor, organizationExtractor, repositoryExtractor, productExtractor, aiEvidenceEnricher, targetFieldNormalizer, null);
     }
 
     public EvidenceExtractor(AiExtractionClient aiExtractionClient) {
@@ -67,10 +83,21 @@ public class EvidenceExtractor {
         this.productExtractor = new ProductEvidenceExtractor(this.evidenceMerger);
         this.aiEvidenceEnricher = new AiEvidenceEnricher(aiExtractionClient != null ? aiExtractionClient : new NoOpAiExtractionClient(), this.evidenceMerger);
         this.targetFieldNormalizer = new TargetFieldNormalizer();
+        this.fieldExtractors = defaultFieldExtractors();
     }
 
     public EvidenceExtractor() {
         this((AiExtractionClient) null);
+    }
+
+    private static List<com.subdual.research_service.extraction.extractor.field.FieldExtractor> defaultFieldExtractors() {
+        return List.of(
+                new com.subdual.research_service.extraction.extractor.field.RoleFieldExtractor(),
+                new com.subdual.research_service.extraction.extractor.field.OrganizationFieldExtractor(),
+                new com.subdual.research_service.extraction.extractor.field.EducationFieldExtractor(),
+                new com.subdual.research_service.extraction.extractor.field.LocationFieldExtractor(),
+                new com.subdual.research_service.extraction.extractor.field.TechFieldExtractor()
+        );
     }
 
     public Map<String, EvidenceTuple> extractEvidence(
@@ -86,10 +113,48 @@ public class EvidenceExtractor {
         Map<String, EvidenceTuple> attributes = new LinkedHashMap<>();
         extractCommonAttributes(target, sources, documents, resolutions, attributes);
         extractEntityTypeAttributes(target, documents, resolutions, attributes);
+        extractFieldSpecificAttributes(target, documents, resolutions, attributes);
         enrichWithAiIfAvailable(target, documents, resolutions, attributes);
         applyTargetFieldsIfRequested(target, attributes);
 
         return attributes;
+    }
+
+    private void extractFieldSpecificAttributes(
+            ResearchTarget target,
+            List<ExtractedDocument> documents,
+            Map<String, EntityResolver.ResolutionResult> resolutions,
+            Map<String, EvidenceTuple> attributes
+    ) {
+        if (fieldExtractors == null || fieldExtractors.isEmpty() || documents == null) {
+            return;
+        }
+
+        List<String> targetFields = target.targetFields();
+        for (ExtractedDocument doc : documents) {
+            if (!CommonEvidenceExtractor.isMatchedDocument(doc, resolutions)) {
+                continue;
+            }
+            for (com.subdual.research_service.extraction.extractor.field.FieldExtractor fe : fieldExtractors) {
+                boolean isRequested = targetFields == null || targetFields.isEmpty()
+                        || targetFields.stream().anyMatch(tf -> fe.supports(tf, target.entityType()));
+                if (isRequested) {
+                    EvidenceTuple tuple = fe.extract(doc, target);
+                    if (tuple != null && tuple.value() != null && !tuple.value().isBlank()) {
+                        evidenceMerger.mergeAttribute(
+                                attributes,
+                                fe.fieldKey(),
+                                tuple.value(),
+                                tuple.sourceUrl(),
+                                tuple.evidenceSnippet(),
+                                tuple.confidence(),
+                                tuple.sourceType(),
+                                tuple.extractionMethod()
+                        );
+                    }
+                }
+            }
+        }
     }
 
     private boolean hasExtractableContent(ResearchTarget target, List<ExtractedDocument> documents) {

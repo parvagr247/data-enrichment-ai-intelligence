@@ -24,16 +24,42 @@ public class DefaultResearchDiscoveryService implements ResearchDiscoveryService
 
     @Override
     public List<DiscoveredSource> discoverSources(ResearchTarget target) {
+        long startTime = System.currentTimeMillis();
         String query = queryBuilder.buildDiscoveryQuery(target);
-        return searchWithProvider(query, discoveryProperties.maxResults());
+        List<DiscoveredSource> raw = searchWithProvider(query, discoveryProperties.maxResults());
+
+        var dedupResult = com.subdual.research_service.discovery.ranking.SourceDeduplicator.deduplicate(raw);
+        List<DiscoveredSource> ranked = com.subdual.research_service.discovery.ranking.SourceRanker.rankSources(
+                dedupResult.deduplicated(), target, com.subdual.research_service.discovery.model.QueryIntent.GENERAL_PROFILE
+        );
+
+        long duration = System.currentTimeMillis() - startTime;
+        log.info("[Pipeline: DISCOVERY_METRICS] Provider: '{}', Queries: 1, Results: {}, DedupRemoved: {}, Selected: {}, Duration: {}ms",
+                searchProvider.providerName(), raw.size(), dedupResult.duplicatesRemovedCount(), ranked.size(), duration);
+
+        return ranked;
     }
 
     @Override
     public List<DiscoveredSource> discoverAdaptiveSources(ResearchTarget target, List<String> missingFields, int maxResults) {
+        long startTime = System.currentTimeMillis();
         String query = queryBuilder.buildAdaptiveQuery(target, missingFields);
         log.info("[Pipeline: ADAPTIVE_DISCOVERY] Searching provider '{}' for missing fields {} with query: '{}'",
-                discoveryProperties.provider(), missingFields, query);
-        return searchWithProvider(query, Math.max(1, maxResults));
+                searchProvider.providerName(), missingFields, query);
+
+        List<DiscoveredSource> raw = searchWithProvider(query, Math.max(1, maxResults));
+        var dedupResult = com.subdual.research_service.discovery.ranking.SourceDeduplicator.deduplicate(raw);
+        List<DiscoveredSource> ranked = com.subdual.research_service.discovery.ranking.SourceRanker.rankSources(
+                dedupResult.deduplicated(), target, com.subdual.research_service.discovery.QueryBuilder.mapFieldToIntent(
+                        missingFields != null && !missingFields.isEmpty() ? missingFields.get(0) : null
+                )
+        );
+
+        long duration = System.currentTimeMillis() - startTime;
+        log.info("[Pipeline: ADAPTIVE_METRICS] Provider: '{}', MissingFields: {}, Results: {}, DedupRemoved: {}, Selected: {}, Duration: {}ms",
+                searchProvider.providerName(), missingFields, raw.size(), dedupResult.duplicatesRemovedCount(), ranked.size(), duration);
+
+        return ranked;
     }
 
     private List<DiscoveredSource> searchWithProvider(String query, int maxResults) {

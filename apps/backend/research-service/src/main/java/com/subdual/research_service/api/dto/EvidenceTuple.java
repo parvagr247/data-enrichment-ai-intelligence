@@ -9,8 +9,22 @@ public record EvidenceTuple(
         String evidenceSnippet,
         ConfidenceTier confidence,
         List<String> corroboratingSources,
-        boolean conflictDetected
+        boolean conflictDetected,
+        String conflictDescription,
+        String sourceType,
+        String extractionMethod
 ) {
+    public EvidenceTuple(
+            String value,
+            String sourceUrl,
+            String evidenceSnippet,
+            ConfidenceTier confidence,
+            List<String> corroboratingSources,
+            boolean conflictDetected
+    ) {
+        this(value, sourceUrl, evidenceSnippet, confidence, corroboratingSources, conflictDetected, null, null, null);
+    }
+
     public EvidenceTuple(String value, String sourceUrl, String evidenceSnippet, ConfidenceTier confidence) {
         this(
                 value,

@@ -1,10 +1,15 @@
 package com.subdual.research_service.discovery;
 
+import com.subdual.research_service.discovery.model.QueryIntent;
+import com.subdual.research_service.discovery.model.QueryStrategy;
+import com.subdual.research_service.discovery.model.ResearchQuery;
 import com.subdual.research_service.research.model.EntityType;
 import com.subdual.research_service.research.model.ResearchTarget;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -18,109 +23,59 @@ class QueryBuilderTest {
     }
 
     @Test
-    @DisplayName("Should build anchored query with domain and path when both URL and name are present")
-    void shouldBuildAnchoredQueryForUrlAndName() {
+    @DisplayName("Should generate requirement-aware queries with multiple strategies and intents")
+    void shouldGenerateRequirementQueries() {
         ResearchTarget target = new ResearchTarget(
-                "https://www.linkedin.com/in/jane-doe",
-                "https://www.linkedin.com/in/jane-doe",
-                "id-1",
+                "https://www.linkedin.com/in/johndoe",
+                "https://www.linkedin.com/in/johndoe",
+                "id-10",
                 EntityType.PERSON,
-                "Jane Doe"
+                "John Doe",
+                java.util.Map.of(
+                        "organization", "Acme Corp",
+                        "role", "Staff Engineer",
+                        "targetFields", List.of("role", "education", "skills")
+                )
         );
 
-        String query = queryBuilder.buildDiscoveryQuery(target);
-        assertThat(query).isEqualTo("\"Jane Doe\" linkedin.com/in/jane-doe");
+        List<ResearchQuery> queries = queryBuilder.buildRequirementQueries(target);
+
+        assertThat(queries).isNotEmpty();
+        // Strategy A: EXACT_NAME_AND_ORG
+        assertThat(queries.stream().anyMatch(q -> q.strategy() == QueryStrategy.EXACT_NAME_AND_ORG)).isTrue();
+        // Strategy B: NAME_AND_FIELD for education
+        assertThat(queries.stream().anyMatch(q -> q.intent() == QueryIntent.EDUCATION)).isTrue();
+        // Strategy B: NAME_AND_FIELD for skills/tech
+        assertThat(queries.stream().anyMatch(q -> q.intent() == QueryIntent.TECHNOLOGY)).isTrue();
     }
 
     @Test
-    @DisplayName("Should build anchored query for repository with URL and display name")
-    void shouldBuildAnchoredQueryForRepositoryWithUrl() {
+    @DisplayName("Should build adaptive queries for missing fields")
+    void shouldBuildAdaptiveQueries() {
         ResearchTarget target = new ResearchTarget(
-                "https://github.com/spring-projects/spring-boot",
-                "https://github.com/spring-projects/spring-boot",
-                "id-2",
-                EntityType.REPOSITORY,
-                "Spring Boot"
+                "https://example.com/jane",
+                "https://example.com/jane",
+                "id-11",
+                EntityType.PERSON,
+                "Jane Doe",
+                java.util.Map.of("organization", "Google")
         );
 
-        String query = queryBuilder.buildDiscoveryQuery(target);
-        assertThat(query).isEqualTo("\"Spring Boot\" github.com/spring-projects/spring-boot");
+        List<ResearchQuery> adaptive = queryBuilder.buildAdaptiveResearchQueries(target, List.of("education", "role"));
+
+        assertThat(adaptive).hasSize(2);
+        assertThat(adaptive.get(0).intent()).isEqualTo(QueryIntent.EDUCATION);
+        assertThat(adaptive.get(0).queryText()).contains("Jane Doe").contains("education");
     }
 
     @Test
-    @DisplayName("Should build anchored query for organization with URL and display name")
-    void shouldBuildAnchoredQueryForOrganizationWithUrl() {
-        ResearchTarget target = new ResearchTarget(
-                "https://openai.com",
-                "https://openai.com/",
-                "id-3",
-                EntityType.ORGANIZATION,
-                "OpenAI"
-        );
-
-        String query = queryBuilder.buildDiscoveryQuery(target);
-        assertThat(query).isEqualTo("\"OpenAI\" openai.com company");
-    }
-
-    @Test
-    @DisplayName("Should build broad discovery query when only name is provided (no URL)")
-    void shouldBuildBroadQueryForNameOnly() {
-        ResearchTarget orgTarget = new ResearchTarget(
-                null, null, "id-4", EntityType.ORGANIZATION, "OpenAI"
-        );
-        assertThat(queryBuilder.buildDiscoveryQuery(orgTarget)).isEqualTo("OpenAI company official");
-
-        ResearchTarget repoTarget = new ResearchTarget(
-                null, null, "id-5", EntityType.REPOSITORY, "Spring Boot"
-        );
-        assertThat(queryBuilder.buildDiscoveryQuery(repoTarget)).isEqualTo("Spring Boot repository source code");
-
-        ResearchTarget personTarget = new ResearchTarget(
-                null, null, "id-6", EntityType.PERSON, "Jane Doe"
-        );
-        assertThat(queryBuilder.buildDiscoveryQuery(personTarget)).isEqualTo("Jane Doe profile biography");
-    }
-
-    @Test
-    @DisplayName("Should handle null entityType gracefully without NullPointerException")
-    void shouldHandleNullEntityTypeGracefully() {
-        ResearchTarget target = new ResearchTarget(
-                null, null, "id-7", null, "Something"
-        );
-
-        String query = queryBuilder.buildDiscoveryQuery(target);
-        assertThat(query).isEqualTo("Something overview");
-    }
-
-    @Test
-    @DisplayName("Should fallback to domain and path when display name is omitted")
-    void shouldFallbackToDomainAndPathWhenDisplayNameOmitted() {
-        ResearchTarget target = new ResearchTarget(
-                "https://github.com/spring-projects/spring-boot",
-                "https://github.com/spring-projects/spring-boot",
-                "id-8",
-                EntityType.REPOSITORY,
-                "https://github.com/spring-projects/spring-boot"
-        );
-
-        String query = queryBuilder.buildDiscoveryQuery(target);
-        assertThat(query).isEqualTo("spring-projects spring-boot repository");
-    }
-
-    @Test
-    @DisplayName("Should return empty string for null target")
-    void shouldReturnEmptyStringForNullTarget() {
-        assertThat(queryBuilder.buildDiscoveryQuery(null)).isEmpty();
-    }
-
-    @Test
-    @DisplayName("Should resolve type keywords correctly")
-    void shouldResolveTypeKeywords() {
-        assertThat(queryBuilder.resolveTypeKeyword(EntityType.ORGANIZATION)).isEqualTo("company");
-        assertThat(queryBuilder.resolveTypeKeyword(EntityType.REPOSITORY)).isEqualTo("repository");
-        assertThat(queryBuilder.resolveTypeKeyword(EntityType.PERSON)).isEqualTo("profile");
-        assertThat(queryBuilder.resolveTypeKeyword(EntityType.PRODUCT)).isEqualTo("product");
-        assertThat(queryBuilder.resolveTypeKeyword(EntityType.WEBSITE)).isEqualTo("official");
-        assertThat(queryBuilder.resolveTypeKeyword(null)).isEqualTo("overview");
+    @DisplayName("Should map field names to appropriate QueryIntent")
+    void shouldMapFieldToIntent() {
+        assertThat(QueryBuilder.mapFieldToIntent("role")).isEqualTo(QueryIntent.ROLE);
+        assertThat(QueryBuilder.mapFieldToIntent("employer")).isEqualTo(QueryIntent.ORGANIZATION);
+        assertThat(QueryBuilder.mapFieldToIntent("university")).isEqualTo(QueryIntent.EDUCATION);
+        assertThat(QueryBuilder.mapFieldToIntent("city")).isEqualTo(QueryIntent.LOCATION);
+        assertThat(QueryBuilder.mapFieldToIntent("skills")).isEqualTo(QueryIntent.TECHNOLOGY);
+        assertThat(QueryBuilder.mapFieldToIntent("unknown_field")).isEqualTo(QueryIntent.GENERAL_PROFILE);
     }
 }

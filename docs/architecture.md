@@ -89,3 +89,32 @@ The platform is strictly organized around clear separation of concerns:
 * **Communication Protocol**: Synchronous HTTP/1.1 REST using JSON (`application/json`) contracts.
 * **CORS**: Configured uniformly across all 3 backend services allowing origins `http://localhost:3000`, `http://127.0.0.1:3000`, and Docker internal network hostnames.
 * **Security Model**: Zero Spring Security overhead for rapid, frictionless local development and containerized orchestration.
+
+---
+
+## 4. V2 Architecture Evolutions (Tasks 51–80)
+
+The V2 platform introduces three modular architectural enhancements:
+
+### 1. Research & Discovery Engine (Tasks 51–60)
+* **Provider Abstraction**: Decoupled `ResearchProvider` / `SearchProvider` interfaces supporting production web search (Tavily) and zero-network test mocks (`MockSearchProvider`).
+* **Multi-Strategy Query Generation**: Formulates targeted queries per intent (`QueryIntent`, `QueryStrategy`, `ResearchQuery`). The primary identity query (`EXACT_NAME_AND_ORG`) is always anchored first, followed by adaptive queries targeting missing schema fields.
+* **Source Classification & Deduplication**: Canonicalizes and strips tracking parameters from URLs via `SourceDeduplicator`. Categorizes domains via `SourceTypeClassifier` into strongly-typed `SourceType` and baseline `SourceReliability` tiers.
+* **Multi-Factor Source Ranking**: Prioritizes sources via `SourceRanker` combining search engine relevance, authoritative source type weights, entity name matching, and domain reliability.
+
+### 2. Evidence & Extraction 2.0 (Tasks 61–70)
+* **Cohesive Field Extractors**: Replaced monolithic extraction logic with specialized single-responsibility classes:
+  - `RoleFieldExtractor`: Extracts executive and technical positions.
+  - `OrganizationFieldExtractor`: Identifies companies and institutional affiliations.
+  - `EducationFieldExtractor`: Identifies degrees, academic majors, and universities.
+  - `LocationFieldExtractor`: Identifies geographic headquarters, cities, and countries.
+  - `TechFieldExtractor`: Identifies programming languages, frameworks, and technologies.
+* **Verbatim Evidence Tuples**: Every extracted fact is anchored by an immutable `EvidenceTuple` containing `exactQuote`, `sourceUrl`, and `confidence`.
+* **Multi-Source Corroboration & Conflict Resolution**: `EvidenceMerger` boosts confidence when multiple sources corroborate a claim, and non-destructively records `conflictDetected = true` with detailed `conflictDescription` when contradictory values are encountered.
+
+### 3. Spring AI Intelligence Layer (Tasks 71–80)
+* **Externalized Prompt Engineering**: Templates stored in `src/main/resources/prompts/*.st` rendered dynamically by `PromptTemplateService`.
+* **Zero-Hallucination Guardrails**: `AiResponseValidator` validates that every claim's exact quote exists verbatim within the retrieved source text, discarding ungrounded attributes.
+* **Resilient Fallback & Bounded Retries**: `SpringAiIntelligence` executes up to 2 retries with exponential backoff before gracefully failing over to `DeterministicAiIntelligence`. The system never returns an unhandled HTTP 500 error on remote AI outages.
+* **Execution Telemetry**: Captures token consumption, latencies, provider details, and execution status through `AiExecutionMetrics`.
+

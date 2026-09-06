@@ -40,6 +40,11 @@ public class TavilySearchProvider implements SearchProvider {
         return mapResults(response);
     }
 
+    @Override
+    public String providerName() {
+        return "tavily";
+    }
+
     private void validateApiKey() {
         if (properties.apiKey() == null || properties.apiKey().isBlank()) {
             throw new ExternalServiceException("Search provider API key is not configured for provider: tavily");

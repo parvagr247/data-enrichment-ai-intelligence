@@ -603,6 +603,523 @@
           }
         }
       ]
+    },
+    {
+      "name": "06 V2 Intelligence & Ingestion",
+      "description": "V2 Modular Dataset Ingestion, Quality Profiling, and AI Requirement Planning endpoints.",
+      "item": [
+        {
+          "name": "Upload Dataset File (V2)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Raw dataset returned headers and rows\", function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('headers');",
+                  "    pm.expect(json).to.have.property('rows');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json", "type": "text" }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{datasetBaseUrl}}/api/v2/datasets/upload",
+              "host": ["{{datasetBaseUrl}}"],
+              "path": ["api", "v2", "datasets", "upload"]
+            },
+            "description": "Uploads and parses CSV or XLSX dataset with delimiter sniffing and malformed row isolation."
+          }
+        },
+        {
+          "name": "Profile Dataset Quality & Schemas (V2)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Report contains qualityScore, columnProfiles, and recommendedMappings\", function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('overallQualityScore');",
+                  "    pm.expect(json).to.have.property('columnProfiles');",
+                  "    pm.expect(json).to.have.property('recommendedMappings');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json", "type": "text" },
+              { "key": "Accept", "value": "application/json", "type": "text" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dataset\": {\n    \"datasetName\": \"sample_candidates.csv\",\n    \"headers\": [\"Full Name\", \"Company\", \"Role\", \"LinkedIn Profile\"],\n    \"rows\": [\n      {\"Full Name\": \"Alice Smith\", \"Company\": \"Stripe\", \"Role\": \"Engineer\", \"LinkedIn Profile\": \"https://linkedin.com/in/alicesmith\"},\n      {\"Full Name\": \"Bob Jones\", \"Company\": \"Google\", \"Role\": \"Staff SRE\", \"LinkedIn Profile\": \"https://linkedin.com/in/bobjones\"}\n    ]\n  }\n}"
+            },
+            "url": {
+              "raw": "{{datasetBaseUrl}}/api/v2/datasets/profile",
+              "host": ["{{datasetBaseUrl}}"],
+              "path": ["api", "v2", "datasets", "profile"]
+            },
+            "description": "Profiles dataset columns, detects entity columns, row conflicts, computes 0-100 quality score, and generates recommended mappings."
+          }
+        },
+        {
+          "name": "Generate AI Enrichment Plan (V2)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Enrichment plan contains planned fields and strategies\", function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('plannedFields');",
+                  "    pm.expect(json).to.have.property('userGoalSummary');",
+                  "    pm.expect(json.plannedFields).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json", "type": "text" },
+              { "key": "Accept", "value": "application/json", "type": "text" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userRequirement\": \"Find employer, educational background, and tech skills\",\n  \"entityType\": \"PERSON\",\n  \"datasetColumns\": [\"Full Name\", \"LinkedIn Profile\"]\n}"
+            },
+            "url": {
+              "raw": "{{aiBaseUrl}}/api/v2/ai/requirements/plan",
+              "host": ["{{aiBaseUrl}}"],
+              "path": ["api", "v2", "ai", "requirements", "plan"]
+            },
+            "description": "Translates unstructured user requirements into a structured, executable EnrichmentPlan with field strategies."
+          }
+        }
+      ]
+    },
+    {
+      "name": "07 V2 Scenarios (Tasks 51-80)",
+      "description": "Comprehensive test suite covering the 10 core V2 scenarios across Research Discovery, Evidence Extraction 2.0, and Spring AI Intelligence Layer.",
+      "item": [
+        {
+          "name": "Scenario 01: Requirement-Driven Enrichment",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Plan contains requested target fields\", function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('plannedFields');",
+                  "    pm.expect(json.plannedFields.length).to.be.above(0);",
+                  "    pm.expect(json).to.have.property('userGoalSummary');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json", "type": "text" },
+              { "key": "Accept", "value": "application/json", "type": "text" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userObjective\": \"Find current role, employer company, university degrees, and city location\",\n  \"entityType\": \"PERSON\",\n  \"existingDatasetColumns\": [\"Name\", \"LinkedIn\"]\n}"
+            },
+            "url": {
+              "raw": "{{aiBaseUrl}}/api/v2/ai/requirements/plan",
+              "host": ["{{aiBaseUrl}}"],
+              "path": ["api", "v2", "ai", "requirements", "plan"]
+            },
+            "description": "Scenario 1: Evaluates user requirement parsing into targeted field extraction strategies."
+          }
+        },
+        {
+          "name": "Scenario 02: Blank Requirement Fallback",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Plan provides default fields when requirement is blank\", function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('plannedFields');",
+                  "    pm.expect(json.plannedFields.length).to.be.above(0);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json", "type": "text" },
+              { "key": "Accept", "value": "application/json", "type": "text" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userObjective\": \"\",\n  \"entityType\": \"PERSON\"\n}"
+            },
+            "url": {
+              "raw": "{{aiBaseUrl}}/api/v2/ai/requirements/plan",
+              "host": ["{{aiBaseUrl}}"],
+              "path": ["api", "v2", "ai", "requirements", "plan"]
+            },
+            "description": "Scenario 2: Evaluates graceful fallback to standard scope when no user requirement is provided."
+          }
+        },
+        {
+          "name": "Scenario 03: Adaptive Research (Target-Field Driven)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Research produces result entity with evidence\", function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('entityName');",
+                  "    pm.expect(json).to.have.property('evidence');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json", "type": "text" },
+              { "key": "Accept", "value": "application/json", "type": "text" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Satya Nadella\",\n  \"organization\": \"Microsoft\",\n  \"entityType\": \"PERSON\",\n  \"targetFields\": [\"role\", \"education\"],\n  \"userRequirement\": \"Find university degrees and executive role\"\n}"
+            },
+            "url": {
+              "raw": "{{researchBaseUrl}}/api/v1/research",
+              "host": ["{{researchBaseUrl}}"],
+              "path": ["api", "v1", "research"]
+            },
+            "description": "Scenario 3: Executes requirement-aware adaptive queries targeting missing attributes."
+          }
+        },
+        {
+          "name": "Scenario 04: Multi-Source Web Discovery",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Sources are discovered and tracked\", function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('sourcesRetrieved');",
+                  "    pm.expect(json.sourcesRetrieved.length).to.be.above(0);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json", "type": "text" },
+              { "key": "Accept", "value": "application/json", "type": "text" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Guido van Rossum\",\n  \"url\": \"https://github.com/gvanrossum\",\n  \"entityType\": \"PERSON\",\n  \"depth\": \"DEEP\"\n}"
+            },
+            "url": {
+              "raw": "{{researchBaseUrl}}/api/v1/research",
+              "host": ["{{researchBaseUrl}}"],
+              "path": ["api", "v1", "research"]
+            },
+            "description": "Scenario 4: Discovers permitted public sources using multi-strategy query generation."
+          }
+        },
+        {
+          "name": "Scenario 05: Source Ranking & Reliability",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Response has confidence score and ranked sources\", function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('confidenceScore');",
+                  "    pm.expect(json.confidenceScore).to.be.within(0.0, 1.0);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json", "type": "text" },
+              { "key": "Accept", "value": "application/json", "type": "text" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Linus Torvalds\",\n  \"url\": \"https://github.com/torvalds\",\n  \"entityType\": \"PERSON\"\n}"
+            },
+            "url": {
+              "raw": "{{researchBaseUrl}}/api/v1/research",
+              "host": ["{{researchBaseUrl}}"],
+              "path": ["api", "v1", "research"]
+            },
+            "description": "Scenario 5: Prioritizes high-reliability authoritative sources over general web sources."
+          }
+        },
+        {
+          "name": "Scenario 06: Evidence-Backed Grounded Extraction",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Facts contain verbatim exactQuotes\", function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('facts');",
+                  "    pm.expect(json.facts).to.have.property('role');",
+                  "    pm.expect(json.facts.role).to.have.property('exactQuote');",
+                  "    pm.expect(json.facts.role.exactQuote.length).to.be.above(0);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json", "type": "text" },
+              { "key": "Accept", "value": "application/json", "type": "text" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"entityName\": \"Alex Chen\",\n  \"entityType\": \"PERSON\",\n  \"sourceUrl\": \"https://example.com/team/alex\",\n  \"textContent\": \"Alex Chen is a Staff Infrastructure Engineer at CloudScale Inc located in Seattle, Washington. He earned his Master of Science in Computer Science from Stanford University.\",\n  \"targetFields\": [\"role\", \"organization\", \"location\", \"education\"]\n}"
+            },
+            "url": {
+              "raw": "{{aiBaseUrl}}/api/v1/ai/extract",
+              "host": ["{{aiBaseUrl}}"],
+              "path": ["api", "v1", "ai", "extract"]
+            },
+            "description": "Scenario 6: Validates that extracted facts contain verbatim source quotes with zero hallucination."
+          }
+        },
+        {
+          "name": "Scenario 07: Ambiguous Entity Disambiguation",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Ambiguous entity returns processed entity\", function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('entityName');",
+                  "    pm.expect(json.entityName).to.eql(\"John Smith\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json", "type": "text" },
+              { "key": "Accept", "value": "application/json", "type": "text" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"John Smith\",\n  \"entityType\": \"PERSON\",\n  \"depth\": \"NORMAL\"\n}"
+            },
+            "url": {
+              "raw": "{{researchBaseUrl}}/api/v1/research",
+              "host": ["{{researchBaseUrl}}"],
+              "path": ["api", "v1", "research"]
+            },
+            "description": "Scenario 7: Disambiguates common names and penalizes confidence when entity anchor is weak."
+          }
+        },
+        {
+          "name": "Scenario 08: Conflicting Evidence Corroboration",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Attributes map exists and retains provenance\", function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('attributes');",
+                  "    pm.expect(json).to.have.property('evidence');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json", "type": "text" },
+              { "key": "Accept", "value": "application/json", "type": "text" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Jane Developer\",\n  \"url\": \"https://linkedin.com/in/janedev\",\n  \"organization\": \"Acme Labs\",\n  \"entityType\": \"PERSON\",\n  \"targetFields\": [\"organization\"]\n}"
+            },
+            "url": {
+              "raw": "{{researchBaseUrl}}/api/v1/research",
+              "host": ["{{researchBaseUrl}}"],
+              "path": ["api", "v1", "research"]
+            },
+            "description": "Scenario 8: Multi-source corroboration and non-destructive conflict recording."
+          }
+        },
+        {
+          "name": "Scenario 09: AI Structured Fact Extraction",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Facts contain structured role and location\", function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('facts');",
+                  "    pm.expect(json.facts).to.have.property('role');",
+                  "    pm.expect(json.facts.role.value).to.include('VP of Engineering');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json", "type": "text" },
+              { "key": "Accept", "value": "application/json", "type": "text" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"entityName\": \"Priya Sharma\",\n  \"entityType\": \"PERSON\",\n  \"sourceUrl\": \"https://techcorp.com/leadership/priya\",\n  \"textContent\": \"Priya Sharma serves as VP of Engineering at TechCorp. She is based in Bengaluru, India.\",\n  \"targetFields\": [\"role\", \"organization\", \"location\"]\n}"
+            },
+            "url": {
+              "raw": "{{aiBaseUrl}}/api/v1/ai/extract",
+              "host": ["{{aiBaseUrl}}"],
+              "path": ["api", "v1", "ai", "extract"]
+            },
+            "description": "Scenario 9: Structured extraction using externalized templates and JSON schema validation."
+          }
+        },
+        {
+          "name": "Scenario 10: AI Failure Resiliency & Heuristic Fallback",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Deterministic engine delivers facts on LLM fallback\", function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('facts');",
+                  "    pm.expect(json.facts).to.have.property('role');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json", "type": "text" },
+              { "key": "Accept", "value": "application/json", "type": "text" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"entityName\": \"Dev Fallback\",\n  \"entityType\": \"PERSON\",\n  \"sourceUrl\": \"https://example.org/profile/fallback\",\n  \"textContent\": \"Dev Fallback is a Software Architect at GlobalFin based in New York.\",\n  \"targetFields\": [\"role\", \"organization\", \"location\"]\n}"
+            },
+            "url": {
+              "raw": "{{aiBaseUrl}}/api/v1/ai/extract",
+              "host": ["{{aiBaseUrl}}"],
+              "path": ["api", "v1", "ai", "extract"]
+            },
+            "description": "Scenario 10: Resiliency verification: heuristic fallback guarantees pipeline continuity if LLM calls fail."
+          }
+        }
+      ]
     }
   ]
 }
