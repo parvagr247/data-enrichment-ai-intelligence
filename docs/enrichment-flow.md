@@ -1,121 +1,124 @@
 # End-to-End Enrichment Flow
 
-This document details the lifecycle of an entity through the **Data Enrichment AI Intelligence Platform**, tracing how raw, sparse inputs are transformed into verified, evidence-grounded attributes.
+This document details the complete lifecycle of a dataset through the **Data Enrichment AI Intelligence Platform**, tracing how raw spreadsheet inputs are transformed into verified, evidence-grounded attributes under bounded concurrent execution and real-time observability.
 
 ---
 
-## 1. Flow Diagram
+## 1. End-to-End Flow Sequence
 
 ```mermaid
 sequenceDiagram
     autonumber
-    actor User as User / Frontend
-    participant Dataset as dataset-service (:9743)
-    participant Research as research-service (:9741)
-    participant Search as Web Search Provider
+    actor User as User / Browser
+    participant UI as Next.js UI (:3000)
+    participant DS as dataset-service (:9743)
+    participant RS as research-service (:9741)
+    participant Search as Web Search (Tavily/Mock)
     participant Web as Target Web Pages
     participant AI as ai-intelligent-service (:9742)
     participant DB as MySQL DB (:3306)
 
-    User->>Dataset: Upload CSV/XLSX & Map Columns + Requirement
-    User->>Dataset: POST /api/v1/enrichment/jobs (or loop /single)
-    activate Dataset
-    Dataset->>AI: POST /api/v1/ai/clean (Input Cleansing)
-    AI-->>Dataset: Cleaned seeds (name, url, context)
-    
-    loop For each row in dataset (Isolated Execution)
-        Dataset->>Research: POST /api/v1/research (with userRequirement)
-        activate Research
+    Note over User,UI: 1. Ingestion & Profiling
+    User->>UI: Upload CSV / XLSX
+    UI->>UI: Parse tabular rows & detect column types (Name, URL, Org, Role)
+    User->>UI: Confirm column mappings & enter natural language requirement
+
+    Note over UI,DS: 2. Batch Job Submission & Real-Time Stream
+    UI->>DS: POST /api/v1/enrichment/jobs (rows, mapping, requirement)
+    DS-->>UI: 202 Accepted (jobId, totalRows, concurrency=3)
+    UI->>DS: GET /api/v1/enrichment/jobs/{jobId}/events (SSE Connection)
+    DS-->>UI: Event: INIT (connection open, replay buffer)
+
+    Note over DS,AI: 3. Input Cleansing
+    DS->>AI: POST /api/v1/ai/clean (normalize raw seeds)
+    AI-->>DS: Cleaned names, normalized URLs
+
+    Note over DS,DB: 4. Bounded Concurrent Execution (Pool Size: 3 Workers)
+    par Worker-1 (Row 0), Worker-2 (Row 1), Worker-3 (Row 2)
+        DS->>UI: Event: STARTED (workerId, rowIndex, entityName)
         
-        Research->>AI: POST /api/v1/ai/requirement (Parse target fields)
-        AI-->>Research: Target fields & search keywords
-        
-        Research->>Research: Formulate targeted search queries
-        Research->>Search: Query primary & secondary web sources
-        Search-->>Research: Discovered URLs & metadata
-        
-        Research->>Research: Filter, deduplicate & rank sources
-        
-        loop Top authoritative sources
-            Research->>Web: Fetch HTML/DOM
-            Web-->>Research: Raw web content
-            Research->>Research: Strip boilerplate & extract core text
-            
-            Research->>AI: POST /api/v1/ai/enrich (Ground fact extraction)
-            AI-->>Research: Structured attributes with verbatim quotes
+        Note over DS,RS: Stage: RESEARCH
+        DS->>UI: Event: STAGE_TRANSITION (RESEARCH)
+        DS->>RS: POST /api/v1/research (url, name, requirement)
+        RS->>AI: POST /api/v1/ai/requirement (parse target fields)
+        AI-->>RS: Target fields & keywords
+        RS->>Search: Query primary & secondary sources
+        Search-->>RS: Candidate URLs & snippets
+        loop Authoritative Sources
+            RS->>Web: Fetch HTML & clean boilerplate
+            Web-->>RS: Raw text
+            RS->>AI: POST /api/v1/ai/enrich (grounded extraction)
+            AI-->>RS: Facts with exact verbatim quotes
         end
-        
-        Research->>Research: Corroborate across sources & detect conflicts
-        Research->>Research: Calculate confidence tier (HIGH / MEDIUM / LOW)
-        
-        Research->>Dataset: POST /api/v1/entities (Snapshot entity & evidence)
-        Dataset->>DB: Upsert entity, sources, attributes
-        DB-->>Dataset: Confirmed persistence
-        
-        Research-->>Dataset: ResearchResponse (Enriched attributes & sources)
-        deactivate Research
-        
-        Dataset->>Dataset: Update row status (COMPLETED / PARTIAL / FAILED)
+        RS->>RS: Corroborate sources & resolve conflicts
+        RS-->>DS: ResearchResponse (attributes, sources, confidence)
+
+        Note over DS,AI: Stage: AI_EXTRACTION (Profile Assessment)
+        DS->>UI: Event: STAGE_TRANSITION (AI_EXTRACTION)
+        DS->>AI: POST /api/v1/ai/profile/assess (objective evaluation)
+        AI-->>DS: Multi-dimensional score & summary
+
+        Note over DS,DB: Stage: PERSISTENCE
+        DS->>UI: Event: STAGE_TRANSITION (PERSISTENCE)
+        DS->>DB: Upsert entity, sources, attributes (Flyway/JPA)
+        DB-->>DS: Confirmed persistence
+
+        DS->>UI: Event: ROW_COMPLETED (metadata: result with sources & attributes)
+        Note over UI: Row immediately available for Evidence Modal Inspection!
     end
-    
-    deactivate Dataset
-    Dataset-->>User: Enriched dataset with original data + Enriched_* attributes
+
+    Note over DS,UI: 5. Terminal Completion
+    DS->>UI: Event: JOB_COMPLETED (jobId, status=COMPLETED)
+    User->>UI: Inspect full dataset or Export CSV / XLSX
 ```
 
 ---
 
-## 2. Detailed Pipeline Stages
+## 2. Stage-by-Stage Breakdown
 
-### Stage 1: Input Cleansing & Identification
-* **Objective**: Remove formatting anomalies and determine the entity category (`PERSON`, `ORGANIZATION`, `PRODUCT`, `REPOSITORY`, `WEBSITE`, `OTHER`).
-* **Actions**:
-  - Strip emojis, honorifics, corporate suffixes (e.g., `Inc.`, `LLC`), and query parameters from profile URLs.
-  - Normalization extracts canonical handles (e.g., `linkedin.com/in/johndoe` $\rightarrow$ `johndoe`).
+### Stage 1: Tabular Dataset Ingestion & Profiling
+* **Client-Side Parsing**: Next.js parses CSV or Excel (`.xlsx`) files in-browser via SheetJS (`xlsx`), never uploading raw files to ephemeral temporary storage.
+* **Automatic Schema Detection**: Analyzes column names and row sample values using regex heuristics to detect entity names, URLs (LinkedIn, GitHub, websites), organizations, and job titles.
+* **Requirement Input**: Users select prompt suggestions (e.g. *"Identify current role, tech stack, open-source projects, and education"*) or enter custom natural-language requirements.
 
-### Stage 2: Requirement Interpretation
-* **Objective**: Transform user natural language intent into structured search priorities.
-* **Actions**:
-  - Free-form text like `"Find funding rounds, founders, and headquarters"` is parsed by `ai-intelligent-service` into:
-    ```json
-    {
-      "targetFields": ["funding_rounds", "founders", "headquarters"],
-      "focusAreas": ["Investment", "Leadership", "Location"],
-      "searchKeywords": ["funding series", "seed", "founder", "HQ address"]
-    }
-    ```
+### Stage 2: Bounded Concurrent Batch Orchestration
+* **Job Creation**: `dataset-service` generates a unique `jobId`, registers an in-memory job state tracker, and schedules row tasks onto `enrichmentTaskExecutor`.
+* **Dynamic Concurrency**: Operates over a bounded `ThreadPoolTaskExecutor` (default: 3 workers). Threads are named `dataset-enrichment-worker-N`.
+* **Row-Level Error Isolation**: Each row runs inside its own `CompletableFuture`. If row 2 encounters a scraping 403 or network timeout, it is marked `FAILED` with diagnostic logs; rows 0, 1, and 3 continue to completion uninterrupted.
 
-### Stage 3: Query Generation & Source Discovery
-* **Objective**: Retrieve candidate web documents while minimizing search noise.
-* **Actions**:
-  - Generates specialized boolean queries:
-    - `"Acme Corp" (funding OR series OR investment OR "round")`
-    - `"Acme Corp" (founders OR "founded by" OR "co-founder")`
-  - Fetches results via Tavily / Mock Search Provider.
-  - Ranks primary and official sources higher than aggregated syndication sites.
+### Stage 3: Real-Time Observability via Server-Sent Events (SSE)
+* **Live Connection**: The frontend opens `GET /api/v1/enrichment/jobs/{jobId}/events` using native `EventSource`.
+* **Event Taxonomy**: Emits discrete transitions:
+  - `init`: Handshake event with current concurrency and total rows.
+  - `execution-event`: Granular progress carrying `workerId`, `rowIndex`, `stage` (`STARTED`, `RESEARCH`, `AI_EXTRACTION`, `PERSISTENCE`), and message.
+  - `row-completed`: Carries the complete `RowEnrichmentResult` inside event metadata, allowing the frontend to hydrate rows incrementally.
+  - `job-completed`: Terminal event signaling the entire batch has concluded.
+* **Bounded Replay Buffer**: The backend retains the last 500 events per job so newly connected or reconnected clients immediately reconstruct the in-flight worker cards.
+* **Graceful Fallback**: If SSE disconnects or is blocked by an intermediate proxy, the frontend automatically falls back to periodic interval polling (`GET /api/v1/enrichment/jobs/{jobId}`).
 
-### Stage 4: Web Fetching & Boilerplate Cleaning
-* **Objective**: Convert raw web documents into clean, dense text.
-* **Actions**:
-  - Strips HTML navigation headers, footers, cookie notices, and advertisements.
-  - Extracts title, meta descriptions, and core body segments preserving paragraph structures.
+### Stage 4: Autonomous Web Discovery & Retrieval (`research-service`)
+* **URL Canonicalization**: Strips tracking query parameters (`utm_source`, `utm_medium`, `ref`, `fbclid`) and sorts functional parameters.
+* **Intent-Driven Queries**: Formulates targeted search queries combining the canonical entity identifier with requirement keywords.
+* **Provider Abstraction**: Dispatches search queries through `SearchProvider` (Tavily with graceful `MockSearchProvider` fallback).
+* **Source Ranking**: Prioritizes primary sources (official organization domains, GitHub, LinkedIn, technical docs) over low-reliability scrapers.
+* **Polite Web Scraping**: Fetches target HTML pages with strict timeouts (5000ms), caps response size, and strips HTML boilerplate, scripts, styling, and navigation headers.
 
-### Stage 5: Grounded AI Fact Extraction (Zero-Hallucination)
-* **Objective**: Extract structured field values grounded in verifiable facts.
-* **Core Rule**: **Every extracted attribute MUST include an exact verbatim substring quote from the scraped text.**
-* **Actions**:
-  - Prompt enforces structured JSON schema output.
-  - If information is not explicitly mentioned in the text, the model returns `UNKNOWN` or omits the field. The model is forbidden from extrapolating or guessing.
+### Stage 5: Grounded Fact Extraction (`ai-intelligent-service`)
+* **Prompt Construction**: Uses externalized StringTemplate files (`src/main/resources/prompts/*.st`) enforcing strict JSON schema output.
+* **Zero-Hallucination Programmatic Guard**: Every extracted attribute **must** supply an `exactQuote`. The service validates that `exactQuote` appears verbatim inside the scraped text before accepting the fact. Ungrounded claims are discarded immediately.
+* **Deterministic Fallback**: If the external LLM is rate-limited (HTTP 429) or unavailable, extraction seamlessly degrades to deterministic regex heuristics, guaranteeing the batch never halts.
 
-### Stage 6: Multi-Source Corroboration & Confidence Tiers
-* **Objective**: Merge facts from independent sources and compute trustworthiness.
-* **Confidence Criteria**:
-  - `HIGH`: Confirmed by multiple independent sources OR sourced from an authoritative primary domain with direct verbatim quote.
-  - `MEDIUM`: Sourced from a single reputable secondary source with clear evidence.
-  - `LOW`: Inferred with weak snippet context or ambiguous entity match.
-  - `Conflict Flag`: When two sources assert contradictory facts (e.g., different founding dates), the attribute is marked `conflictDetected = true` with both sources preserved.
+### Stage 6: Multi-Source Corroboration & Relational Persistence
+* **Agreement Boosting**: When multiple independent sources assert the same attribute, confidence is upgraded from `LOW` to `MEDIUM` or `MEDIUM` to `HIGH`.
+* **Conflict Flagging**: When sources assert contradictory facts, `conflictDetected` is set to `true`, preserving all conflicting claims for human audit.
+* **Idempotent Upsert**: `dataset-service` saves entities, sources, and attributes in MySQL within an atomic transaction using JPA `orphanRemoval = true`.
 
-### Stage 7: Persistence & Non-Destructive Export
-* **Objective**: Save audit trail and provide exportable data.
-* **Actions**:
-  - Entities, sources, and attributes are persisted into MySQL.
-  - Client can download CSV/XLSX where original uploaded columns are completely untouched, with new `Enriched_<attribute>` and `Enrichment_Status` columns added.
+### Stage 7: Real-Time Inspection & Non-Destructive Export
+* **Instant Evidence Modal**: Finished rows populate in the UI immediately. Users can click **"Inspect Evidence"** to view discovered sources, attribute confidence badges, and exact quotes *while remaining rows are still being processed*.
+* **Non-Destructive Export**: Exports the enriched dataset to CSV or XLSX, appending `Enriched_<attribute>`, `Enrichment_Status`, and `Canonical_Url` columns while strictly preserving all original user columns.
+
+---
+
+For architecture diagrams and service boundaries, see [System Architecture](architecture.md).  
+For the complete REST and SSE API contract, see [API Reference](api.md).  
+For architectural decisions, see [Architecture Decisions](decisions.md).

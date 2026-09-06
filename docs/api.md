@@ -403,4 +403,69 @@ Extracts structured factual attributes from source text using Spring AI (Gemini 
   }
   ```
 
+### `POST /api/v2/ai/objective/parse` (`ai-intelligent-service :9742`)
+Parses an open-ended research goal into structured dimensional targets and focus areas.
+
+* **Headers**: `Content-Type: application/json`, `Accept: application/json`
+* **Request Body**:
+  ```json
+  {
+    "objective": "Find senior backend engineers with extensive distributed systems and Kubernetes experience"
+  }
+  ```
+* **Response `200 OK`**:
+  ```json
+  {
+    "rawObjective": "Find senior backend engineers with extensive distributed systems and Kubernetes experience",
+    "targetRole": "Senior Backend Engineer",
+    "requiredSkills": ["Distributed Systems", "Kubernetes"],
+    "seniorityLevel": "SENIOR",
+    "domainFocus": "Cloud Infrastructure"
+  }
+  ```
+
+### `POST /api/v2/ai/profile/assess` (`ai-intelligent-service :9742`)
+Executes multi-dimensional profile assessment against an objective, computing role alignment, experience depth, and verified skill scores.
+
+* **Headers**: `Content-Type: application/json`, `Accept: application/json`
+* **Request Body** (`ProfileAssessmentRequest`):
+  ```json
+  {
+    "displayName": "Linus Torvalds",
+    "entityType": "PERSON",
+    "canonicalUrl": "https://github.com/torvalds",
+    "objective": "Find Linux kernel maintainers with C systems programming background",
+    "attributes": {
+      "currentRole": "Principal Fellow",
+      "organization": "Linux Foundation"
+    },
+    "sources": [
+      {
+        "url": "https://github.com/torvalds",
+        "title": "Linus Torvalds",
+        "snippet": "Creator of Linux and Git"
+      }
+    ]
+  }
+  ```
+* **Response `200 OK`** (`ProfileAssessmentResponse`):
+  ```json
+  {
+    "displayName": "Linus Torvalds",
+    "overallMatchScore": 0.98,
+    "fitCategory": "STRONG_MATCH",
+    "dimensionalScores": {
+      "roleAlignment": 1.0,
+      "skillOverlap": 0.96,
+      "domainRelevance": 1.0
+    },
+    "executiveSummary": "World-leading systems architect and original creator of Linux kernel and Git.",
+    "highlightedStrengths": ["Kernel development", "Distributed version control", "C systems programming"],
+    "potentialGaps": [],
+    "confidenceTier": "HIGH",
+    "assessedAt": "2026-09-06T10:00:00Z"
+  }
+  ```
+
+
 
