@@ -48,6 +48,7 @@ services:
     build:
       context: ../../apps/backend/config-server
       dockerfile: Dockerfile
+    pull_policy: build
     container_name: enrichment-config-server
     restart: unless-stopped
     environment:
@@ -75,6 +76,7 @@ services:
     build:
       context: ../../apps/backend/discovery-server
       dockerfile: Dockerfile
+    pull_policy: build
     container_name: enrichment-discovery-server
     restart: unless-stopped
     environment:
@@ -102,6 +104,7 @@ services:
     build:
       context: ../../apps/backend/auth-service
       dockerfile: Dockerfile
+    pull_policy: build
     container_name: enrichment-auth-service
     restart: unless-stopped
     environment:
@@ -138,6 +141,7 @@ services:
     build:
       context: ../../apps/backend/ai-intelligent-service
       dockerfile: Dockerfile
+    pull_policy: build
     container_name: enrichment-ai-intelligent-service
     restart: unless-stopped
     environment:
@@ -170,6 +174,7 @@ services:
     build:
       context: ../../apps/backend/research-service
       dockerfile: Dockerfile
+    pull_policy: build
     container_name: enrichment-research-service
     restart: unless-stopped
     environment:
@@ -211,6 +216,7 @@ services:
     build:
       context: ../../apps/backend/dataset-service
       dockerfile: Dockerfile
+    pull_policy: build
     container_name: enrichment-dataset-service
     restart: unless-stopped
     environment:
@@ -252,6 +258,7 @@ services:
     build:
       context: ../../apps/backend/api-gateway
       dockerfile: Dockerfile
+    pull_policy: build
     container_name: enrichment-api-gateway
     restart: unless-stopped
     ports:
@@ -297,6 +304,7 @@ services:
         NEXT_PUBLIC_DATASET_SERVICE_URL: ${NEXT_PUBLIC_DATASET_SERVICE_URL:-http://${VM_IP}:9738}
         NEXT_PUBLIC_AUTH_SERVICE_URL: ${NEXT_PUBLIC_AUTH_SERVICE_URL:-http://${VM_IP}:9738}
         NEXT_PUBLIC_GATEWAY_API_KEY: ${GATEWAY_API_KEY:-}
+    pull_policy: build
     container_name: enrichment-frontend
     restart: unless-stopped
     ports:
