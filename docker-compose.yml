@@ -48,6 +48,7 @@ services:
     environment:
       SERVER_PORT: 9736
       SPRING_PROFILES_ACTIVE: native
+      EUREKA_SERVER_URL: http://discovery-server:9737/eureka/
     volumes:
       - ./config:/config:ro
     networks:

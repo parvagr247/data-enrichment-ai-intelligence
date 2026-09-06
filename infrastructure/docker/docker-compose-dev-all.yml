@@ -35,6 +35,7 @@ services:
       SERVER_PORT: 9736
       SPRING_PROFILES_ACTIVE: native
       CONFIG_SEARCH_LOCATIONS: file:/config
+      EUREKA_SERVER_URL: http://discovery-server:9737/eureka/
     volumes:
       - maven_cache:/root/.m2
       - ../../config:/config:ro
