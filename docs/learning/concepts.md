@@ -1154,3 +1154,174 @@ LLM Generation -> [Raw String: "```json { 'name': 'Jane' } ```"]
 
 ---
 
+## 32. Externalized Centralized Configuration (Spring Cloud Config Native Model)
+
+### 1. Core Concept
+Externalized configuration separates application runtime configuration from code and container artifacts. The Spring Cloud Config Native Model serves YAML property definitions from local or mounted file systems (`/config`) over an HTTP REST API without needing external Git or database backends.
+
+### 2. Why It Matters in Real Systems
+In microservice architectures, updating timeouts, scraper boundaries, or model parameters across multiple independent services without centralized configuration requires rebuilding or redeploying every container. A centralized config server provides a single source of truth for runtime parameters and environment overrides.
+
+### 3. How This System Implements It
+`config-server` runs on Port `9736` using the `native` profile and searches `/config` (mounted to `config/`). It serves `application.yml` (shared Eureka and Actuator settings) alongside service-specific files (`research-service.yml`, `ai-intelligent-service.yml`, `dataset-service.yml`, `api-gateway.yml`). Client microservices fetch their configuration using `spring.config.import: optional:configserver:${CONFIG_SERVER_URL:http://localhost:9736}`. The `optional:` prefix ensures services cleanly fall back to local `application.yaml` defaults if the Config Server is unreachable.
+
+### 4. Real Failure Modes & Edge Cases
+- Startup Deadlock: If client services treat Config Server as mandatory (`spring.config.import: configserver:...`), an outage of the config server blocks all downstream service boots. The `optional:` prefix eliminates this single point of failure.
+- Stale Configuration: In-flight singletons do not automatically refresh when files change unless `@RefreshScope` and Actuator `/actuator/refresh` or Spring Cloud Bus are triggered.
+
+### 5. Mental Model & Diagram
+```
+  [ Local / Mounted config/ directory ]
+                  |
+         (Native File System)
+                  v
+       [ config-server (:9736) ]
+                  |
+     HTTP GET /app-name/default
+                  |
+   +--------------+--------------+
+   |                             |
+[ research-service ]     [ dataset-service ]
+(optional: fallback      (optional: fallback
+ to embedded yaml)        to embedded yaml)
+```
+
+### 6. Architectural Trade-offs
+- Pros: Simple, lightweight, zero external Git/credential dependencies; fully VM-friendly and versioned via local repository commits.
+- Cons: In native mode, changes require service restart or manual `/actuator/refresh` webhook invocation compared to webhook-driven Git backing.
+
+### 7. Senior Engineering & Interview Talking Points
+"Centralized configuration is essential for operational sanity, but making it a hard boot dependency creates a critical single point of failure. By using `optional:configserver` and embedding safe production fallbacks inside each service's local YAML, our services achieve centralized governance without sacrificing startup resilience."
+
+---
+
+## 33. Client-Side Service Discovery & Registry Heartbeats (Netflix Eureka)
+
+### 1. Core Concept
+Service discovery maintains a dynamic runtime registry of healthy service instances (hostnames, IP addresses, ports). Netflix Eureka provides a client-side discovery architecture where microservices register themselves on boot and resolve target service locations from local in-memory registry caches.
+
+### 2. Why It Matters in Real Systems
+In dynamic containerized environments, container IP addresses shift on restarts and deployments. Hardcoding static IP addresses or internal hostnames makes scaling and zero-downtime rolling deployments difficult. Service discovery abstracts network addresses behind logical service IDs (e.g. `DATASET-SERVICE`).
+
+### 3. How This System Implements It
+`discovery-server` runs on Port `9737` as a standalone Eureka Server (`register-with-eureka: false`, `fetch-registry: false`). Business microservices (`research-service`, `ai-intelligent-service`, `dataset-service`) and `api-gateway` include `spring-cloud-starter-netflix-eureka-client`. They register on startup and send periodic heartbeats (10s renewal interval) while maintaining local discovery caches.
+
+### 4. Real Failure Modes & Edge Cases
+- Eureka Self-Preservation Mode: When a network partition occurs and the server misses more than 15% of expected heartbeats, it enters self-preservation mode and stops evicting instances, preventing premature deregistration of healthy nodes during temporary blips.
+- Client Registry Staleness: Clients refresh their local registry cache periodically (default 30s). A newly spun-down service may still receive requests until the cache invalidates; client-side retries and circuit breakers mitigate this window.
+
+### 5. Mental Model & Diagram
+```
+                      [ Eureka Registry (:9737) ]
+                             ^           ^
+             Heartbeat (10s) |           | Query / Fetch Registry
+                             |           |
+                     [ research-service ]+
+                             |
+                   Resolves: DATASET-SERVICE
+                             |
+                             v
+                     [ dataset-service (:9743) ]
+```
+
+### 6. Architectural Trade-offs
+- Pros: Decentralized resolution eliminates the gateway/proxy bottle-neck for internal service-to-service RPC; self-preservation protects against false eviction during transient network spikes.
+- Cons: Eventual consistency in registry state; adds memory footprint (~100MB JVM) for Eureka registry coordination.
+
+### 7. Senior Engineering & Interview Talking Points
+"In modern cloud architectures, Eureka provides robust client-side load balancing and health awareness. Even if Eureka goes offline temporarily, client services continue operating without interruption because their local in-memory registry cache preserves the last-known healthy endpoints."
+
+---
+
+## 34. Reverse Proxy Routing & Unified Ingress Gateway (Spring Cloud Gateway WebMvc)
+
+### 1. Core Concept
+An API Gateway acts as a reverse proxy and single ingress checkpoint at the edge of a microservices cluster. Spring Cloud Gateway Server (WebMvc) executes within the standard Servlet container stack, matching incoming HTTP request paths and forwarding them to internal downstream microservices.
+
+### 2. Why It Matters in Real Systems
+Exposing individual microservices directly to browsers creates complex CORS configurations, requires distributed authentication logic across every service, and leaks internal network topology. A unified gateway centralizes security, rate limiting, request validation, and routing.
+
+### 3. How This System Implements It
+`api-gateway` runs on Port `9738` using Spring Cloud Gateway Server (WebMvc) on Spring Boot 4.1.1 and Java 25. Route predicates forward `/api/v1/research/**` and `/api/v1/sources/**` to `research-service:9741`, `/api/v1/ai/**` to `ai-intelligent-service:9742`, and `/api/v1/enrichment/**` and `/api/v1/entities/**` to `dataset-service:9743`. In dev and prod Docker Compose files, the frontend targets Port `9738` as its single ingress point.
+
+### 4. Real Failure Modes & Edge Cases
+- Streaming Interruption (SSE Buffering): Naive reverse proxies buffer HTTP response bodies before forwarding, breaking real-time Server-Sent Events. Spring Cloud Gateway WebMvc streams chunked responses natively without buffering SSE event streams.
+- Header Forwarding Loops: Failure to append or preserve `X-Forwarded-For` and `X-Forwarded-Host` can cause downstream redirect loops or incorrect origin checks.
+
+### 5. Mental Model & Diagram
+```
+[ Client / Next.js UI ]
+          |
+   (Host Port 9738)
+          v
++-------------------------------------------------------+
+|                 api-gateway (:9738)                   |
+|  - ApiKeyAuthenticationFilter                         |
+|  - GatewaySecurityConfiguration (CORS & Headers)      |
++-------------------------------------------------------+
+     |                    |                    |
+     | /api/v1/research/**| /api/v1/ai/**      | /api/v1/enrichment/**
+     v                    v                    v
+[ research-service ] [ ai-service ]  [ dataset-service ]
+    (:9741)               (:9742)              (:9743)
+```
+
+### 6. Architectural Trade-offs
+- Pros: Single entry point simplifies frontend network config; allows rolling internal service rewrites and path deprecations without breaking client contracts.
+- Cons: Adds single network hop latency (typically <2ms); gateway outage impacts all inbound public traffic.
+
+### 7. Senior Engineering & Interview Talking Points
+"Using Spring Cloud Gateway WebMvc on the Servlet stack aligns perfectly with Spring Boot 4's lightweight virtual-thread-ready architecture. It provides full enterprise routing, load balancing, and header manipulation without requiring the reactive WebFlux mental overhead for standard CRUD and SSE streaming flows."
+
+---
+
+## 35. Defense-in-Depth Ingress Protection & Security Headers
+
+### 1. Core Concept
+Defense-in-depth establishes multiple concentric layers of security: network perimeter isolation (private Docker bridge networks), gateway authentication filters (`X-API-Key`), and browser-level exploit mitigation via HTTP security headers.
+
+### 2. Why It Matters in Real Systems
+Deploying microservices on a public VM without network boundaries allows attackers to bypass application security by probing internal database or microservice ports directly. Furthermore, missing browser security headers leaves clients vulnerable to clickjacking, MIME-type sniffing, and data exfiltration.
+
+### 3. How This System Implements It
+1. **Network Isolation**: In `docker-compose.yml`, only `api-gateway` (Port `9738`) and `frontend` (Port `3000`) publish ports to the host. The three business microservices and MySQL have zero published host ports and communicate strictly over the internal bridge network (`enrichment-network`).
+2. **API Key Authentication**: `ApiKeyAuthenticationFilter` inspects incoming requests for `X-API-Key: <key>`. Requests missing or providing an invalid key receive an immediate RFC-standard `401 Unauthorized`. Actuator health/info endpoints and CORS `OPTIONS` preflight requests bypass the filter.
+3. **HTTP Security Headers**: Injected automatically by `GatewaySecurityConfiguration`:
+   - `X-Content-Type-Options: nosniff` (prevents MIME confusion attacks)
+   - `X-Frame-Options: DENY` (prevents clickjacking via iframes)
+   - `Referrer-Policy: strict-origin-when-cross-origin` (protects query parameters from leaking)
+   - `Permissions-Policy: geolocation=(), microphone=(), camera=()` (disables unused device APIs)
+4. **CORS Governance**: Centrally defines allowed origins (`http://localhost:3000`), methods (`GET`, `POST`, `OPTIONS`, etc.), and exposes essential headers (`Content-Disposition`, `X-Correlation-ID`).
+
+### 4. Real Failure Modes & Edge Cases
+- Preflight Blocking: If security filters execute before CORS filters and reject `OPTIONS` requests with 401, browsers block subsequent cross-origin POST/GET calls. Handled by explicitly bypassing `OPTIONS` requests before API key checks.
+- Health Check Lockout: If monitoring probes (`/actuator/health`) are subjected to API key authentication, VM load balancers or orchestrators report the service as dead. Handled by whitelisting `/actuator/health` and `/actuator/info`.
+
+### 5. Mental Model & Diagram
+```
+Public Internet / VM Host
+  |
+  +--- [ Port 3000: Next.js Frontend ]
+  |
+  +--- [ Port 9738: api-gateway ]
+            |
+      (X-API-Key Check + Security Headers + CORS)
+            |
+  ======================================================
+  Private Docker Network (enrichment-network)
+  [No host ports exposed]
+  |
+  +---> research-service (:9741)
+  +---> ai-intelligent-service (:9742)
+  +---> dataset-service (:9743)
+  +---> mysql (:3306)
+  ======================================================
+```
+
+### 6. Architectural Trade-offs
+- Pros: Complete protection against unauthenticated internal probing; zero overhead for internal microservice-to-microservice communication within the trusted private network.
+- Cons: Static API keys require secure externalization (environment variables) and periodic rotation; does not replace mutual TLS (mTLS) in zero-trust multi-tenant cloud environments.
+
+### 7. Senior Engineering & Interview Talking Points
+"Security is best implemented in layers: isolate the network perimeter so internal services aren't reachable, authenticate inbound requests at the gateway edge with preflight awareness, and instruct the browser to enforce strict MIME and frame isolation via standard HTTP security headers."
+

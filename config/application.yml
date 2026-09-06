@@ -1,0 +1,35 @@
+# ==============================================================================
+# Centralized Common Configuration (Shared across all Spring Boot services)
+# Managed by Config Server (Port 9736)
+# ==============================================================================
+
+eureka:
+  instance:
+    prefer-ip-address: true
+    lease-renewal-interval-in-seconds: 10
+    lease-expiration-duration-in-seconds: 30
+  client:
+    enabled: ${EUREKA_CLIENT_ENABLED:true}
+    service-url:
+      defaultZone: ${EUREKA_SERVER_URL:http://discovery-server:9737/eureka/}
+    registry-fetch-interval-seconds: 10
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: when_authorized
+
+logging:
+  pattern:
+    console: "%clr(%d{yyyy-MM-dd HH:mm:ss.SSS}){faint} %clr([%-5level]) %clr([%X{correlationId}]){magenta} %clr([%15.15t]){faint} %clr(%-40.40logger{39}){cyan} : %m%n"
+  level:
+    root: INFO
+    com.subdual: INFO
+    org.springframework.cloud: INFO
+    org.springframework.web: INFO

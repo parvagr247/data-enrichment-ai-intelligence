@@ -4,6 +4,15 @@ server:
 spring:
   application:
     name: dataset-service
+  config:
+    import: optional:configserver:${CONFIG_SERVER_URL:http://localhost:9736}
+
+eureka:
+  client:
+    enabled: ${EUREKA_CLIENT_ENABLED:true}
+    service-url:
+      defaultZone: ${EUREKA_SERVER_URL:http://localhost:9737/eureka/}
+
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/enrichment_db}
     username: ${SPRING_DATASOURCE_USERNAME:root}

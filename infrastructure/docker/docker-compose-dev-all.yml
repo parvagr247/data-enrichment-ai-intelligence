@@ -17,11 +17,102 @@ services:
     networks:
       - enrichment-network
     healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$${MYSQL_ROOT_PASSWORD:-rootpassword} --silent"]
-      interval: 10s
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost --silent"]
+      interval: 5s
       timeout: 5s
-      retries: 5
-      start_period: 30s
+      retries: 15
+      start_period: 60s
+
+  config-server:
+    build:
+      context: ../../apps/backend/config-server
+      dockerfile: Dockerfile
+    container_name: enrichment-config-server
+    restart: unless-stopped
+    ports:
+      - "9736:9736"
+    environment:
+      SERVER_PORT: 9736
+      SPRING_PROFILES_ACTIVE: native
+      CONFIG_SEARCH_LOCATIONS: file:/config
+    volumes:
+      - maven_cache:/root/.m2
+      - ../../config:/config:ro
+      - ../../apps/backend/config-server/pom.xml:/app/pom.xml
+      - ../../apps/backend/config-server/src:/app/src
+    develop:
+      watch:
+        - path: ../../apps/backend/config-server/pom.xml
+          action: rebuild
+        - path: ../../apps/backend/config-server/Dockerfile
+          action: rebuild
+        - path: ../../apps/backend/config-server/src
+          target: /app/src
+          action: sync+restart
+    networks:
+      - enrichment-network
+
+  discovery-server:
+    build:
+      context: ../../apps/backend/discovery-server
+      dockerfile: Dockerfile
+    container_name: enrichment-discovery-server
+    restart: unless-stopped
+    ports:
+      - "9737:9737"
+    environment:
+      SERVER_PORT: 9737
+      SPRING_APPLICATION_NAME: discovery-server
+      CONFIG_SERVER_URL: http://config-server:9736
+    volumes:
+      - maven_cache:/root/.m2
+      - ../../apps/backend/discovery-server/pom.xml:/app/pom.xml
+      - ../../apps/backend/discovery-server/src:/app/src
+    develop:
+      watch:
+        - path: ../../apps/backend/discovery-server/pom.xml
+          action: rebuild
+        - path: ../../apps/backend/discovery-server/Dockerfile
+          action: rebuild
+        - path: ../../apps/backend/discovery-server/src
+          target: /app/src
+          action: sync+restart
+    networks:
+      - enrichment-network
+
+  api-gateway:
+    build:
+      context: ../../apps/backend/api-gateway
+      dockerfile: Dockerfile
+    container_name: enrichment-api-gateway
+    restart: unless-stopped
+    ports:
+      - "9738:9738"
+    environment:
+      SERVER_PORT: 9738
+      SPRING_APPLICATION_NAME: api-gateway
+      CONFIG_SERVER_URL: http://config-server:9736
+      EUREKA_SERVER_URL: http://discovery-server:9737/eureka/
+      RESEARCH_SERVICE_URL: http://research-service:9741
+      AI_INTELLIGENT_SERVICE_URL: http://ai-intelligent-service:9742
+      DATASET_SERVICE_URL: http://dataset-service:9743
+      GATEWAY_API_KEY: ${GATEWAY_API_KEY:-}
+      GATEWAY_CORS_ALLOWED_ORIGINS: ${GATEWAY_CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+    volumes:
+      - maven_cache:/root/.m2
+      - ../../apps/backend/api-gateway/pom.xml:/app/pom.xml
+      - ../../apps/backend/api-gateway/src:/app/src
+    develop:
+      watch:
+        - path: ../../apps/backend/api-gateway/pom.xml
+          action: rebuild
+        - path: ../../apps/backend/api-gateway/Dockerfile
+          action: rebuild
+        - path: ../../apps/backend/api-gateway/src
+          target: /app/src
+          action: sync+restart
+    networks:
+      - enrichment-network
 
   research-service:
     build:
@@ -34,6 +125,8 @@ services:
     environment:
       SERVER_PORT: 9741
       SPRING_APPLICATION_NAME: research-service
+      CONFIG_SERVER_URL: http://config-server:9736
+      EUREKA_SERVER_URL: http://discovery-server:9737/eureka/
       AI_INTELLIGENT_SERVICE_URL: http://ai-intelligent-service:9742
       DATASET_SERVICE_URL: http://dataset-service:9743
       SEARCH_PROVIDER_NAME: ${SEARCH_PROVIDER_NAME:-mock}
@@ -73,6 +166,8 @@ services:
     environment:
       SERVER_PORT: 9742
       SPRING_APPLICATION_NAME: ai-intelligent-service
+      CONFIG_SERVER_URL: http://config-server:9736
+      EUREKA_SERVER_URL: http://discovery-server:9737/eureka/
       AI_MOCK_MODE: ${AI_MOCK_MODE:-false}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-mock-key}
       AI_MODEL: ${AI_MODEL:-gemini-3.5-flash-lite}
@@ -103,6 +198,8 @@ services:
     environment:
       SERVER_PORT: 9743
       SPRING_APPLICATION_NAME: dataset-service
+      CONFIG_SERVER_URL: http://config-server:9736
+      EUREKA_SERVER_URL: http://discovery-server:9737/eureka/
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-enrichment_db}?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
       SPRING_DATASOURCE_USERNAME: ${MYSQL_USER:-enrichment_user}
       SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:-enrichment_password}
@@ -140,9 +237,11 @@ services:
       PORT: 3000
       HOSTNAME: "0.0.0.0"
       WATCHPACK_POLLING: "true"
-      NEXT_PUBLIC_RESEARCH_SERVICE_URL: ${NEXT_PUBLIC_RESEARCH_SERVICE_URL:-http://localhost:9741}
-      NEXT_PUBLIC_AI_INTELLIGENT_SERVICE_URL: ${NEXT_PUBLIC_AI_INTELLIGENT_SERVICE_URL:-http://localhost:9742}
-      NEXT_PUBLIC_DATASET_SERVICE_URL: ${NEXT_PUBLIC_DATASET_SERVICE_URL:-http://localhost:9743}
+      NEXT_PUBLIC_GATEWAY_URL: ${NEXT_PUBLIC_GATEWAY_URL:-http://localhost:9738}
+      NEXT_PUBLIC_RESEARCH_SERVICE_URL: ${NEXT_PUBLIC_RESEARCH_SERVICE_URL:-http://localhost:9738}
+      NEXT_PUBLIC_AI_INTELLIGENT_SERVICE_URL: ${NEXT_PUBLIC_AI_INTELLIGENT_SERVICE_URL:-http://localhost:9738}
+      NEXT_PUBLIC_DATASET_SERVICE_URL: ${NEXT_PUBLIC_DATASET_SERVICE_URL:-http://localhost:9738}
+      NEXT_PUBLIC_GATEWAY_API_KEY: ${GATEWAY_API_KEY:-}
     volumes:
       - ../../apps/frontend:/app
       - /app/node_modules

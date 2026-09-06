@@ -1,0 +1,62 @@
+server:
+  port: 9738
+
+spring:
+  application:
+    name: api-gateway
+  config:
+    import: optional:configserver:${CONFIG_SERVER_URL:http://localhost:9736}
+  cloud:
+    gateway:
+      server:
+        webmvc:
+          routes:
+            - id: research-service-sync
+              uri: ${RESEARCH_SERVICE_URL:http://localhost:9741}
+              predicates:
+                - Path=/api/v1/research
+            - id: research-service-jobs
+              uri: ${RESEARCH_SERVICE_URL:http://localhost:9741}
+              predicates:
+                - Path=/api/v1/research/jobs/**
+            - id: ai-service-v1
+              uri: ${AI_INTELLIGENT_SERVICE_URL:http://localhost:9742}
+              predicates:
+                - Path=/api/v1/ai/**
+            - id: ai-service-v2
+              uri: ${AI_INTELLIGENT_SERVICE_URL:http://localhost:9742}
+              predicates:
+                - Path=/api/v2/ai/**
+            - id: dataset-service-v2-datasets
+              uri: ${DATASET_SERVICE_URL:http://localhost:9743}
+              predicates:
+                - Path=/api/v2/datasets/**
+            - id: dataset-service-v1-enrichment
+              uri: ${DATASET_SERVICE_URL:http://localhost:9743}
+              predicates:
+                - Path=/api/v1/enrichment/**
+            - id: dataset-service-v1-entities
+              uri: ${DATASET_SERVICE_URL:http://localhost:9743}
+              predicates:
+                - Path=/api/v1/entities/**
+
+eureka:
+  client:
+    enabled: ${EUREKA_CLIENT_ENABLED:true}
+    service-url:
+      defaultZone: ${EUREKA_SERVER_URL:http://localhost:9737/eureka/}
+
+gateway:
+  security:
+    api-key: ${GATEWAY_API_KEY:}
+  cors:
+    allowed-origins: ${GATEWAY_CORS_ALLOWED_ORIGINS:http://localhost:3000,http://127.0.0.1:3000}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: when_authorized

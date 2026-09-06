@@ -1,0 +1,248 @@
+# ==============================================================================
+# Production / Linux VM Deployment Stack
+# Data Enrichment AI Intelligence Platform
+#
+# Primary Public Endpoints:
+#   - API Gateway: 9738
+#   - Frontend UI: 3000
+#
+# All backend business and infrastructure services are private within the
+# internal Docker bridge network ("enrichment-network").
+# ==============================================================================
+
+name: data-enrichment-production
+
+services:
+  # ----------------------------------------------------------------------------
+  # 1. Database Layer (Internal Only)
+  # ----------------------------------------------------------------------------
+  mysql:
+    image: mysql:latest
+    container_name: enrichment-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-enrichment_db}
+      MYSQL_USER: ${MYSQL_USER:-enrichment_user}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-enrichment_password}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - enrichment-network
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+      start_period: 60s
+
+  # ----------------------------------------------------------------------------
+  # 2. Centralized Configuration Server (Internal Only :9736)
+  # ----------------------------------------------------------------------------
+  config-server:
+    build:
+      context: apps/backend/config-server
+      dockerfile: Dockerfile
+    container_name: enrichment-config-server
+    restart: unless-stopped
+    environment:
+      SERVER_PORT: 9736
+      SPRING_PROFILES_ACTIVE: native
+    volumes:
+      - ./config:/config:ro
+    networks:
+      - enrichment-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9736/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # ----------------------------------------------------------------------------
+  # 3. Service Discovery Server (Internal Only :9737)
+  # ----------------------------------------------------------------------------
+  discovery-server:
+    build:
+      context: apps/backend/discovery-server
+      dockerfile: Dockerfile
+    container_name: enrichment-discovery-server
+    restart: unless-stopped
+    environment:
+      SERVER_PORT: 9737
+      EUREKA_INSTANCE_HOSTNAME: discovery-server
+    depends_on:
+      config-server:
+        condition: service_healthy
+    networks:
+      - enrichment-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9737/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 25s
+
+  # ----------------------------------------------------------------------------
+  # 4. AI Intelligent Service (Internal Only :9742)
+  # ----------------------------------------------------------------------------
+  ai-intelligent-service:
+    build:
+      context: apps/backend/ai-intelligent-service
+      dockerfile: Dockerfile
+    container_name: enrichment-ai-intelligent-service
+    restart: unless-stopped
+    environment:
+      SERVER_PORT: 9742
+      SPRING_APPLICATION_NAME: ai-intelligent-service
+      CONFIG_SERVER_URL: http://config-server:9736
+      EUREKA_SERVER_URL: http://discovery-server:9737/eureka/
+      AI_MOCK_MODE: ${AI_MOCK_MODE:-false}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-mock-key}
+      AI_MODEL: ${AI_MODEL:-gemini-3.5-flash-lite}
+    depends_on:
+      discovery-server:
+        condition: service_healthy
+    networks:
+      - enrichment-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9742/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # ----------------------------------------------------------------------------
+  # 5. Research Service (Internal Only :9741)
+  # ----------------------------------------------------------------------------
+  research-service:
+    build:
+      context: apps/backend/research-service
+      dockerfile: Dockerfile
+    container_name: enrichment-research-service
+    restart: unless-stopped
+    environment:
+      SERVER_PORT: 9741
+      SPRING_APPLICATION_NAME: research-service
+      CONFIG_SERVER_URL: http://config-server:9736
+      EUREKA_SERVER_URL: http://discovery-server:9737/eureka/
+      AI_INTELLIGENT_SERVICE_URL: http://ai-intelligent-service:9742
+      DATASET_SERVICE_URL: http://dataset-service:9743
+      SEARCH_PROVIDER_NAME: ${SEARCH_PROVIDER_NAME:-mock}
+      SEARCH_PROVIDER_API_KEY: ${SEARCH_PROVIDER_API_KEY:-}
+      SEARCH_PROVIDER_BASE_URL: ${SEARCH_PROVIDER_BASE_URL:-https://api.tavily.com}
+      SEARCH_DISCOVERY_MAX_RESULTS: ${SEARCH_DISCOVERY_MAX_RESULTS:-5}
+      SEARCH_DISCOVERY_TIMEOUT_MS: ${SEARCH_DISCOVERY_TIMEOUT_MS:-4000}
+      WEB_FETCH_CONNECT_TIMEOUT_MS: ${WEB_FETCH_CONNECT_TIMEOUT_MS:-3000}
+      WEB_FETCH_READ_TIMEOUT_MS: ${WEB_FETCH_READ_TIMEOUT_MS:-5000}
+      WEB_FETCH_MAX_RESPONSE_SIZE_MB: ${WEB_FETCH_MAX_RESPONSE_SIZE_MB:-5}
+      RESEARCH_MAX_SOURCES: ${RESEARCH_MAX_SOURCES:-5}
+      RESEARCH_MAX_CONTENT_LENGTH: ${RESEARCH_MAX_CONTENT_LENGTH:-50000}
+    depends_on:
+      discovery-server:
+        condition: service_healthy
+    networks:
+      - enrichment-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9741/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # ----------------------------------------------------------------------------
+  # 6. Dataset Service (Internal Only :9743)
+  # ----------------------------------------------------------------------------
+  dataset-service:
+    build:
+      context: apps/backend/dataset-service
+      dockerfile: Dockerfile
+    container_name: enrichment-dataset-service
+    restart: unless-stopped
+    environment:
+      SERVER_PORT: 9743
+      SPRING_APPLICATION_NAME: dataset-service
+      CONFIG_SERVER_URL: http://config-server:9736
+      EUREKA_SERVER_URL: http://discovery-server:9737/eureka/
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-enrichment_db}?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER:-enrichment_user}
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:-enrichment_password}
+      RESEARCH_SERVICE_URL: http://research-service:9741
+      AI_INTELLIGENT_SERVICE_URL: http://ai-intelligent-service:9742
+    depends_on:
+      mysql:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+    networks:
+      - enrichment-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9743/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # ----------------------------------------------------------------------------
+  # 7. API Gateway (Primary External Entrypoint :9738)
+  # ----------------------------------------------------------------------------
+  api-gateway:
+    build:
+      context: apps/backend/api-gateway
+      dockerfile: Dockerfile
+    container_name: enrichment-api-gateway
+    restart: unless-stopped
+    ports:
+      - "9738:9738"
+    environment:
+      SERVER_PORT: 9738
+      SPRING_APPLICATION_NAME: api-gateway
+      CONFIG_SERVER_URL: http://config-server:9736
+      EUREKA_SERVER_URL: http://discovery-server:9737/eureka/
+      RESEARCH_SERVICE_URL: http://research-service:9741
+      AI_INTELLIGENT_SERVICE_URL: http://ai-intelligent-service:9742
+      DATASET_SERVICE_URL: http://dataset-service:9743
+      GATEWAY_API_KEY: ${GATEWAY_API_KEY:-}
+      GATEWAY_CORS_ALLOWED_ORIGINS: ${GATEWAY_CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+    depends_on:
+      discovery-server:
+        condition: service_healthy
+    networks:
+      - enrichment-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9738/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 25s
+
+  # ----------------------------------------------------------------------------
+  # 8. Frontend Dashboard (External Entrypoint :3000)
+  # ----------------------------------------------------------------------------
+  frontend:
+    build:
+      context: apps/frontend
+      dockerfile: Dockerfile
+    container_name: enrichment-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOSTNAME: "0.0.0.0"
+      NEXT_PUBLIC_GATEWAY_URL: ${NEXT_PUBLIC_GATEWAY_URL:-http://localhost:9738}
+      NEXT_PUBLIC_GATEWAY_API_KEY: ${GATEWAY_API_KEY:-}
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+    networks:
+      - enrichment-network
+
+volumes:
+  mysql_data:
+    driver: local
+
+networks:
+  enrichment-network:
+    driver: bridge

@@ -11,6 +11,7 @@ sequenceDiagram
     autonumber
     actor User as User / Browser
     participant UI as Next.js UI (:3000)
+    participant GW as api-gateway (:9738)
     participant DS as dataset-service (:9743)
     participant RS as research-service (:9741)
     participant Search as Web Search (Tavily/Mock)
@@ -23,11 +24,17 @@ sequenceDiagram
     UI->>UI: Parse tabular rows & detect column types (Name, URL, Org, Role)
     User->>UI: Confirm column mappings & enter natural language requirement
 
-    Note over UI,DS: 2. Batch Job Submission & Real-Time Stream
-    UI->>DS: POST /api/v1/enrichment/jobs (rows, mapping, requirement)
-    DS-->>UI: 202 Accepted (jobId, totalRows, concurrency=3)
-    UI->>DS: GET /api/v1/enrichment/jobs/{jobId}/events (SSE Connection)
-    DS-->>UI: Event: INIT (connection open, replay buffer)
+    Note over UI,GW: 2. Batch Job Submission & Gateway Ingress
+    UI->>GW: POST /api/v1/enrichment/jobs (X-API-Key, rows, mapping)
+    GW->>GW: Validate API Key & Inject Security Headers
+    GW->>DS: Forward to dataset-service:9743
+    DS-->>GW: 202 Accepted (jobId, totalRows, concurrency=3)
+    GW-->>UI: 202 Accepted
+
+    UI->>GW: GET /api/v1/enrichment/jobs/{jobId}/events (SSE Connection)
+    GW->>DS: Forward SSE Stream
+    DS-->>GW: SSE Stream (INIT, replay buffer)
+    GW-->>UI: SSE Stream
 
     Note over DS,AI: 3. Input Cleansing
     DS->>AI: POST /api/v1/ai/clean (normalize raw seeds)

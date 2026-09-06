@@ -3,6 +3,7 @@
  */
 
 import { ProblemDetail } from '@/types/common';
+import { ENV } from '@/config/env';
 
 export interface RequestOptions extends Omit<RequestInit, 'body'> {
   body?: unknown;
@@ -30,6 +31,9 @@ export async function apiClient<T>(url: string, options: RequestOptions = {}): P
   const headers = new Headers(customHeaders);
   if (!headers.has('Accept')) {
     headers.set('Accept', 'application/json');
+  }
+  if (ENV.GATEWAY_API_KEY && !headers.has('X-API-Key')) {
+    headers.set('X-API-Key', ENV.GATEWAY_API_KEY);
   }
 
   let finalBody: BodyInit | null = null;

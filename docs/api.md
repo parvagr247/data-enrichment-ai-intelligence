@@ -4,13 +4,60 @@ This document provides a comprehensive catalog of all REST API endpoints provide
 
 ---
 
-## 1. Services Overview
+## 1. API Gateway & Ingress Layer (`:9738`)
 
-| Service | Base URL | Primary Role |
+All client interactions (including the Next.js Frontend) route through the **API Gateway** on Port `9738`. The Gateway acts as the single unified entry point, enforcing reverse proxy routing, optional API key authentication, strict security headers, and centralized CORS.
+
+### Gateway Routing Table
+
+| Ingress Path Pattern | Destination Microservice | Purpose |
 | :--- | :--- | :--- |
-| **`research-service`** | `http://localhost:9741` | Research execution, web scraping, and evidence collection |
-| **`ai-intelligent-service`** | `http://localhost:9742` | Requirement interpretation, input cleansing, and grounded fact extraction |
-| **`dataset-service`** | `http://localhost:9743` | Batch enrichment jobs, row-level tracking, and MySQL entity persistence |
+| `/api/v1/research/**` | `research-service:9741` | Synchronous & async entity research pipelines |
+| `/api/v1/sources/**` | `research-service:9741` | Discovered source retrieval & verification |
+| `/api/v1/ai/**` | `ai-intelligent-service:9742` | Requirement parsing, data cleansing, LLM grounding |
+| `/api/v1/enrichment/**` | `dataset-service:9743` | Batch dataset enrichment jobs & SSE events |
+| `/api/v1/entities/**` | `dataset-service:9743` | Persisted entity records, sources, and attributes |
+| `/actuator/health` | Local Gateway | Gateway liveness and readiness probes |
+| `/actuator/info` | Local Gateway | Gateway runtime information |
+
+### Authentication & Ingress Security
+
+* **API Key Header**: `X-API-Key: <key>`
+* **Configuration**: Set via `GATEWAY_API_KEY` environment variable.
+  * **Production Mode**: When `GATEWAY_API_KEY` is non-empty, any request omitting or supplying an incorrect `X-API-Key` is rejected with `401 Unauthorized`.
+  * **Development Mode**: If `GATEWAY_API_KEY` is blank/unset, authentication is bypassed (open-access mode) for frictionless local development.
+* **Public Exceptions**: The following endpoints bypass authentication unconditionally:
+  * `/actuator/health` and `/actuator/info`
+  * HTTP `OPTIONS` requests (CORS preflight)
+
+### Gateway Unauthorized Response (`401 Unauthorized`)
+```json
+{
+  "timestamp": "2026-09-06T19:59:21.823Z",
+  "status": 401,
+  "error": "Unauthorized",
+  "message": "Invalid or missing API key",
+  "path": "/api/v1/entities"
+}
+```
+
+### Injected Security Headers
+Every HTTP response mediated through the gateway includes:
+* `X-Content-Type-Options: nosniff`
+* `X-Frame-Options: DENY`
+* `Referrer-Policy: strict-origin-when-cross-origin`
+* `Permissions-Policy: geolocation=(), microphone=(), camera=()`
+
+---
+
+## 2. Services Overview
+
+| Service | Host Port | Internal Port | Primary Role |
+| :--- | :--- | :--- | :--- |
+| **`api-gateway`** | `9738` | `9738` | Ingress gateway, reverse proxy, CORS, and security |
+| **`research-service`** | Internal | `9741` | Research execution, web scraping, and evidence collection |
+| **`ai-intelligent-service`** | Internal | `9742` | Requirement interpretation, input cleansing, and grounded fact extraction |
+| **`dataset-service`** | Internal | `9743` | Batch enrichment jobs, row-level tracking, and MySQL entity persistence |
 
 ---
 

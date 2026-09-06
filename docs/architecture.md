@@ -4,66 +4,145 @@ The **Data Enrichment AI Intelligence Platform** is a distributed, production-gr
 
 ---
 
-## 1. High-Level Topology
+## 1. High-Level Topology & Ingress Architecture
 
 ```mermaid
 flowchart TB
-    subgraph UI ["Client Layer (Port 3000)"]
-        Frontend["Next.js 15 Web Application<br/>- File Upload (CSV/XLSX)<br/>- Schema Profiling & Column Mapping<br/>- Requirement Input & Chips<br/>- Live Execution Dashboard (SSE)<br/>- Grounded Evidence Inspector Modal<br/>- Non-Destructive Exporter"]
+    subgraph External ["External Clients & Browsers"]
+        Browser["User Browser / Client Application"]
     end
 
-    subgraph Backend ["Microservices Layer (Spring Boot / Java 25)"]
-        DatasetService["dataset-service (:9743)<br/>- Batch Enrichment Jobs<br/>- Bounded Concurrency (3 Workers)<br/>- Real-Time SSE Stream (:events)<br/>- Row State & Error Isolation<br/>- MySQL Relational Persistence<br/>- Flyway Migrations"]
-        ResearchService["research-service (:9741)<br/>- Entity Identity & Normalization<br/>- Requirement-Aware Search Queries<br/>- Multi-Source Web Discovery<br/>- Polite Fetching & Boilerplate Cleaning<br/>- Verbatim Evidence Extraction<br/>- Multi-Source Corroboration"]
-        AIService["ai-intelligent-service (:9742)<br/>- Spring AI (Google GenAI Gemini Client)<br/>- Requirement Interpretation<br/>- Input Data Cleansing<br/>- Fact Extraction & Grounding<br/>- Zero-Hallucination Guardrails<br/>- Deterministic Fallback Engine"]
+    subgraph HostPorts ["Exposed Host Ports (Public Ingress)"]
+        Port3000["Port 3000: Web Dashboard"]
+        Port9738["Port 9738: API Gateway Ingress"]
     end
 
-    subgraph Storage ["Persistence Layer (Port 3306)"]
-        MySQL[("MySQL 8.0+<br/>- entities<br/>- entity_sources<br/>- entity_attributes<br/>- flyway_schema_history")]
+    subgraph InternalNet ["Isolated Internal Network (enrichment-network)"]
+        subgraph Infra ["Platform Infrastructure Layer"]
+            ConfigServer["config-server (:9736)<br/>- Spring Cloud Config Server (native)<br/>- Centralized YAML in /config<br/>- Actuator Health Probes"]
+            DiscoveryServer["discovery-server (:9737)<br/>- Spring Cloud Netflix Eureka<br/>- Dynamic Heartbeats & Registry<br/>- Self-Preservation Tuned"]
+            ApiGateway["api-gateway (:9738)<br/>- Spring Cloud Gateway (WebMvc)<br/>- Unified Reverse Proxy & Routing<br/>- API Key Auth (X-API-Key)<br/>- CORS & Strict Security Headers<br/>- Client Ingress Normalization"]
+        end
+
+        subgraph Backend ["Microservices Layer (Spring Boot / Java 25)"]
+            DatasetService["dataset-service (:9743)<br/>- Batch Enrichment Jobs<br/>- Bounded Concurrency (3 Workers)<br/>- Real-Time SSE Stream (:events)<br/>- Row State & Error Isolation<br/>- MySQL Relational Persistence<br/>- Flyway Migrations"]
+            ResearchService["research-service (:9741)<br/>- Entity Identity & Normalization<br/>- Requirement-Aware Search Queries<br/>- Multi-Source Web Discovery<br/>- Polite Fetching & Boilerplate Cleaning<br/>- Verbatim Evidence Extraction<br/>- Multi-Source Corroboration"]
+            AIService["ai-intelligent-service (:9742)<br/>- Spring AI (Google GenAI Gemini Client)<br/>- Requirement Interpretation<br/>- Input Data Cleansing<br/>- Fact Extraction & Grounding<br/>- Zero-Hallucination Guardrails<br/>- Deterministic Fallback Engine"]
+        end
+
+        subgraph Storage ["Persistence Layer (Internal Port 3306)"]
+            MySQL[("MySQL 8.0+<br/>- entities<br/>- entity_sources<br/>- entity_attributes<br/>- flyway_schema_history")]
+        end
     end
 
-    subgraph External ["External Providers"]
+    subgraph CloudAPIs ["External Cloud Providers"]
         SearchAPI["Web Search Engine<br/>(Tavily / Mock Provider)"]
         WebPages["Discovered Web Pages / URLs"]
         LLMProvider["LLM API<br/>(Google Gemini / Vertex)"]
     end
 
-    Frontend -->|HTTP REST & SSE| DatasetService
-    Frontend -->|HTTP REST| ResearchService
-    DatasetService -->|HTTP REST Client| ResearchService
-    DatasetService -->|HTTP REST Client| AIService
+    Browser -->|Port 3000| Port3000
+    Browser -->|Port 9738 (REST / SSE)| Port9738
+    Port9738 --> ApiGateway
+
+    ApiGateway -->|Reverse Proxy /api/v1/enrichment/**| DatasetService
+    ApiGateway -->|Reverse Proxy /api/v1/entities/**| DatasetService
+    ApiGateway -->|Reverse Proxy /api/v1/research/**| ResearchService
+    ApiGateway -->|Reverse Proxy /api/v1/sources/**| ResearchService
+    ApiGateway -->|Reverse Proxy /api/v1/ai/**| AIService
+
+    Backend -.->|Optional Config Fetch| ConfigServer
+    Backend -.->|Heartbeat & Discovery| DiscoveryServer
+    ApiGateway -.->|Heartbeat & Discovery| DiscoveryServer
+
+    DatasetService -->|Internal HTTP Client| ResearchService
+    DatasetService -->|Internal HTTP Client| AIService
     DatasetService -->|JDBC JPA| MySQL
-    ResearchService -->|HTTP REST Client| AIService
-    ResearchService -->|HTTP REST Client| DatasetService
-    ResearchService -->|HTTPS| SearchAPI
-    ResearchService -->|HTTPS Fetch| WebPages
-    AIService -->|HTTPS| LLMProvider
+    ResearchService -->|Internal HTTP Client| AIService
+    ResearchService -->|Internal HTTP Client| DatasetService
+    ResearchService -->|HTTPS Outbound| SearchAPI
+    ResearchService -->|HTTPS Outbound Fetch| WebPages
+    AIService -->|HTTPS Outbound| LLMProvider
 ```
 
 ---
 
-## 2. Microservice Responsibilities & Boundaries
+## 2. Port Map & Network Isolation
 
-The platform enforces strict separation of concerns across its three backend services:
+In production VM deployments, **only two ports are bound to the host interfaces**:
+* **Port 3000**: Next.js Web Frontend.
+* **Port 9738**: API Gateway (Unified ingress entry point).
+
+All internal business microservices, the configuration server, Eureka registry, and the MySQL database reside exclusively inside the private Docker bridge network (`enrichment-network`), unreachable directly from outside the VM.
+
+| Service | Port | Network Scope | Technology | Purpose |
+| :--- | :--- | :--- | :--- | :--- |
+| **`config-server`** | `9736` | Internal-only | Spring Cloud Config Server | Native file-based centralized configuration store |
+| **`discovery-server`** | `9737` | Internal-only | Spring Cloud Netflix Eureka | Dynamic service registry and health awareness |
+| **`api-gateway`** | `9738` | **Public Host** | Spring Cloud Gateway (WebMvc) | Unified ingress, reverse proxy, API key auth, CORS, security headers |
+| **`research-service`** | `9741` | Internal-only | Spring Boot 4.1.1 / Java 25 | Web research, multi-source scraping, corroboration |
+| **`ai-intelligent-service`** | `9742` | Internal-only | Spring Boot 4.1.1 / Java 25 | LLM grounding, entity cleansing, schema interpretation |
+| **`dataset-service`** | `9743` | Internal-only | Spring Boot 4.1.1 / Java 25 | Ingestion, async batch worker pools, SSE events, JPA persistence |
+| **`mysql`** | `3306` | Internal-only | MySQL 8.0+ | Relational schema persistence and Flyway history |
+| **`frontend`** | `3000` | **Public Host** | Next.js 15 / React / Tailwind | Interactive multi-stage dataset enrichment UI |
+
+---
+
+## 3. Platform Infrastructure Layer
+
+### A. Centralized Configuration (`config-server` on Port 9736)
+* **Storage Model**: `native` profile loading YAML definitions directly from `/config` volume mount (local repository directory `config/`).
+* **Client Integration**: Business services use `spring.config.import: optional:configserver:${CONFIG_SERVER_URL:http://localhost:9736}`.
+* **Fault Tolerance**: If the Config Server is temporarily unavailable during local development, services smoothly fallback to their embedded `application.yaml` defaults without crashing.
+* **Config Profiles**:
+  * `application.yml`: Shared defaults (Eureka client registration, Actuator health probes, Logback MDC pattern).
+  * `research-service.yml`: Research timeouts, max sources, scraper buffer thresholds.
+  * `ai-intelligent-service.yml`: Gemini model, temperature, deterministic fallback thresholds.
+  * `dataset-service.yml`: JPA connection pools, Flyway execution, thread pool concurrency.
+  * `api-gateway.yml`: Gateway route rules, CORS allowed origins, security parameters.
+
+### B. Dynamic Service Discovery (`discovery-server` on Port 9737)
+* **Engine**: Spring Cloud Netflix Eureka Server configured in standalone mode (`register-with-eureka: false`, `fetch-registry: false`).
+* **Client Behavior**: All microservices register dynamically upon startup, announcing their hostnames and ports with periodic heartbeats (lease renewal 10s, expiration 30s).
+* **Dual Resolution**: Supports Eureka service IDs (`lb://SERVICE-NAME`) or direct container name resolution via Docker internal DNS.
+
+### C. Unified API Gateway (`api-gateway` on Port 9738)
+* **Engine**: Spring Cloud Gateway Server (WebMvc) on Spring Boot 4.1.1 and Java 25.
+* **Routing Strategy**:
+  * `/api/v1/enrichment/**` $\rightarrow$ `dataset-service` (:9743)
+  * `/api/v1/entities/**` $\rightarrow$ `dataset-service` (:9743)
+  * `/api/v1/research/**` $\rightarrow$ `research-service` (:9741)
+  * `/api/v1/sources/**` $\rightarrow$ `research-service` (:9741)
+  * `/api/v1/ai/**` $\rightarrow$ `ai-intelligent-service` (:9742)
+  * `/actuator/**` $\rightarrow$ Local Gateway Actuator health & info
+* **Security & Ingress Protection**:
+  * **API Key Auth**: `ApiKeyAuthenticationFilter` intercepts all incoming requests. When `GATEWAY_API_KEY` is set, calls must include `X-API-Key: <key>`. If invalid or missing, a RFC-compatible 401 Unauthorized JSON response is emitted. If unset/empty, open-access mode is preserved for local development.
+  * **Bypassed Paths**: `/actuator/health`, `/actuator/info`, and HTTP `OPTIONS` preflight requests always bypass authentication.
+  * **Security Headers**: Injects `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, and `Permissions-Policy: geolocation=(), microphone=(), camera=()`.
+  * **Centralized CORS**: Handles preflight across all microservices, allowing configured frontend origins and exposing SSE/correlation headers.
+
+---
+
+## 4. Microservice Responsibilities & Boundaries
 
 ### A. `research-service` (Port 9741)
 * **Core Principle**: *"Research produces evidence."*
 * **Primary Responsibilities**:
-  1. **Seed Input Identification & Normalization**: Canonicalizes raw URLs, removes tracking parameters (`utm_*`, `ref`), and handles sparse seeds across entity types (`PERSON`, `ORGANIZATION`, `PRODUCT`, `REPOSITORY`, `WEBSITE`, `OTHER`).
+  1. **Seed Input Identification & Normalization**: Canonicalizes raw URLs, removes tracking parameters (`utm_*`, `ref`), and handles composite identities across person names, titles, and organizations.
   2. **Requirement-Aware Search Query Formulation**: Combines entity identifiers and target field requirements into optimized search queries via `QueryBuilder` and strategy adapters.
-  3. **Multi-Source Discovery & Primary Source Ranking**: Queries search providers (Tavily with graceful `MockSearchProvider` fallback) and prioritizes authoritative primary domains (official domains, GitHub, LinkedIn, official documentation).
+  3. **Multi-Source Discovery & Primary Source Ranking**: Queries search providers (Tavily with graceful `MockSearchProvider` fallback) and prioritizes authoritative primary domains.
   4. **Web Content Fetching & Boilerplate Cleaning**: Fetches HTML/JSON/Markdown content, strips noise, navigation links, and ads, extracting core text sections with size and timeout guardrails.
-  5. **Evidence Extraction**: Dual-strategy extraction using specialized field extractors (`ExperienceFieldExtractor`, `EducationFieldExtractor`, `SkillFieldExtractor`, `ProjectFieldExtractor`, `ActivityFieldExtractor`, `RoleFieldExtractor`, `OrganizationFieldExtractor`) alongside delegation to `ai-intelligent-service`.
+  5. **Evidence Extraction**: Specialized field extractors alongside delegation to `ai-intelligent-service`.
   6. **Multi-Source Corroboration & Conflict Resolution**: Merges overlapping evidence, flags conflicting claims across sources, and computes confidence tiers (`HIGH`, `MEDIUM`, `LOW`).
 
 ### B. `ai-intelligent-service` (Port 9742)
 * **Core Principle**: *"AI produces clean, structured, requirement-aware enrichment without hallucination."*
 * **Primary Responsibilities**:
-  1. **Requirement Interpretation (`/api/v1/ai/requirement`)**: Parses free-form natural language requirements (e.g. *"Find tech stack, founders, and latest funding"*) into structured target fields and priority search keywords.
+  1. **Requirement Interpretation (`/api/v1/ai/requirement`)**: Parses free-form natural language requirements into structured target fields and priority search keywords.
   2. **Input Cleansing (`/api/v1/ai/clean`)**: Cleans noisy names, strips emojis, parses compound roles and titles, and normalizes URLs.
   3. **Fact Extraction & Grounding (`/api/v1/ai/enrich`)**: Extracts structured factual tuples from raw text. Every extracted attribute **must** be grounded in an exact verbatim quote. If evidence is missing, the value is marked `UNKNOWN`.
-  4. **Profile Assessment (`/api/v1/ai/profile/assess`)**: Evaluates multi-dimensional alignment against objective targets (scoring relevance, experience depth, skill matches).
-  5. **Transparent Deterministic Fallback**: When external LLM APIs are unreachable, rate-limited, or return invalid JSON, a deterministic heuristic engine provides continuous operation without halting the pipeline.
+  4. **Profile Assessment (`/api/v1/ai/profile/assess`)**: Evaluates multi-dimensional alignment against objective targets.
+  5. **Transparent Deterministic Fallback**: When external LLM APIs are unreachable, rate-limited, or return invalid JSON, a deterministic heuristic engine provides continuous operation.
 
 ### C. `dataset-service` (Port 9743)
 * **Core Principle**: *"Dataset Service owns dataset ingestion, job execution, and relational persistence."*
@@ -78,16 +157,17 @@ The platform enforces strict separation of concerns across its three backend ser
 * **Core Principle**: *"Frontend guides the user through progressive enrichment and transparently displays grounded evidence."*
 * **Primary Responsibilities**:
   1. **Progressive 5-Stage Workflow**: Upload $\rightarrow$ Preview & Profile $\rightarrow$ Column Mapping $\rightarrow$ Live Processing Dashboard $\rightarrow$ Results & Export.
-  2. **Live Execution Dashboard**: Real-time worker cards, progress metrics, active stages, activity log, and immediate modal inspection of finished rows.
-  3. **Evidence Transparency**: Attribute confidence badges, conflict indicators, and detailed multi-tab evidence inspection modal showing exact quotes and provenance URLs.
-  4. **Non-Destructive Export**: Appends new `Enriched_*` attributes, canonical URLs, and confidence metadata while strictly preserving all original spreadsheet columns.
+  2. **Unified API Gateway Communication**: Dispatches all research, AI, and dataset requests to the Gateway (`http://localhost:9738`), attaching the configured `X-API-Key`.
+  3. **Live Execution Dashboard**: Real-time worker cards, progress metrics, active stages, activity log, and immediate modal inspection of finished rows.
+  4. **Evidence Transparency**: Attribute confidence badges, conflict indicators, and detailed multi-tab evidence inspection modal showing exact quotes and provenance URLs.
+  5. **Non-Destructive Export**: Appends new `Enriched_*` attributes, canonical URLs, and confidence metadata while strictly preserving all original spreadsheet columns.
 
 ---
 
-## 3. Domain & Relational Data Model
+## 5. Domain & Relational Data Model
 
 ### Domain Concepts
-* **Entity**: The logical subject being enriched (Person, Organization, Product, Repository, Website). Identified by a deterministic SHA-256 hash of its canonical URL.
+* **Entity**: The logical subject being enriched (Person, Organization, Product, Repository, Website). Identified by a deterministic SHA-256 hash of its composite identity.
 * **Source**: A web document discovered during research, categorized by `sourceType` (`PRIMARY`, `SOCIAL_PROFILE`, `SEARCH_DISCOVERY`, `ACADEMIC`, `REGISTRY`) and tracked with domain, provider, and relevance score.
 * **Evidence Tuple**: An atomic verifiable claim: `(attributeName, value, exactQuote, sourceUrl, confidence)`.
 * **Corroborated Attribute**: An attribute consolidated across multiple sources, noting corroborating URLs, confidence tier (`HIGH`, `MEDIUM`, `LOW`), and any detected conflicts.
@@ -141,14 +221,11 @@ CREATE TABLE entity_attributes (
 
 ---
 
-## 4. Communication & Cross-Cutting Concerns
+## 6. Observability, Tracing & Resilience
 
-* **Protocols**: Synchronous HTTP/1.1 REST using JSON (`application/json`) contracts; Server-Sent Events (`text/event-stream`) for real-time progress.
-* **Error Representation**: Standardized RFC 7807 `application/problem+json` emitted on all `4xx`/`5xx` failures.
-* **Distributed Tracing**: Logback MDC tracking carries `correlationId`, `jobId`, and `rowId` through worker executions.
-* **CORS**: Configured across all microservices to allow origins `http://localhost:3000` and internal Docker service names.
-
-For architectural decisions, trade-offs, and future roadmap, see [Architecture Decisions & System Evolution](decisions.md).  
-For the end-to-end data processing walkthrough, see [Enrichment Flow](enrichment-flow.md).  
-For complete REST and SSE endpoint documentation, see [API Reference](api.md).  
-For local development and Docker orchestration, see [Development Guide](development.md).
+* **Actuator Probes**: All backend microservices expose `/actuator/health` (with liveness and readiness state) and `/actuator/info`.
+* **Central Logging**: Uniform Logback format outputting timestamp, process PID, thread name, logger category, and correlation identifiers.
+* **Graceful Degradation**: 
+  * If Config Server is unreachable $\rightarrow$ Client services fall back to local `application.yaml`.
+  * If Eureka is unreachable $\rightarrow$ Gateway and internal clients route using direct container DNS (`http://service-name:port`).
+  * If External Search API / LLM is unreachable $\rightarrow$ Graceful fallback to heuristic extraction and mock provider without crashing batch jobs.

@@ -4,6 +4,14 @@ server:
 spring:
   application:
     name: research-service
+  config:
+    import: optional:configserver:${CONFIG_SERVER_URL:http://localhost:9736}
+
+eureka:
+  client:
+    enabled: ${EUREKA_CLIENT_ENABLED:true}
+    service-url:
+      defaultZone: ${EUREKA_SERVER_URL:http://localhost:9737/eureka/}
 
 management:
   endpoints:
