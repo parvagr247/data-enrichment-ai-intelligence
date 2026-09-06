@@ -43,9 +43,12 @@ flowchart LR
 
 ---
 
-## 3. Core Architectural Concepts (Learning Series)
+## 3. Core Architectural Concepts & Post-Mortems
 
-Deep dives into the engineering decisions and production patterns implemented in this codebase:
+* 📘 **[Complete 31 Engineering Concepts Reference (7 Sections Each)](learning/concepts.md)**: Exhaustive production-grade guide across 31 system design, distributed systems, and applied AI concepts.
+* 🚨 **[Production Failure Modes & 11 Root-Cause Post-Mortems](learning/failure-modes.md)**: Real-world post-mortems documenting Gemini 404, LinkedIn HTTP 999 blocking, snippet fallbacks, SSE starvation, and silent degradation avoidance.
+
+### Individual Concept Deep Dives:
 
 1. 🌐 **[01. HTTP REST API Design & Media Type Contracts](learning/01-http-api-design-and-media-types.md)**  
    *Explicit media types (`consumes`/`produces`), status codes (`200` vs `202` vs `400`), and RFC 7807 `ProblemDetail` error responses.*
