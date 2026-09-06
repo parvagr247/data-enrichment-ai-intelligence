@@ -1,84 +1,185 @@
-# Complete GCP VM Production Deployment Guide
+# GCP VM Production Deployment Guide
 ## Data Enrichment AI Intelligence Platform
 
-This guide provides the complete, reproducible, copy-pasteable deployment procedure for running the Data Enrichment AI Intelligence Platform on a fresh Google Cloud Platform (GCP) Compute Engine Virtual Machine using Docker Compose.
+This document provides a simple, practical guide for deploying and operating the Data Enrichment AI Intelligence Platform on a Google Cloud Platform (GCP) Compute Engine Virtual Machine using Docker Compose and GitHub Actions.
 
 ---
 
-## 1. Target Production Architecture
+## 1. Production Architecture & Network Exposure
 
-The platform runs as a distributed multi-service architecture inside an isolated Docker bridge network (`enrichment-network`). Only the **API Gateway (`:9738`)** and **Frontend UI (`:3000`)** are exposed to external traffic. All internal microservices communicate using internal Docker DNS names (`auth-service`, `research-service`, `ai-intelligent-service`, `dataset-service`, `mysql`, `config-server`, `discovery-server`).
+The application runs as 9 containerized services inside an isolated Docker bridge network (`enrichment-network`). Only the **API Gateway** and **Frontend UI** are exposed publicly. All backend microservices communicate securely inside the Docker network.
 
 ```
-                              Internet / External Client Browser
-                                              �
-                                              ?
-                                    GCP VM External IP
-                                              �
-                         +-----------------------------------------+
-                         �                                         �
-                         ? (Port 3000)                             ? (Port 9738)
-               +-------------------+                     +-------------------+
-               �    Frontend UI    �                     �    API Gateway    �
-               �   (Next.js 15)    �                     �  (Spring Cloud)   �
-               +-------------------+                     +-------------------+
-                                                                   �
-                                 +---------------------------------+---------------------------------+
-                                 � (Internal Network)              � (Internal Network)              � (Internal Network)
-                                 ?                                 ?                                 ?
-                       +-------------------+             +-------------------+             +-------------------+
-                       �   Auth Service    �             � Research Service  �             �  Dataset Service  �
-                       �     (:9739)       �             �     (:9741)       �             �     (:9743)       �
-                       +-------------------+             +-------------------+             +-------------------+
-                                 �                                 � (Internal)                      �
-                                 �                                 ?                                 �
-                                 �                       +-------------------+                       �
-                                 �                       �   AI Intelligent  �                       �
-                                 �                       �  Service (:9742)  �                       �
-                                 �                       +-------------------+                       �
-                                 �                                                                   �
-                                 +-------------------------------------------------------------------+
-                                                                 ?
-                                                       +-------------------+
-                                                       �   MySQL 8.0 DB    �
-                                                       �  (:3306 Internal) �
-                                                       +-------------------+
-                                                                 ?
-                                          +---------------------------------------------+
-                                          �                                             �
-                                +-------------------+                         +-------------------+
-                                �   Config Server   �                         �  Discovery Server �
-                                �  (:9736 Internal) �                         �  (:9737 Internal) �
-                                +-------------------+                         +-------------------+
+                            Internet / Client Browser
+                                        │
+                                        ▼
+                            GCP VM Public IP Address
+                                        │
+                    ┌───────────────────┴───────────────────┐
+                    ▼ (Port 3000)                           ▼ (Port 9738)
+          ┌───────────────────┐                   ┌───────────────────┐
+          │    Frontend UI    │                   │    API Gateway    │
+          │   (Next.js 15)    │                   │  (Spring Cloud)   │
+          └───────────────────┘                   └─────────┬─────────┘
+                    │                                       │
+         (Browser calls Gateway)                            │
+                    └───────────────────────────────────────┤
+                                                            ▼
+                         ┌──────────────────────────────────┴──────────────────────────────────┐
+                         │ Internal Docker Bridge Network ("enrichment-network")                │
+                         │                                                                     │
+                         ▼                                  ▼                                  ▼
+               ┌───────────────────┐              ┌───────────────────┐              ┌───────────────────┐
+               │   Auth Service    │              │ Research Service  │              │  Dataset Service  │
+               │      (:9739)      │              │      (:9741)      │              │      (:9743)      │
+               └─────────┬─────────┘              └─────────┬─────────┘              └─────────┬─────────┘
+                         │                                  │ (Internal HTTP)                  │
+                         │                                  ▼                                  │
+                         │                        ┌───────────────────┐                        │
+                         │                        │  AI Intelligent   │                        │
+                         │                        │  Service (:9742)  │                        │
+                         │                        └───────────────────┘                        │
+                         │                                                                     │
+                         └──────────────────────────────────┬──────────────────────────────────┘
+                                                            │
+                                                            ▼
+                                                  ┌───────────────────┐
+                                                  │     MySQL 8.0     │
+                                                  │  (:3306 Internal) │
+                                                  └─────────┬─────────┘
+                                                            │
+                                      ┌─────────────────────┴─────────────────────┐
+                                      ▼                                           ▼
+                            ┌───────────────────┐                       ┌───────────────────┐
+                            │   Config Server   │                       │ Discovery Server  │
+                            │  (:9736 Internal) │                       │  (:9737 Internal) │
+                            └───────────────────┘                       └───────────────────┘
 ```
 
-### Service Port Map
+### Port Accessibility Matrix
 
-| Component | Port | Exposure | Role | Health Endpoint |
+| Service | Container Name | Port | Network Scope | Healthcheck Endpoint |
 | :--- | :--- | :--- | :--- | :--- |
-| **API Gateway** | `9738` | **Public** | Primary reverse proxy, JWT & API Key validation, routing | `http://localhost:9738/actuator/health` |
-| **Frontend UI** | `3000` | **Public** | Next.js 15 client dashboard & SSE live execution | `http://localhost:3000` |
-| **Auth Service** | `9739` | **Internal** | User registration, login, JWT token issuance | `http://localhost:9739/actuator/health` |
-| **Research Service** | `9741` | **Internal** | Multi-query discovery, scraping, snippet fallback | `http://localhost:9741/actuator/health` |
-| **AI Intelligent Service**| `9742` | **Internal** | Gemini 2.0 Flash extraction & multi-dimensional scoring | `http://localhost:9742/actuator/health` |
-| **Dataset Service** | `9743` | **Internal** | Ingestion profiling, concurrency executor, persistence | `http://localhost:9743/actuator/health` |
-| **MySQL Database** | `3306` | **Internal** | Relational data (`entities`, `users`, Flyway migrations) | `mysqladmin ping` |
-| **Config Server** | `9736` | **Internal** | Centralized Spring Cloud Config repository | `http://localhost:9736/actuator/health` |
-| **Discovery Server** | `9737` | **Internal** | Netflix Eureka service discovery & registration | `http://localhost:9737/actuator/health` |
+| **API Gateway** | `enrichment-api-gateway` | `9738` | **PUBLIC / EXTERNAL** | `http://localhost:9738/actuator/health` |
+| **Frontend UI** | `enrichment-frontend` | `3000` | **PUBLIC / EXTERNAL** | `http://localhost:3000` |
+| **Auth Service** | `enrichment-auth-service` | `9739` | **INTERNAL ONLY** | `http://localhost:9739/actuator/health` |
+| **Research Service** | `enrichment-research-service` | `9741` | **INTERNAL ONLY** | `http://localhost:9741/actuator/health` |
+| **AI Intelligent Service**| `enrichment-ai-intelligent-service` | `9742` | **INTERNAL ONLY** | `http://localhost:9742/actuator/health` |
+| **Dataset Service** | `enrichment-dataset-service` | `9743` | **INTERNAL ONLY** | `http://localhost:9743/actuator/health` |
+| **MySQL Database** | `enrichment-mysql` | `3306` | **INTERNAL ONLY** | `mysqladmin ping` |
+| **Config Server** | `enrichment-config-server` | `9736` | **INTERNAL ONLY** | `http://localhost:9736/actuator/health` |
+| **Discovery Server** | `enrichment-discovery-server` | `9737` | **INTERNAL ONLY** | `http://localhost:9737/actuator/health` |
 
 ---
 
-## 2. Step 1: Provision GCP Compute Engine Virtual Machine
+## 2. Deployment Architecture & Flow
 
-### Recommended Machine Specifications
-* **Machine Type**: `e2-standard-4` (4 vCPU, 16 GB RAM) recommended for building all Java containers concurrently.
-  *(Minimum acceptable for runtime after building: `e2-standard-2` with 2 vCPU, 8 GB RAM and 4 GB swap).*
-* **Operating System**: **Ubuntu 24.04 LTS (x86/64, amd64)**
-* **Boot Disk**: **50 GB Balanced Persistent Disk** (SSD/balanced recommended for Maven dependency cache and Docker build layers).
-* **Region/Zone**: Choose the region closest to your location (e.g., `us-central1-a`, `asia-south1-a`, `europe-west1-b`).
+The repository is cloned directly onto the GCP VM, and Docker Compose builds and runs all services locally on the VM from the repository source trees. Neither Google Artifact Registry nor Docker Hub is required.
 
-### Option A: Provision via Google Cloud CLI (`gcloud`)
-Run from your local terminal or Google Cloud Shell:
+```
+Developer (git push main)
+   │
+   ▼
+GCP Compute Engine VM (/home/parvagr2/data-enrichment-ai-intelligence)
+   │
+   ├── 1. Fetch latest changes: git pull
+   │
+   ├── 2. Build local images: docker compose -f infrastructure/docker/docker-compose.prod.yml build
+   │
+   └── 3. Start containers:   docker compose -f infrastructure/docker/docker-compose.prod.yml up -d
+```
+
+---
+
+## 3. GitHub Repository Configuration
+
+Configure these values in:
+**GitHub → Repository → Settings → Secrets and variables → Actions**
+
+### A. GitHub Secrets (Sensitive Credentials)
+
+| Secret Name | Type | What It Contains | Where It Comes From | Why It Is Needed |
+| :--- | :--- | :--- | :--- | :--- |
+| `GCP_SA_KEY` | **Secret** | Full JSON content of a GCP Service Account Key with `roles/artifactregistry.writer` | GCP IAM → Service Accounts → Keys | Allows GitHub Actions to authenticate and push built Docker images to Google Artifact Registry. |
+| `GCP_SSH_PRIVATE_KEY` | **Secret** | OpenSSH private key (e.g. ED25519) | Generated locally (`ssh-keygen -t ed25519`) | Allows GitHub Actions to securely SSH into the GCP VM to run `deploy.sh`. |
+
+### B. GitHub Variables (Non-Sensitive Configuration)
+
+| Variable Name | Type | What It Contains | Where It Comes From | Why It Is Needed |
+| :--- | :--- | :--- | :--- | :--- |
+| `GCP_PROJECT_ID` | **Variable** | GCP Project ID (e.g., `my-enrichment-prod`) | Google Cloud Console | Identifies target GCP project for Artifact Registry. |
+| `GCP_REGION` | **Variable** | Artifact Registry region (e.g., `us-central1`) | Chosen at repository creation | Constructs registry domain (`<region>-docker.pkg.dev`). |
+| `GCP_ARTIFACT_REPOSITORY` | **Variable** | Name of the Artifact Registry repository (e.g., `enrichment-repo`) | GCP Artifact Registry | Identifies destination repository for container images. |
+| `GCP_VM_HOST` | **Variable** | External IP address of your GCP VM | GCP Compute Engine console | Target host for SSH connection. |
+| `GCP_VM_USER` | **Variable** | SSH username on the VM (e.g., `ubuntu`) | VM login user | Target username for SSH authentication. |
+| `GCP_VM_APP_DIR` | **Variable** *(Optional)* | Project root directory on VM (defaults to `~/data-enrichment-ai-intelligence`) | Filesystem path on VM | Directory where `deploy.sh` and Compose files reside. |
+| `GCP_VM_SSH_PORT` | **Variable** *(Optional)* | SSH port (defaults to `22`) | Custom SSH configuration | Allows non-standard SSH ports if hardened. |
+| `NEXT_PUBLIC_GATEWAY_URL` | **Variable** *(Optional)* | Public Gateway URL baked into Frontend (e.g. `http://<VM_IP>:9738`) | Gateway IP/domain | Next.js build-time argument for API routing. |
+
+---
+
+## 4. Personal Access Token (PAT) Note
+
+> **No GitHub Personal Access Token (PAT) is required for the current deployment setup.**
+>
+> Container images are built in GitHub Actions and pushed directly to Google Artifact Registry. Deployment assets (`docker-compose.prod.yml`, `deploy.sh`, `config/*.yml`) are synced to the VM by GitHub Actions over SSH. The VM does not pull code from GitHub during automated deployments.
+
+---
+
+## 5. SSH Authentication Setup
+
+GitHub Actions connects to the VM using dedicated SSH key-pair authentication.
+
+### Step 1: Generate an SSH Key Pair (on your local machine)
+```bash
+ssh-keygen -t ed25519 -f ./gcp_deploy_key -C "github-actions-deployer"
+```
+
+### Step 2: Put the Public Key on the GCP VM
+Add the contents of `./gcp_deploy_key.pub` to the VM's `~/.ssh/authorized_keys`:
+```bash
+# On the GCP VM
+mkdir -p ~/.ssh && chmod 700 ~/.ssh
+echo "<CONTENTS_OF_gcp_deploy_key.pub>" >> ~/.ssh/authorized_keys
+chmod 600 ~/.ssh/authorized_keys
+```
+
+### Step 3: Store the Private Key in GitHub Secrets
+Copy the entire contents of `./gcp_deploy_key` (including `-----BEGIN OPENSSH PRIVATE KEY-----`) into GitHub Secret:
+`GCP_SSH_PRIVATE_KEY`
+
+---
+
+## 6. Environment Variables & Production Secrets Matrix
+
+| Variable | Target Location | Category | Source / Description |
+| :--- | :--- | :--- | :--- |
+| `IMAGE_PREFIX` | VM `.env` & GitHub Actions | Registry Configuration | `us-central1-docker.pkg.dev/<PROJECT_ID>/<REPO>/` (with trailing slash) |
+| `IMAGE_TAG` | VM `.env` & GitHub Actions | Image Version | Set to immutable Git SHA (`${{ github.sha }}`) or `latest` |
+| `APP_ENV` | VM `.env` | Environment | Set to `production` |
+| `COMPOSE_PROJECT_NAME`| VM `.env` | Compose Config | Set to `data-enrichment-production` |
+| `MYSQL_ROOT_PASSWORD` | VM `.env` | Application Secret | Generated once manually (`openssl rand -hex 16`) |
+| `MYSQL_DATABASE` | VM `.env` | DB Config | Set to `enrichment_db` |
+| `MYSQL_USER` | VM `.env` | DB Config | Set to `enrichment_user` |
+| `MYSQL_PASSWORD` | VM `.env` | Application Secret | Generated once manually (`openssl rand -hex 16`) |
+| `JWT_SECRET` | VM `.env` | Application Secret | 256-bit base64 secret (`openssl rand -base64 32`) |
+| `JWT_EXPIRATION_MS` | VM `.env` | Auth Config | Default: `86400000` (24 hours) |
+| `GATEWAY_CORS_ALLOWED_ORIGINS` | VM `.env` | Security Config | `http://<VM_PUBLIC_IP>:3000,http://localhost:3000` |
+| `NEXT_PUBLIC_GATEWAY_URL` | VM `.env` | Frontend Config | `http://<VM_PUBLIC_IP>:9738` |
+| `GEMINI_API_KEY` | VM `.env` | External API Secret | Google AI Studio key (or `mock-key` if `AI_MOCK_MODE=true`) |
+| `SEARCH_PROVIDER_NAME`| VM `.env` | Search Config | `tavily` or `mock` |
+| `SEARCH_PROVIDER_API_KEY` | VM `.env` | External API Secret | Tavily API key (required if `tavily`) |
+
+---
+
+## 7. Initial Fresh GCP VM Setup (Step-by-Step)
+
+Follow these steps once on a fresh machine:
+
+### Step 1: Create the VM Instance
+- **Machine Type**: `e2-standard-4` (4 vCPUs, 16 GB RAM).
+- **Boot Disk**: Ubuntu 24.04 LTS, 50 GB SSD (`pd-balanced`).
+- **Network Tags**: `enrichment-platform,http-server,https-server`.
 
 ```bash
 gcloud compute instances create enrichment-platform-vm \
@@ -86,490 +187,186 @@ gcloud compute instances create enrichment-platform-vm \
     --zone="us-central1-a" \
     --machine-type="e2-standard-4" \
     --network-interface="network-tier=PREMIUM,subnet=default" \
-    --maintenance-policy="MIGRATE" \
     --scopes="https://www.googleapis.com/auth/cloud-platform" \
     --tags="enrichment-platform,http-server,https-server" \
     --create-disk="auto-delete=yes,boot=yes,image=projects/ubuntu-os-cloud/global/images/family/ubuntu-2404-lts-amd64,mode=rw,size=50,type=pd-balanced"
 ```
 
-### Option B: Provision via Google Cloud Console
-1. Open [Google Cloud Console > Compute Engine > VM Instances](https://console.cloud.google.com/compute/instances).
-2. Click **Create Instance**.
-3. Name: `enrichment-platform-vm`.
-4. Region: Choose your preferred region.
-5. Machine Configuration: General-purpose > **E2** > Preset > **e2-standard-4** (4 vCPU, 16 GB memory).
-6. Boot Disk: Click **Change** > OS: **Ubuntu** > Version: **Ubuntu 24.04 LTS** > Size: **50 GB** > **Select**.
-7. Firewall: Check **Allow HTTP traffic** and **Allow HTTPS traffic**.
-8. Networking > Network tags: Add `enrichment-platform`.
-9. Click **Create**.
-
----
-
-## 3. Step 2: Configure GCP VPC Firewall Rules
-
-In GCP, network traffic is blocked by default. You must create firewall rules to allow external access to the public entry points (**Port 22 for SSH**, **Port 3000 for Frontend**, **Port 9738 for API Gateway**).
-
-### Via `gcloud` CLI:
+### Step 2: Configure VPC Firewall Rules
+Allow public access only to SSH (`22`), Frontend (`3000`), and Gateway (`9738`):
 ```bash
-# 1. Allow SSH (Port 22)
+# SSH Access (Port 22)
 gcloud compute firewall-rules create allow-enrichment-ssh \
-    --direction=INGRESS \
-    --priority=1000 \
-    --network=default \
-    --action=ALLOW \
-    --rules=tcp:22 \
-    --source-ranges=0.0.0.0/0 \
-    --target-tags=enrichment-platform
+    --direction=INGRESS --priority=1000 --network=default --action=ALLOW \
+    --rules=tcp:22 --source-ranges=0.0.0.0/0 --target-tags=enrichment-platform
 
-# 2. Allow Frontend UI (Port 3000)
+# Frontend UI (Port 3000)
 gcloud compute firewall-rules create allow-enrichment-frontend \
-    --direction=INGRESS \
-    --priority=1000 \
-    --network=default \
-    --action=ALLOW \
-    --rules=tcp:3000 \
-    --source-ranges=0.0.0.0/0 \
-    --target-tags=enrichment-platform
+    --direction=INGRESS --priority=1000 --network=default --action=ALLOW \
+    --rules=tcp:3000 --source-ranges=0.0.0.0/0 --target-tags=enrichment-platform
 
-# 3. Allow API Gateway (Port 9738)
+# API Gateway (Port 9738)
 gcloud compute firewall-rules create allow-enrichment-gateway \
-    --direction=INGRESS \
-    --priority=1000 \
-    --network=default \
-    --action=ALLOW \
-    --rules=tcp:9738 \
-    --source-ranges=0.0.0.0/0 \
-    --target-tags=enrichment-platform
+    --direction=INGRESS --priority=1000 --network=default --action=ALLOW \
+    --rules=tcp:9738 --source-ranges=0.0.0.0/0 --target-tags=enrichment-platform
 ```
 
-> [!CAUTION]
-> **DO NOT** create firewall rules for ports `3306`, `9736`, `9737`, `9739`, `9741`, `9742`, or `9743`. Those services must remain internal to the VM.
-
----
-
-## 4. Step 3: Connect via SSH & Configure VM Firewall (UFW)
-
-Connect to your VM via SSH:
+### Step 3: Install Docker CE & Docker Compose Plugin
+Connect to the VM via SSH and execute:
 ```bash
-gcloud compute ssh enrichment-platform-vm --zone="us-central1-a"
-```
-*(Or use the SSH button in the GCP Web Console).*
+# 1. Install prerequisites
+sudo apt-get update && sudo apt-get install -y ca-certificates curl gnupg
 
-### Configure Host Firewall (UFW)
-Always enable SSH **before** turning on UFW to avoid locking yourself out:
-
-```bash
-# 1. Ensure UFW allows SSH before enabling
-sudo ufw allow 22/tcp comment 'SSH access'
-
-# 2. Allow public application ports
-sudo ufw allow 3000/tcp comment 'Next.js Frontend UI'
-sudo ufw allow 9738/tcp comment 'Spring Cloud API Gateway'
-
-# 3. Enable UFW
-sudo ufw --force enable
-
-# 4. Verify firewall status
-sudo ufw status verbose
-```
-
----
-
-## 5. Step 4: Install Docker & Docker Compose Plugin
-
-Run the official Docker installation script on the Ubuntu VM:
-
-```bash
-# 1. Update system package index
-sudo apt-get update
-sudo apt-get install -y ca-certificates curl gnupg lsb-release git
-
-# 2. Add Docker official GPG key
+# 2. Add Docker official repository
 sudo install -m 0755 -d /etc/apt/keyrings
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
 sudo chmod a+r /etc/apt/keyrings/docker.gpg
 
-# 3. Set up the Docker apt repository
 echo \
   "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
-  $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+  $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+  sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
 
-# 4. Install Docker Engine, containerd, and Docker Compose plugin
 sudo apt-get update
 sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
-# 5. Add current user to the docker group (allows running docker without sudo)
+# 3. Add user to docker group
 sudo usermod -aG docker $USER
-
-# 6. Apply group changes to current shell
 newgrp docker
 
-# 7. Verify installations
-docker --version
-docker compose version
-```
-
-Expected output:
-* `Docker version 27.x.x` or higher
-* `Docker Compose version v2.x.x` or higher
-
----
-
-## 6. Step 5: Clone Repository & Setup Swap Space
-
-### Recommended: Add 4 GB Swap Space
-Compiling multiple Spring Boot and Next.js applications requires sufficient memory. On smaller VMs, adding a swapfile prevents Out-Of-Memory (OOM) compiler crashes:
-
-```bash
+# 4. Configure 4GB Swapfile (prevents JVM OOM kills)
 sudo fallocate -l 4G /swapfile
 sudo chmod 600 /swapfile
 sudo mkswap /swapfile
 sudo swapon /swapfile
 echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
-free -h
 ```
 
-### Clone the Repository
+### Step 4: Configure Project Directory & Environment
 ```bash
-# Clone the repository
-git clone <YOUR_REPOSITORY_URL> data-enrichment-ai-intelligence
+# Clone the repository once to initialize directories
+git clone https://github.com/parvagr247/data-enrichment-ai-intelligence.git ~/data-enrichment-ai-intelligence
+cd ~/data-enrichment-ai-intelligence/infrastructure/docker
 
-# Enter the project directory
-cd data-enrichment-ai-intelligence
-
-# Checkout your production release branch (e.g., main)
-git checkout main
+# Create production .env file
+cp .env.example .env
+nano .env
 ```
 
----
-
-## 7. Step 6: Configure Production Secrets & Environment Variables
-
-Create the production `.env` file from the provided template in `infrastructure/docker/`:
-
+**Essential `.env` values to edit:**
 ```bash
-cp infrastructure/docker/.env.example infrastructure/docker/.env
-```
+VM_IP=$(curl -s ifconfig.me)
 
-Now generate a cryptographically secure 256-bit JWT secret:
-```bash
-openssl rand -base64 32
-```
+NEXT_PUBLIC_GATEWAY_URL=http://${VM_IP}:9738
+GATEWAY_CORS_ALLOWED_ORIGINS=http://${VM_IP}:3000,http://localhost:3000
 
-Edit `infrastructure/docker/.env`:
-```bash
-nano infrastructure/docker/.env
-```
+MYSQL_ROOT_PASSWORD=your_strong_root_password
+MYSQL_PASSWORD=your_strong_user_password
+JWT_SECRET=$(openssl rand -base64 32)
 
-Find your VM's public IP by running:
-```bash
-curl -s ifconfig.me
-```
-
-Configure the variables as follows:
-
-```ini
-# ==============================================================================
-# Production Environment Configuration (.env)
-# ==============================================================================
-APP_ENV=production
-COMPOSE_PROJECT_NAME=data-enrichment-production
-
-# --- Database ---
-MYSQL_ROOT_PASSWORD=SuperStrongRootSecret992!
-MYSQL_DATABASE=enrichment_db
-MYSQL_USER=enrichment_user
-MYSQL_PASSWORD=SuperStrongUserPassword883!
-
-# --- Security & Auth ---
-# Paste your generated 256-bit key from `openssl rand -base64 32`:
-JWT_SECRET=q7vJm2X9kP4sL8wR3nY6tB1cF5hQ0zAa9UeD7xK2pNs=
-JWT_EXPIRATION_MS=86400000
-
-# Optional API key for X-API-Key header (leave blank for open access):
-GATEWAY_API_KEY=
-
-# Set to your VM's public IP so the browser can make CORS requests:
-GATEWAY_CORS_ALLOWED_ORIGINS=http://<YOUR_VM_PUBLIC_IP>:3000,http://localhost:3000
-
-# --- AI Intelligence Service (:9742) ---
-GEMINI_API_KEY=<YOUR_GOOGLE_GEMINI_API_KEY>
-AI_MODEL=gemini-2.0-flash
-AI_MOCK_MODE=false
-
-# --- Research Service (:9741) ---
+GEMINI_API_KEY=your_gemini_api_key
 SEARCH_PROVIDER_NAME=tavily
-SEARCH_PROVIDER_API_KEY=<YOUR_TAVILY_API_KEY>
-SEARCH_PROVIDER_BASE_URL=https://api.tavily.com
-SEARCH_DISCOVERY_MAX_RESULTS=5
-SEARCH_DISCOVERY_TIMEOUT_MS=4000
-WEB_FETCH_CONNECT_TIMEOUT_MS=3000
-WEB_FETCH_READ_TIMEOUT_MS=5000
-WEB_FETCH_MAX_RESPONSE_SIZE_MB=5
-RESEARCH_MAX_SOURCES=5
-RESEARCH_MAX_CONTENT_LENGTH=50000
-
-# --- Dataset Service (:9743) ---
-ENRICHMENT_CONCURRENCY=3
-ENRICHMENT_QUEUE_CAPACITY=500
-ENRICHMENT_ENTITY_TIMEOUT=60
-ENRICHMENT_JOB_TIMEOUT=30
-ENRICHMENT_AI_ENABLED=true
-
-# --- Frontend (:3000) ---
-# CRITICAL: Must point to the public Gateway address accessible by the browser
-NEXT_PUBLIC_GATEWAY_URL=http://<YOUR_VM_PUBLIC_IP>:9738
-NEXT_PUBLIC_GATEWAY_API_KEY=
+SEARCH_PROVIDER_API_KEY=your_tavily_api_key
 ```
 
-Restrict file permissions so only your user can read the secrets:
+### Step 5: Perform Initial Deployment (Local VM Build)
 ```bash
-chmod 600 infrastructure/docker/.env
+cd ~/data-enrichment-ai-intelligence/infrastructure/docker
+chmod +x deploy.sh
+./deploy.sh
 ```
 
 ---
 
-## 8. Step 7: Build & Launch Production Stack
+## 8. Subsequent Deployments
 
-### Validate Configuration Syntax First
+### A. Automated Deployment via GitHub Actions (Recommended)
+Simply push your changes to `main`:
 ```bash
-docker compose \
-  -f infrastructure/docker/docker-compose.prod.yml \
-  --env-file infrastructure/docker/.env \
-  config
+git push origin main
 ```
+GitHub Actions will:
+1. Run test suites and linting via `.github/workflows/ci.yml`.
+2. Build and push all 8 tagged images to Google Artifact Registry.
+3. SSH to the VM, sync files, and execute `./deploy.sh ${{ github.sha }}`.
+4. Verify health endpoints and output deployment status.
 
-### Build and Start All Services
+### B. Manual Deployment (Directly on the VM)
+If you need to redeploy or roll back manually on the VM:
 ```bash
-docker compose \
-  -f infrastructure/docker/docker-compose.prod.yml \
-  --env-file infrastructure/docker/.env \
-  up -d --build
-```
+# Connect to VM
+ssh ubuntu@<VM_PUBLIC_IP>
 
-### Monitor Startup Progress
-The services start in strict, health-verified dependency sequence:
-1. `mysql` initializes database and starts healthcheck.
-2. `config-server` starts and loads `/config`.
-3. `discovery-server` starts Eureka registry after Config Server is healthy.
-4. `auth-service`, `dataset-service`, `ai-intelligent-service`, and `research-service` initialize and register with Eureka after MySQL and Discovery Server are healthy.
-5. `api-gateway` starts routing after Discovery and Auth services are healthy.
-6. `frontend` starts after API Gateway is healthy.
-
-```bash
-# Watch container statuses
-watch -n 2 docker compose -f infrastructure/docker/docker-compose.prod.yml ps
-```
-
-Wait until all containers show status **`Up (healthy)`**.
-
----
-
-## 9. Step 8: Health Verification & Sanity Checks
-
-Run these commands on the VM to verify every layer:
-
-```bash
-# 1. Verify MySQL
-docker exec -it enrichment-mysql mysqladmin ping -u root -pSuperStrongRootSecret992!
-
-# 2. Verify Config Server
-curl -s http://localhost:9736/actuator/health | grep '"status":"UP"'
-
-# 3. Verify Eureka Discovery Server
-curl -s http://localhost:9737/actuator/health | grep '"status":"UP"'
-
-# 4. Verify Auth Service (Internal via docker network)
-docker exec -it enrichment-api-gateway curl -s http://auth-service:9739/actuator/health
-
-# 5. Verify Research Service
-docker exec -it enrichment-api-gateway curl -s http://research-service:9741/actuator/health
-
-# 6. Verify AI Intelligent Service
-docker exec -it enrichment-api-gateway curl -s http://ai-intelligent-service:9742/actuator/health
-
-# 7. Verify Dataset Service
-docker exec -it enrichment-api-gateway curl -s http://dataset-service:9743/actuator/health
-
-# 8. Verify Public Gateway Health (Public Port 9738)
-curl -s http://localhost:9738/actuator/health
-
-# 9. Verify Frontend (Public Port 3000)
-curl -I http://localhost:3000
+# Run deployment script with latest or a specific Git SHA
+cd ~/data-enrichment-ai-intelligence/infrastructure/docker
+./deploy.sh <optional-commit-sha-or-latest>
 ```
 
 ---
 
-## 10. Step 9: User Workflow & Verification Walkthrough
+## 9. Verification Commands
 
-Once healthy, open your web browser on your computer:
-
-```
-http://<YOUR_VM_PUBLIC_IP>:3000
-```
-
-### Complete End-to-End Workflow Verification:
-
-1. **User Registration**:
-   Test creating an account via the API Gateway:
-   ```bash
-   curl -X POST http://<YOUR_VM_PUBLIC_IP>:9738/api/v1/auth/register \
-     -H "Content-Type: application/json" \
-     -d '{"name":"Admin User","email":"admin@example.com","password":"Password123!"}'
-   ```
-   *Expected: HTTP 201 Created with JWT token and user profile.*
-
-2. **User Login**:
-   ```bash
-   curl -X POST http://<YOUR_VM_PUBLIC_IP>:9738/api/v1/auth/login \
-     -H "Content-Type: application/json" \
-     -d '{"email":"admin@example.com","password":"Password123!"}'
-   ```
-   *Expected: HTTP 200 OK with Bearer token.*
-
-3. **Frontend Dashboard Ingestion**:
-   - Open `http://<YOUR_VM_PUBLIC_IP>:3000` in your browser.
-   - Drag and drop `data/samples/v1-regression-dataset.csv` into the Upload dropzone.
-   - Observe automatic column role profiling (`Name`, `Company`, `Role`, `LinkedIn`).
-   - Configure research depth (`NORMAL`) and enter your target objective prompt:
-     *"Identify and enrich the profiles of people most likely to help with a Java/Spring Boot backend internship."*
-   - Click **Run Enrichment Job**.
-   - Watch real-time SSE progress indicators transition smoothly across stages:
-     `DISCOVERING` $\rightarrow$ `COLLECTING_SOURCES` $\rightarrow$ `EXTRACTING_EVIDENCE` $\rightarrow$ `AI_ENRICHMENT` $\rightarrow$ `ASSESSING` $\rightarrow$ `PERSISTING`.
-   - Inspect the resulting enriched table, multi-dimensional scores (0�100), talking points, and source provenance pills (`FULL_PAGE` vs `SEARCH_SNIPPET`).
-
----
-
-## 11. Step 10: Production Operations & Maintenance
-
-### Viewing Service Logs
-```bash
-# Follow logs across all containers
-docker compose -f infrastructure/docker/docker-compose.prod.yml --env-file infrastructure/docker/.env logs -f
-
-# Follow logs for a specific service
-docker compose -f infrastructure/docker/docker-compose.prod.yml logs -f api-gateway
-docker compose -f infrastructure/docker/docker-compose.prod.yml logs -f research-service
-docker compose -f infrastructure/docker/docker-compose.prod.yml logs -f dataset-service
-docker compose -f infrastructure/docker/docker-compose.prod.yml logs -f auth-service
-
-# View the last 200 lines of logs
-docker compose -f infrastructure/docker/docker-compose.prod.yml logs --tail=200 api-gateway
-```
-
-### Update & Zero-Data-Loss Redeployment
-When you push code updates to your Git repository:
+Run these on the VM to verify system health:
 
 ```bash
-cd ~/data-enrichment-ai-intelligence
+# 1. Check container health status overview
+docker compose -f ~/data-enrichment-ai-intelligence/infrastructure/docker/docker-compose.prod.yml ps
 
-# 1. Pull latest changes
-git pull origin main
+# 2. Check public API Gateway health
+curl -s http://localhost:9738/actuator/health | grep -o '"status":"[^"]*"'
 
-# 2. Rebuild changed containers
-docker compose -f infrastructure/docker/docker-compose.prod.yml --env-file infrastructure/docker/.env build
+# 3. Check public Frontend response
+curl -s -I http://localhost:3000 | head -n 1
 
-# 3. Re-launch stack (Docker updates only containers with changes; database volume persists intact)
-docker compose -f infrastructure/docker/docker-compose.prod.yml --env-file infrastructure/docker/.env up -d
+# 4. Check internal microservices via container execution
+docker exec enrichment-config-server curl -s http://localhost:9736/actuator/health
+docker exec enrichment-discovery-server curl -s http://localhost:9737/actuator/health
+docker exec enrichment-auth-service curl -s http://localhost:9739/actuator/health
+docker exec enrichment-research-service curl -s http://localhost:9741/actuator/health
+docker exec enrichment-ai-intelligent-service curl -s http://localhost:9742/actuator/health
+docker exec enrichment-dataset-service curl -s http://localhost:9743/actuator/health
 
-# 4. Verify health
-docker compose -f infrastructure/docker/docker-compose.prod.yml ps
-```
-
-### Database Backup & Restore Procedure
-
-#### Create Backup:
-```bash
-# Create timestamped SQL dump
-TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-docker exec enrichment-mysql mysqldump -u root -pSuperStrongRootSecret992! enrichment_db > ~/backup_enrichment_${TIMESTAMP}.sql
-
-# Verify dump file size
-ls -lh ~/backup_enrichment_${TIMESTAMP}.sql
-```
-
-#### Restore from Backup:
-```bash
-docker exec -i enrichment-mysql mysql -u root -pSuperStrongRootSecret992! enrichment_db < ~/backup_enrichment_YYYYMMDD_HHMMSS.sql
-```
-
-### Stopping & Restarting Services
-```bash
-# Restart a single service (e.g., after changing an environment variable)
-docker compose -f infrastructure/docker/docker-compose.prod.yml restart research-service
-
-# Stop all services safely (preserves database data volume)
-docker compose -f infrastructure/docker/docker-compose.prod.yml down
-
-# Start services back up
-docker compose -f infrastructure/docker/docker-compose.prod.yml --env-file infrastructure/docker/.env up -d
+# 5. Check MySQL health
+docker exec enrichment-mysql mysqladmin ping -h localhost --silent && echo "MySQL is healthy"
 ```
 
 ---
 
-## 12. Production Troubleshooting Guide
+## 10. Rollback Procedure
 
-| # | Symptom | Diagnostic Command | Root Cause & Resolution |
-|---|---|---|---|
-| 1 | **Config Server Unavailable** | `docker compose ... logs config-server` | Check that `./config` volume is mounted read-only and `SPRING_PROFILES_ACTIVE=native` is set. |
-| 2 | **Eureka Unavailable** | `docker compose ... logs discovery-server` | Ensure `config-server` is completely healthy before `discovery-server` boots. Check memory usage (`free -m`). |
-| 3 | **Service Not Registered** | `curl http://localhost:9737/eureka/apps` | Eureka discovery registration interval is 10s. Verify service `EUREKA_SERVER_URL=http://discovery-server:9737/eureka/`. |
-| 4 | **Gateway Cannot Discover Service** | `curl http://localhost:9738/actuator/health` | Ensure API Gateway routes use Docker DNS names (`http://dataset-service:9743`) rather than `localhost`. |
-| 5 | **Database Unavailable** | `docker compose ... logs mysql` | Ensure `mysql_data` volume is writable and `MYSQL_ROOT_PASSWORD` matches application datasource configuration. |
-| 6 | **Authentication Fails / 401 Unauthorized** | `docker compose ... logs auth-service` | Verify `JWT_SECRET` in `.env` is identical across `auth-service` and `api-gateway`. Must be at least 256 bits (32 chars). |
-| 7 | **JWT Expiration / Signature Error** | `docker compose ... logs api-gateway` | Client token has expired (`JWT_EXPIRATION_MS`) or was signed with a different key. Log in again to obtain a fresh token. |
-| 8 | **Frontend Calling Localhost:9738** | Open browser Developer Tools > Network tab | `NEXT_PUBLIC_GATEWAY_URL` in `.env` was set to `localhost`. Change it to `http://<YOUR_VM_PUBLIC_IP>:9738` and rebuild the frontend container (`docker compose ... up -d --build frontend`). |
-| 9 | **CORS Errors in Browser** | Browser Console `Access to fetch blocked by CORS` | Update `GATEWAY_CORS_ALLOWED_ORIGINS` in `.env` to include `http://<YOUR_VM_PUBLIC_IP>:3000`, then restart Gateway. |
-| 10 | **Port Already in Use** | `sudo ss -tulpn \| grep -E '3000\|9738\|3306'` | Another process on the VM is binding port 3000 or 9738. Stop conflicting service with `sudo systemctl stop <service>` or `sudo kill -9 <PID>`. |
-| 11 | **Container Crash Loop (OOM)** | `docker inspect <container> \| grep OOMKilled` | VM ran out of RAM during Maven builds. Add 4 GB swapfile (Step 5) and re-run. |
-| 12 | **Environment Variable Missing** | `docker compose ... config` | `.env` file was not found or variable was left blank without a default. Inspect `infrastructure/docker/.env`. |
-| 13 | **AI API Key Invalid** | `docker compose ... logs ai-intelligent-service` | Google Gemini API key is missing or expired. Update `GEMINI_API_KEY` in `.env` or set `AI_MOCK_MODE=true`. |
-| 14 | **Tavily API Key Invalid** | `docker compose ... logs research-service` | Tavily API key is missing. Set `SEARCH_PROVIDER_NAME=mock` to use rich offline mock data or update `SEARCH_PROVIDER_API_KEY`. |
-| 15 | **Database Permission Issue** | `docker compose ... logs dataset-service` | Flyway migration failed due to existing dirty schema. Connect to MySQL and run `DROP DATABASE enrichment_db; CREATE DATABASE enrichment_db;` or repair Flyway table. |
+Because all Docker images are tagged with immutable Git commit SHAs, you can instantly rollback without rebuilding:
+
+```bash
+# SSH into VM
+ssh ubuntu@<VM_PUBLIC_IP>
+cd ~/data-enrichment-ai-intelligence/infrastructure/docker
+
+# Run deploy.sh with the previous stable commit SHA
+./deploy.sh <PREVIOUS_STABLE_GIT_SHA>
+```
+
+Docker Compose will pull `<PREVIOUS_STABLE_GIT_SHA>` from Artifact Registry and update the containers. The MySQL database volume (`mysql_data`) is never destroyed.
 
 ---
 
-## 13. Next Production Hardening Steps (Future Improvements)
+## 11. Troubleshooting
 
-When you are ready to transition from raw Public IP access to an enterprise production setup:
-
-1. **Domain & HTTPS Termination (Reverse Proxy)**:
-   Place Nginx or Caddy in front of the stack on ports `80` and `443`:
-   - Point your DNS A-record to the GCP VM Public IP (`enrichment.yourdomain.com`).
-   - Use Certbot / Let's Encrypt for automatic TLS renewal.
-   - Configure Nginx to route `/` to `localhost:3000` and `/api/` to `localhost:9738`.
-2. **Google Secret Manager**:
-   Instead of storing `.env` on disk, inject production secrets at startup using Google Cloud Secret Manager via `gcloud secrets versions access`.
-3. **Google Artifact Registry**:
-   Set up GitHub Actions CI/CD to build Docker images on code push, tag them, and push them to Google Artifact Registry (`pkg.dev`). On the GCP VM, deployment becomes a simple `docker compose pull && docker compose up -d` without compiling code on the VM.
+| Issue | Diagnostic Command | Quick Resolution |
+| :--- | :--- | :--- |
+| **Docker not running** | `sudo systemctl status docker` | Start daemon: `sudo systemctl start docker`. |
+| **Containers failing / exiting** | `docker compose -f docker-compose.prod.yml ps -a` | Inspect logs: `docker compose -f docker-compose.prod.yml logs <service-name>`. |
+| **Port already in use (9738 or 3000)** | `sudo ss -tulpn | grep -E '9738|3000'` | Identify and stop conflicting process or old container: `docker stop <id>`. |
+| **GitHub Actions SSH connection failure** | `ssh -v -i ~/.ssh/id_deploy ubuntu@<VM_IP>` | Ensure `GCP_SSH_PRIVATE_KEY` matches `~/.ssh/authorized_keys` and port 22 is open in GCP VPC firewall. |
+| **`deploy.sh` Permission Denied** | `ls -l deploy.sh` | Add execution permission: `chmod +x deploy.sh`. |
+| **Missing environment variable error** | `grep MYSQL_ROOT_PASSWORD .env` | Ensure `.env` exists in `infrastructure/docker/` with all required passwords set. |
+| **Service returns 503 from Gateway** | `docker exec enrichment-discovery-server curl -s http://localhost:9737/eureka/apps` | Wait 20–30s for initial Eureka registration heartbeats to stabilize. |
+| **Database connection refused on startup** | `docker logs enrichment-mysql` | MySQL takes ~25s to initialize on first boot. Dependency sequencing will wait until MySQL healthcheck passes. |
 
 ---
 
-## 14. Production Deployment Checklist
+## 12. Security Notes
 
-### Before Deployment:
-- [ ] GCP VM created with recommended specs (`e2-standard-4`, 50 GB disk, Ubuntu 24.04 LTS).
-- [ ] SSH connection established and verified.
-- [ ] GCP VPC Firewall allows ports `22`, `3000`, `9738`.
-- [ ] UFW host firewall configured and active.
-- [ ] Docker Engine and Docker Compose plugin installed.
-- [ ] 4 GB swapfile created.
-- [ ] Repository cloned to `~/data-enrichment-ai-intelligence`.
-- [ ] `infrastructure/docker/.env` created from `.env.example`.
-- [ ] Strong database passwords configured in `.env`.
-- [ ] 256-bit `JWT_SECRET` generated and configured in `.env`.
-- [ ] `NEXT_PUBLIC_GATEWAY_URL` configured to `http://<YOUR_VM_PUBLIC_IP>:9738`.
-- [ ] `GATEWAY_CORS_ALLOWED_ORIGINS` configured with frontend IP address.
-- [ ] `docker compose config` validation succeeds with zero errors.
-
-### After Deployment:
-- [ ] All 9 containers show `Up (healthy)` in `docker compose ps`.
-- [ ] Config Server responds with HTTP 200 on `/actuator/health`.
-- [ ] Eureka Discovery Server registers all services.
-- [ ] MySQL database initialized and Flyway migrations V1 & V2 applied.
-- [ ] User registration (`/api/v1/auth/register`) issues a valid JWT token.
-- [ ] User login (`/api/v1/auth/login`) succeeds.
-- [ ] Frontend UI loads at `http://<YOUR_VM_PUBLIC_IP>:3000`.
-- [ ] CSV dataset upload profiles columns successfully.
-- [ ] Research and AI enrichment runs and completes with honest status tracking.
-- [ ] Enriched entity data persists and survives `docker compose restart`.
+1. **No Credentials in Git**: Never commit `.env`, private SSH keys, service account keys, or API tokens to version control.
+2. **Strict Port Boundaries**: Only ports `22` (SSH), `3000` (Frontend), and `9738` (Gateway) should be allowed through GCP VPC Firewall. All internal microservice ports (`3306`, `9736`, `9737`, `9739`, `9741`, `9742`, `9743`) must remain closed externally.
+3. **Database Volume Preservation**: Never run `docker compose down -v` in production, as `-v` deletes the persistent MySQL volume (`mysql_data`). Use `docker compose down` or `deploy.sh` which preserves volumes.
+4. **Least-Privilege GitHub Actions**: The GCP Service Account only requires `roles/artifactregistry.writer`. It does not need Project Owner or Compute Admin roles.

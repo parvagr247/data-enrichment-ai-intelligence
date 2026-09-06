@@ -1,4 +1,8 @@
 FROM eclipse-temurin:25-jdk
+
+# Install curl for container healthchecks
+RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 # 1. Copy Maven wrapper and POM configuration

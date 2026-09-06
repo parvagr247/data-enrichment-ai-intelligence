@@ -1,4 +1,8 @@
-# It contains Server Side Orchestration Deployment
+#!/usr/bin/env bash
+# ==============================================================================
+# Production Deployment Script (GCP VM Local Build & Run)
+# Data Enrichment AI Intelligence Platform
+# ==============================================================================
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -12,7 +16,6 @@ echo "======================================================================"
 # 1. Load local .env if available
 if [ -f .env ]; then
   echo "[INFO] Loading configuration from ${SCRIPT_DIR}/.env"
-  # Export existing variables without overriding explicitly set environment variables
   set -a
   # shellcheck disable=SC1091
   source .env
@@ -21,21 +24,7 @@ else
   echo "[WARN] No .env file found at ${SCRIPT_DIR}/.env; using environment variables."
 fi
 
-# 2. Extract and validate IMAGE_TAG and IMAGE_PREFIX
-DEPLOY_TAG="${1:-${IMAGE_TAG:-}}"
-export IMAGE_TAG="${DEPLOY_TAG}"
-export IMAGE_PREFIX="${IMAGE_PREFIX:-}"
-
-if [ -z "${IMAGE_TAG}" ]; then
-  echo "[ERROR] IMAGE_TAG is required. Provide it as an argument or set IMAGE_TAG environment variable."
-  echo "        Example: ./deploy.sh 4a9f3b2"
-  exit 1
-fi
-
-echo "[INFO] Target Container Image Tag: ${IMAGE_TAG}"
-echo "[INFO] Target Registry Prefix:     ${IMAGE_PREFIX:-'(local default)'}"
-
-# 3. Validate runtime secrets
+# 2. Validate essential runtime secrets
 if [ -z "${MYSQL_ROOT_PASSWORD:-}" ] || [ -z "${MYSQL_PASSWORD:-}" ]; then
   echo "[ERROR] MYSQL_ROOT_PASSWORD and MYSQL_PASSWORD must be configured in environment or .env"
   exit 1
@@ -46,7 +35,11 @@ if [ -z "${JWT_SECRET:-}" ]; then
   exit 1
 fi
 
-# 4. Check Docker & Docker Compose installation
+if [ -z "${VM_IP:-}" ]; then
+  echo "[WARN] VM_IP is not set. Defaulting frontend gateway URL to localhost."
+fi
+
+# 3. Check Docker & Docker Compose installation
 if ! command -v docker >/dev/null 2>&1; then
   echo "[ERROR] docker command not found. Please install Docker."
   exit 1
@@ -57,33 +50,24 @@ if ! docker compose version >/dev/null 2>&1; then
   exit 1
 fi
 
-# 5. Configure Artifact Registry authentication if applicable
-REGISTRY_HOST=$(echo "${IMAGE_PREFIX}" | cut -d'/' -f1)
-if [[ "${REGISTRY_HOST}" == *"docker.pkg.dev"* ]]; then
-  echo "[INFO] Configuring Docker authentication for ${REGISTRY_HOST}..."
-  if command -v gcloud >/dev/null 2>&1; then
-    gcloud auth configure-docker "${REGISTRY_HOST}" --quiet || echo "[WARN] gcloud configure-docker returned non-zero, continuing with existing credentials..."
-  fi
-fi
-
-# 6. Pull pre-built production container images
+# 4. Build container images locally from source
 echo "----------------------------------------------------------------------"
-echo " Pulling container images (${IMAGE_TAG})..."
+echo " Building container images locally from repository source..."
 echo "----------------------------------------------------------------------"
-docker compose -f docker-compose.prod.yml pull
+docker compose -f docker-compose.prod.yml build
 
-# 7. Start / update containers in background
+# 5. Start / update containers in background
 echo "----------------------------------------------------------------------"
 echo " Starting production container stack..."
 echo "----------------------------------------------------------------------"
 docker compose -f docker-compose.prod.yml up -d --remove-orphans
 
-# 8. Healthcheck verification loop
+# 6. Healthcheck verification loop
 echo "----------------------------------------------------------------------"
 echo " Verifying service health status..."
 echo "----------------------------------------------------------------------"
 
-MAX_ATTEMPTS=24
+MAX_ATTEMPTS=30
 SLEEP_INTERVAL=5
 ATTEMPT=1
 ALL_HEALTHY=false
@@ -105,7 +89,7 @@ while [ ${ATTEMPT} -le ${MAX_ATTEMPTS} ]; do
     break
   fi
 
-  echo "       Gateway (:9738): ${GATEWAY_STATUS} | Frontend (:3000): ${FRONTEND_STATUS} | Unhealthy containers: ${UNHEALTHY_COUNT} | Exited: ${EXITED_COUNT}"
+  echo "       Gateway (:9738): ${GATEWAY_STATUS} | Frontend (:3000): ${FRONTEND_STATUS} | Unhealthy: ${UNHEALTHY_COUNT} | Exited: ${EXITED_COUNT}"
   sleep ${SLEEP_INTERVAL}
   ATTEMPT=$(( ATTEMPT + 1 ))
 done
@@ -119,7 +103,8 @@ if [ "${ALL_HEALTHY}" = true ]; then
   echo "======================================================================"
   echo " [SUCCESS] Deployment completed successfully! All services healthy."
   echo " Timestamp: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
-  echo " Tag: ${IMAGE_TAG}"
+  echo " Gateway:  http://${VM_IP:-localhost}:9738"
+  echo " Frontend: http://${VM_IP:-localhost}:3000"
   echo "======================================================================"
   exit 0
 else
