@@ -1,0 +1,98 @@
+name: Continuous Integration
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend-test:
+    name: Backend Test (${{ matrix.service }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - ai-intelligent-service
+          - api-gateway
+          - auth-service
+          - config-server
+          - dataset-service
+          - discovery-server
+          - research-service
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 25 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '25'
+          cache: 'maven'
+
+      - name: Run Maven Tests (${{ matrix.service }})
+        working-directory: apps/backend/${{ matrix.service }}
+        run: |
+          chmod +x mvnw
+          ./mvnw test -B
+
+  frontend:
+    name: Frontend Build & Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: apps/frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: apps/frontend
+        run: npm ci
+
+      - name: Run ESLint
+        working-directory: apps/frontend
+        run: npm run lint
+
+      - name: Build Next.js Application
+        working-directory: apps/frontend
+        run: npm run build
+        env:
+          NEXT_PUBLIC_GATEWAY_URL: http://localhost:9738
+
+  docker-validate:
+    name: Validate Docker Compose Configuration
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate Development Docker Compose
+        run: |
+          docker compose -f infrastructure/docker/docker-compose.yml config --quiet
+        env:
+          MYSQL_ROOT_PASSWORD: ci_test_root_password
+          MYSQL_PASSWORD: ci_test_password
+          JWT_SECRET: ci_test_secret_key_at_least_256_bits_length_for_hmac_sha256
+
+      - name: Validate Production Docker Compose
+        run: |
+          docker compose -f infrastructure/docker/docker-compose.prod.yml config --quiet
+        env:
+          IMAGE_PREFIX: us-central1-docker.pkg.dev/sample-project/sample-repo/
+          IMAGE_TAG: ci-test-sha
+          MYSQL_ROOT_PASSWORD: ci_test_root_password
+          MYSQL_PASSWORD: ci_test_password
+          JWT_SECRET: ci_test_secret_key_at_least_256_bits_length_for_hmac_sha256
