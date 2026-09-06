@@ -196,7 +196,12 @@ Submits a batch enrichment job across multiple rows.
 ### `GET /api/v1/enrichment/jobs/{jobId}`
 Polls status, progress counters, and row-level results of a batch enrichment job.
 
-* **Response `200 OK`**: Returns current progress and completed row results.
+* **Response `200 OK`**: Returns current progress (`status: "QUEUED" | "PROCESSING" | "COMPLETED" | "PARTIAL" | "FAILED" | "CANCELLED"`) and completed row results.
+
+### `POST /api/v1/enrichment/jobs/{jobId}/cancel`
+Cancels an active or queued batch enrichment job. Currently executing rows complete while queued row futures are cancelled.
+
+* **Response `200 OK`**: Returns the updated job state with `status: "CANCELLED"`.
 
 ### `POST /api/v1/enrichment/single`
 Synchronously enriches a single row record and persists the entity snapshot.

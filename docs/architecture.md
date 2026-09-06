@@ -118,3 +118,25 @@ The V2 platform introduces three modular architectural enhancements:
 * **Resilient Fallback & Bounded Retries**: `SpringAiIntelligence` executes up to 2 retries with exponential backoff before gracefully failing over to `DeterministicAiIntelligence`. The system never returns an unhandled HTTP 500 error on remote AI outages.
 * **Execution Telemetry**: Captures token consumption, latencies, provider details, and execution status through `AiExecutionMetrics`.
 
+---
+
+## 5. Bounded Parallel Processing & Rich Profile Synthesis
+
+The platform addresses sequential bottlenecks and shallow data profiles through two major architectural enhancements:
+
+### 1. Bounded Row-Level Concurrency (`dataset-service`)
+* **Dedicated Task Executor (`EnrichmentTaskExecutor`)**: Custom `ThreadPoolTaskExecutor` with bounded concurrency (default: 3 workers, configurable via `enrichment.concurrency.workers`), bounded work queue (capacity: 500), and `CallerRunsPolicy` backpressure protection against queue starvation.
+* **Row-Level Failure Isolation**: Each row executes in an isolated `CompletableFuture` task. Transient errors, missing links, or network timeouts for one row never fail adjacent rows or abort the overall batch job.
+* **Thread-Safe Job Telemetry**: Atomic progress counters track completed, failed, and in-flight rows. Final job status seamlessly reflects outcome: `COMPLETED`, `PARTIAL` (when some rows succeed and some fail), `FAILED`, or `CANCELLED`.
+* **Job Cancellation Lifecycle**: `POST /api/v1/enrichment/jobs/{jobId}/cancel` allows operators to stop queued tasks instantly while allowing executing worker threads to finish gracefully.
+
+### 2. Rich Evidence Extraction & Professional Profile Synthesis (`research-service` & `ai-intelligent-service`)
+* **Structured Field Extractors**: Specialized evidence extractors parse deep professional dimensions with verbatim quote grounding:
+  - `ExperienceFieldExtractor`: Identifies chronological role timelines, company affiliations, and date ranges.
+  - `EducationFieldExtractor`: Identifies degrees, academic majors, institutions, and graduation years.
+  - `SkillFieldExtractor`: Extracts, normalizes, and deduplicates technical skills and core competencies.
+  - `ProjectFieldExtractor`: Identifies open-source repositories and notable project initiatives.
+  - `ActivityFieldExtractor`: Differentiates between `AUTHORED` articles/posts and passive `MENTIONS`.
+* **Thread-Safe Source Memoization (`ThreadSafeSourceCache`)**: URL fetch cache eliminates redundant HTTP calls when multiple rows reference the same domain or profile URLs.
+* **Multi-Tab Inspection & Rich Export (`frontend`)**: Next.js frontend delivers a tabbed record inspection modal (Overview, Experience, Education, Skills, Projects, Activity, All Evidence, Sources) and flattened multi-attribute CSV/XLSX export.
+

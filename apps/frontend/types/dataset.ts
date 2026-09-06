@@ -108,7 +108,7 @@ export interface EnrichmentJobRequest {
 export interface EnrichmentJobResponse {
   jobId: string;
   datasetName: string;
-  status: 'SUBMITTED' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
+  status: 'QUEUED' | 'SUBMITTED' | 'PROCESSING' | 'COMPLETED' | 'PARTIAL' | 'FAILED' | 'CANCELLED';
   userRequirement?: string;
   totalRows: number;
   completedRows: number;

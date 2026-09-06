@@ -64,6 +64,18 @@ export const datasetService = {
   },
 
   /**
+   * Cancels a running batch enrichment job.
+   */
+  async cancelJob(jobId: string): Promise<EnrichmentJobResponse> {
+    return apiClient<EnrichmentJobResponse>(
+      `${ENV.DATASET_SERVICE_URL}/api/v1/enrichment/jobs/${encodeURIComponent(jobId)}/cancel`,
+      {
+        method: 'POST',
+      }
+    );
+  },
+
+  /**
    * Lists historical batch enrichment jobs.
    */
   async listJobs(): Promise<EnrichmentJobResponse[]> {

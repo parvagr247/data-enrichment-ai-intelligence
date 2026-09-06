@@ -123,18 +123,22 @@ export default function Home() {
           const completed = job.completedRows || 0;
           const failed = job.failedRows || 0;
           const remaining = Math.max(0, totalRowsCount - completed - failed);
+          const isDone = job.status === "COMPLETED" || job.status === "FAILED" || job.status === "PARTIAL";
+          const activeWorkers = isDone ? 0 : Math.min(3, remaining);
 
           setProgress({
             total: totalRowsCount,
             completed,
-            processing: remaining > 0 ? 1 : 0,
+            processing: activeWorkers,
             failed,
             remaining,
-            isFinished: job.status === "COMPLETED" || job.status === "FAILED",
-            statusText: `Backend Status: ${job.status}`,
+            isFinished: isDone,
+            statusText: isDone
+              ? `Backend Status: ${job.status}`
+              : `Processing with 3 concurrent workers (${completed}/${totalRowsCount} rows complete)...`,
           });
 
-          if (job.status === "COMPLETED" || job.status === "FAILED") {
+          if (isDone) {
             if (pollingRef.current) clearInterval(pollingRef.current);
             setJobDurationMs(job.durationMs ?? undefined);
 
@@ -182,7 +186,7 @@ export default function Home() {
       setProgress({
         total: totalRowsCount,
         completed: 0,
-        processing: totalRowsCount > 0 ? 1 : 0,
+        processing: totalRowsCount > 0 ? Math.min(3, totalRowsCount) : 0,
         failed: 0,
         remaining: totalRowsCount,
         isFinished: false,
@@ -211,10 +215,17 @@ export default function Home() {
     }
   };
 
-  const handleCancelEnrichment = () => {
+  const handleCancelEnrichment = async () => {
     if (pollingRef.current) {
       clearInterval(pollingRef.current);
       pollingRef.current = null;
+    }
+    if (activeJobId) {
+      try {
+        await datasetService.cancelJob(activeJobId);
+      } catch (err) {
+        console.warn("Failed to cancel job on server", err);
+      }
     }
     setProgress((prev) => ({ ...prev, processing: 0, isFinished: true, statusText: "Cancelled" }));
     setStep("RESULTS");

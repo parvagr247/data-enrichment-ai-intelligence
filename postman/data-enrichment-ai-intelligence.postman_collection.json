@@ -303,6 +303,38 @@
             },
             "description": "Polls the status and row results of a batch enrichment job."
           }
+        },
+        {
+          "name": "Cancel Batch Job",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Job status is CANCELLED\", function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.status).to.eql(\"CANCELLED\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json", "type": "text" }
+            ],
+            "url": {
+              "raw": "{{datasetBaseUrl}}/api/v1/enrichment/jobs/{{jobId}}/cancel",
+              "host": ["{{datasetBaseUrl}}"],
+              "path": ["api", "v1", "enrichment", "jobs", "{{jobId}}", "cancel"]
+            },
+            "description": "Cancels a running or queued batch enrichment job."
+          }
         }
       ]
     },

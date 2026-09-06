@@ -125,6 +125,9 @@ Deep dives into the engineering decisions and production patterns implemented in
 26. 🖥️ **[27. Frontend Workflow for Data Enrichment](learning/27-frontend-workflow-for-data-enrichment.md)**  
     *The 7-stage interactive workflow: Ingestion $\rightarrow$ Schema Mapping $\rightarrow$ Requirements $\rightarrow$ Execution $\rightarrow$ Inspection $\rightarrow$ Provenance $\rightarrow$ Export.*
 
+27. ⚡ **[28. Bounded Concurrency and Rich Profile Synthesis](learning/28-bounded-concurrency-and-rich-profile-synthesis.md)**  
+    *Bounded thread pools (`EnrichmentTaskExecutor`), row failure isolation, job cancellation, deep dimension extraction (`ExperienceFieldExtractor`, `EducationFieldExtractor`, `SkillFieldExtractor`, `ProjectFieldExtractor`, `ActivityFieldExtractor`), and multi-tab frontend inspection.*
+
 ---
 
 ## 4. Setup & System Specifications

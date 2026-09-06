@@ -142,6 +142,10 @@ services:
       NEXT_PUBLIC_RESEARCH_SERVICE_URL: ${NEXT_PUBLIC_RESEARCH_SERVICE_URL:-http://localhost:9741}
       NEXT_PUBLIC_AI_INTELLIGENT_SERVICE_URL: ${NEXT_PUBLIC_AI_INTELLIGENT_SERVICE_URL:-http://localhost:9742}
       NEXT_PUBLIC_DATASET_SERVICE_URL: ${NEXT_PUBLIC_DATASET_SERVICE_URL:-http://localhost:9743}
+    volumes:
+      - ../../apps/frontend:/app
+      - /app/node_modules
+      - /app/.next
     develop:
       watch:
         - path: ../../apps/frontend/package.json

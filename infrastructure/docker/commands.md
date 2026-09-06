@@ -65,6 +65,9 @@ To run the complete platform in the background without active log streaming:
 ```powershell
 docker compose --env-file infrastructure/docker/.env -f infrastructure/docker/docker-compose-dev-all.yml up -d
 ```
+> **Note on Hot-Reloading in Detached Mode**:
+> All backend microservices and the Next.js frontend mount source files into their containers via `volumes:` with anonymous volume shadowing for `node_modules` and `.next`. Next.js file polling (`WATCHPACK_POLLING=true`) ensures that host edits hot-reload immediately in the browser even when running in detached mode (`up -d`) without an active `--watch` session.
+
 
 To run only the infrastructure (MySQL database):
 
