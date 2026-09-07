@@ -327,8 +327,6 @@ class ApiGatewayRoutingAndSecurityTest {
                 } else {
                     byte[] resp = "{\"datasetName\":\"test.csv\",\"totalRows\":5}".getBytes(java.nio.charset.StandardCharsets.UTF_8);
                     exchange.getResponseHeaders().set("Content-Type", "application/json");
-                    exchange.getResponseHeaders().set("Access-Control-Allow-Origin", "http://34.93.207.65:3000");
-                    exchange.getResponseHeaders().set("Access-Control-Allow-Credentials", "true");
                     exchange.sendResponseHeaders(200, resp.length);
                     try (java.io.OutputStream os = exchange.getResponseBody()) {
                         os.write(resp);
