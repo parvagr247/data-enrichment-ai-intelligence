@@ -113,18 +113,5 @@ public class GatewaySecurityConfiguration {
         return source;
     }
 
-    @Bean
-    public org.springframework.boot.web.servlet.FilterRegistrationBean<org.springframework.web.filter.CorsFilter> corsFilterRegistrationBean() {
-        org.springframework.web.filter.CorsFilter corsFilter = new org.springframework.web.filter.CorsFilter(corsConfigurationSource());
-        org.springframework.boot.web.servlet.FilterRegistrationBean<org.springframework.web.filter.CorsFilter> bean =
-                new org.springframework.boot.web.servlet.FilterRegistrationBean<>(corsFilter);
-        bean.setOrder(org.springframework.core.Ordered.HIGHEST_PRECEDENCE);
-        bean.setDispatcherTypes(
-                jakarta.servlet.DispatcherType.REQUEST,
-                jakarta.servlet.DispatcherType.FORWARD,
-                jakarta.servlet.DispatcherType.ERROR,
-                jakarta.servlet.DispatcherType.ASYNC
-        );
-        return bean;
-    }
+
 }

@@ -1,5 +1,6 @@
 package com.subdual.ai_intelligent_service.configuration;
 
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.cors.CorsConfiguration;
@@ -9,6 +10,7 @@ import org.springframework.web.filter.CorsFilter;
 import java.util.List;
 
 @Configuration
+@ConditionalOnProperty(name = "cors.enabled", havingValue = "true", matchIfMissing = false)
 public class WebCorsConfiguration {
 
     @Bean
