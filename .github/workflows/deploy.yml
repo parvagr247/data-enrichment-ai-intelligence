@@ -7,137 +7,60 @@ on:
 
 permissions:
   contents: read
-  id-token: write
 
 concurrency:
   group: production-deployment
   cancel-in-progress: false
 
 jobs:
-  build-and-push:
-    name: Build & Push Image (${{ matrix.service }})
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: true
-      matrix:
-        include:
-          - service: config-server
-            image_name: enrichment-config-server
-            context: apps/backend/config-server
-          - service: discovery-server
-            image_name: enrichment-discovery-server
-            context: apps/backend/discovery-server
-          - service: auth-service
-            image_name: enrichment-auth-service
-            context: apps/backend/auth-service
-          - service: ai-intelligent-service
-            image_name: enrichment-ai-intelligent-service
-            context: apps/backend/ai-intelligent-service
-          - service: research-service
-            image_name: enrichment-research-service
-            context: apps/backend/research-service
-          - service: dataset-service
-            image_name: enrichment-dataset-service
-            context: apps/backend/dataset-service
-          - service: api-gateway
-            image_name: enrichment-api-gateway
-            context: apps/backend/api-gateway
-          - service: frontend
-            image_name: enrichment-frontend
-            context: apps/frontend
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Authenticate to Google Cloud
-        uses: google-github-actions/auth@v2
-        with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
-
-      - name: Set up Google Cloud SDK
-        uses: google-github-actions/setup-gcloud@v2
-
-      - name: Configure Docker authentication for Artifact Registry
-        run: |
-          gcloud auth configure-docker ${{ vars.GCP_REGION }}-docker.pkg.dev --quiet
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build and Push Docker image (${{ matrix.image_name }})
-        uses: docker/build-push-action@v5
-        with:
-          context: ${{ matrix.context }}
-          push: true
-          tags: |
-            ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.GCP_ARTIFACT_REPOSITORY }}/${{ matrix.image_name }}:${{ github.sha }}
-            ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.GCP_ARTIFACT_REPOSITORY }}/${{ matrix.image_name }}:latest
-          build-args: |
-            NEXT_PUBLIC_GATEWAY_URL=${{ vars.NEXT_PUBLIC_GATEWAY_URL || 'http://localhost:9738' }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
   deploy-to-vm:
     name: Deploy to GCP Compute Engine VM
-    needs: build-and-push
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up SSH Private Key & Host Key Verification
+      - name: Set up SSH
         run: |
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
+
           echo "${{ secrets.GCP_SSH_PRIVATE_KEY }}" > ~/.ssh/id_deploy
           chmod 600 ~/.ssh/id_deploy
-          ssh-keyscan -p "${{ vars.GCP_VM_SSH_PORT || '22' }}" -H "${{ vars.GCP_VM_HOST }}" >> ~/.ssh/known_hosts
+
+          ssh-keyscan \
+            -p "${{ vars.GCP_VM_SSH_PORT || '22' }}" \
+            -H "${{ vars.GCP_VM_HOST }}" \
+            >> ~/.ssh/known_hosts
+
           chmod 644 ~/.ssh/known_hosts
 
-      - name: Sync Deployment Configurations & Script to VM
+      - name: Deploy application to VM
         env:
           VM_USER: ${{ vars.GCP_VM_USER }}
           VM_HOST: ${{ vars.GCP_VM_HOST }}
           VM_PORT: ${{ vars.GCP_VM_SSH_PORT || '22' }}
-          VM_DIR: ${{ vars.GCP_VM_APP_DIR || '~/data-enrichment-ai-intelligence' }}
+          VM_DIR: ${{ vars.GCP_VM_APP_DIR }}
         run: |
-          echo "[INFO] Creating deployment directories on target VM..."
-          ssh -i ~/.ssh/id_deploy -p "${VM_PORT}" "${VM_USER}@${VM_HOST}" \
-            "mkdir -p ${VM_DIR}/infrastructure/docker ${VM_DIR}/config"
+          echo "[INFO] Deploying to GCP VM..."
+          echo "[INFO] Commit: $GITHUB_SHA"
 
-          echo "[INFO] Copying updated Docker Compose configuration and deploy script..."
-          scp -i ~/.ssh/id_deploy -P "${VM_PORT}" \
-            infrastructure/docker/docker-compose.prod.yml \
-            infrastructure/docker/deploy.sh \
-            "${VM_USER}@${VM_HOST}:${VM_DIR}/infrastructure/docker/"
+          ssh \
+            -i ~/.ssh/id_deploy \
+            -p "${VM_PORT}" \
+            "${VM_USER}@${VM_HOST}" \
+            "cd '${VM_DIR}' && \
+             git pull origin main && \
+             chmod +x infrastructure/docker/deploy.sh && \
+             cd infrastructure/docker && \
+             ./deploy.sh"
 
-          echo "[INFO] Copying Spring Cloud configuration files..."
-          scp -i ~/.ssh/id_deploy -P "${VM_PORT}" \
-            config/*.yml \
-            "${VM_USER}@${VM_HOST}:${VM_DIR}/config/"
-
-      - name: Execute Remote Deployment via deploy.sh
-        env:
-          VM_USER: ${{ vars.GCP_VM_USER }}
-          VM_HOST: ${{ vars.GCP_VM_HOST }}
-          VM_PORT: ${{ vars.GCP_VM_SSH_PORT || '22' }}
-          VM_DIR: ${{ vars.GCP_VM_APP_DIR || '~/data-enrichment-ai-intelligence' }}
-          IMAGE_PREFIX: ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.GCP_ARTIFACT_REPOSITORY }}/
-          IMAGE_TAG: ${{ github.sha }}
-        run: |
-          echo "[INFO] Executing deployment on GCP VM with Git SHA: ${IMAGE_TAG}..."
-          ssh -i ~/.ssh/id_deploy -p "${VM_PORT}" "${VM_USER}@${VM_HOST}" "
-            chmod +x ${VM_DIR}/infrastructure/docker/deploy.sh && \
-            cd ${VM_DIR}/infrastructure/docker && \
-            IMAGE_PREFIX='${IMAGE_PREFIX}' IMAGE_TAG='${IMAGE_TAG}' ./deploy.sh
-          "
-
-      - name: Log Deployment Success
+      - name: Log deployment success
         if: success()
         run: |
           echo "======================================================================"
-          echo " Deployment to GCP Compute Engine VM succeeded!"
-          echo " Git Commit SHA: ${{ github.sha }}"
+          echo " Production deployment succeeded!"
+          echo " Git Commit SHA: $GITHUB_SHA"
           echo " Target Host:    ${{ vars.GCP_VM_HOST }}"
           echo "======================================================================"
