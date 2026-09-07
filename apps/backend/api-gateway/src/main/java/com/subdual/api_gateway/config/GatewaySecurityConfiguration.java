@@ -71,6 +71,7 @@ public class GatewaySecurityConfiguration {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/register", "/api/v1/auth/login").permitAll()
+                        .requestMatchers("/error").permitAll()
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(apiKeyAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
@@ -82,27 +83,48 @@ public class GatewaySecurityConfiguration {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(allowedOrigins.isEmpty() ? List.of("http://localhost:3000") : allowedOrigins);
+        List<String> explicitOrigins = allowedOrigins.stream()
+                .filter(o -> !o.contains("*"))
+                .toList();
+        configuration.setAllowedOrigins(explicitOrigins.isEmpty() ? List.of("http://localhost:3000") : explicitOrigins);
+        configuration.setAllowedOriginPatterns(allowedOrigins.isEmpty() ? List.of("http://localhost:3000") : allowedOrigins);
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         configuration.setAllowedHeaders(List.of(
                 "Authorization",
                 "Content-Type",
                 "X-API-Key",
                 "X-Correlation-ID",
+                "X-Request-ID",
                 "Accept",
                 "Origin",
+                "Range",
                 "X-Requested-With",
                 "Cache-Control",
                 "Pragma",
                 "Access-Control-Request-Method",
                 "Access-Control-Request-Headers"
         ));
-        configuration.setExposedHeaders(List.of("Content-Disposition", "Content-Type", "X-Correlation-ID"));
+        configuration.setExposedHeaders(List.of("Content-Disposition", "Content-Type", "X-Correlation-ID", "X-Request-ID"));
         configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;
+    }
+
+    @Bean
+    public org.springframework.boot.web.servlet.FilterRegistrationBean<org.springframework.web.filter.CorsFilter> corsFilterRegistrationBean() {
+        org.springframework.web.filter.CorsFilter corsFilter = new org.springframework.web.filter.CorsFilter(corsConfigurationSource());
+        org.springframework.boot.web.servlet.FilterRegistrationBean<org.springframework.web.filter.CorsFilter> bean =
+                new org.springframework.boot.web.servlet.FilterRegistrationBean<>(corsFilter);
+        bean.setOrder(org.springframework.core.Ordered.HIGHEST_PRECEDENCE);
+        bean.setDispatcherTypes(
+                jakarta.servlet.DispatcherType.REQUEST,
+                jakarta.servlet.DispatcherType.FORWARD,
+                jakarta.servlet.DispatcherType.ERROR,
+                jakarta.servlet.DispatcherType.ASYNC
+        );
+        return bean;
     }
 }

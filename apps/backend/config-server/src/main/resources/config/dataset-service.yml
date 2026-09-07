@@ -6,6 +6,11 @@ server:
   port: 9743
 
 spring:
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 50MB
+      max-request-size: 50MB
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:mysql://mysql:3306/enrichment_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}
     username: ${SPRING_DATASOURCE_USERNAME:enrichment_user}
@@ -26,6 +31,7 @@ spring:
   flyway:
     enabled: ${SPRING_FLYWAY_ENABLED:true}
     baseline-on-migrate: true
+    baseline-version: 0
     locations: classpath:db/migration
 
 management:

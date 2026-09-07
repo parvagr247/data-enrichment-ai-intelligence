@@ -52,6 +52,22 @@ public class GlobalExceptionHandler {
         return problemDetail;
     }
 
+    @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
+    public ProblemDetail handleMaxUploadSizeExceeded(org.springframework.web.multipart.MaxUploadSizeExceededException ex) {
+        log.warn("Uploaded file exceeds maximum allowed size: {}", ex.getMessage());
+        ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(
+                HttpStatus.PAYLOAD_TOO_LARGE,
+                "The uploaded file exceeds the maximum allowed file size limit (50MB)."
+        );
+        problemDetail.setType(DEFAULT_TYPE);
+        problemDetail.setTitle("Payload Too Large");
+        problemDetail.setInstance(URI.create("/api/v2/datasets/upload"));
+        problemDetail.setProperty("code", "MAX_UPLOAD_SIZE_EXCEEDED");
+        problemDetail.setProperty("requestId", org.slf4j.MDC.get(com.subdual.dataset_service.common.filter.CorrelationIdFilter.MDC_KEY));
+        problemDetail.setProperty("timestamp", java.time.Instant.now().toString());
+        return problemDetail;
+    }
+
     @ExceptionHandler(Exception.class)
     public ProblemDetail handleGenericException(Exception ex) {
         log.error("Unhandled error on {}: ", INSTANCE_PATH, ex);
