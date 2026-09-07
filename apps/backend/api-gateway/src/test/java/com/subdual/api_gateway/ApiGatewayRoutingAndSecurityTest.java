@@ -19,6 +19,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Date;
 
+import org.springframework.security.core.context.SecurityContextHolder;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest
@@ -196,5 +198,56 @@ class ApiGatewayRoutingAndSecurityTest {
         assertTrue(Boolean.TRUE.equals(corsConfig.getAllowCredentials()));
         assertTrue(corsConfig.getAllowedMethods().contains("GET"));
         assertTrue(corsConfig.getAllowedMethods().contains("POST"));
+        assertFalse(corsConfig.getAllowedHeaders().contains("*"));
+    }
+
+    @Test
+    @DisplayName("JWT Filter: Should populate SecurityContextHolder on valid token")
+    void jwtFilter_shouldPopulateSecurityContextHolderOnValidToken() throws Exception {
+        SecurityContextHolder.clearContext();
+        try {
+            JwtAuthenticationFilter filter = new JwtAuthenticationFilter(TEST_SECRET);
+            String token = createTestToken("user-context-456", "context@example.com", 60000);
+
+            MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/entities");
+            request.addHeader("Authorization", "Bearer " + token);
+
+            MockHttpServletResponse response = new MockHttpServletResponse();
+            MockFilterChain chain = new MockFilterChain();
+
+            filter.doFilter(request, response, chain);
+
+            assertNotNull(chain.getRequest());
+            assertEquals(200, response.getStatus());
+
+            assertNotNull(SecurityContextHolder.getContext().getAuthentication());
+            assertEquals("user-context-456", SecurityContextHolder.getContext().getAuthentication().getPrincipal());
+            assertTrue(SecurityContextHolder.getContext().getAuthentication().isAuthenticated());
+            assertTrue(SecurityContextHolder.getContext().getAuthentication().getAuthorities()
+                    .stream().anyMatch(a -> a.getAuthority().equals("ROLE_USER")));
+        } finally {
+            SecurityContextHolder.clearContext();
+        }
+    }
+
+    @Test
+    @DisplayName("CORS: Should parse GCP VM IP origin without wildcard credentials collision")
+    void shouldConfigureCorsWithGcpVmOrigin() {
+        ApiKeyAuthenticationFilter apiKeyFilter = new ApiKeyAuthenticationFilter("test-key");
+        JwtAuthenticationFilter jwtFilter = new JwtAuthenticationFilter(TEST_SECRET);
+        GatewaySecurityConfiguration config = new GatewaySecurityConfiguration(
+                apiKeyFilter,
+                jwtFilter,
+                "http://34.93.207.65:3000, http://localhost:3000"
+        );
+
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/entities");
+        CorsConfiguration corsConfig = config.corsConfigurationSource().getCorsConfiguration(request);
+
+        assertNotNull(corsConfig);
+        assertTrue(corsConfig.getAllowedOrigins().contains("http://34.93.207.65:3000"));
+        assertTrue(corsConfig.getAllowedOrigins().contains("http://localhost:3000"));
+        assertFalse(corsConfig.getAllowedOrigins().contains("*"));
+        assertTrue(Boolean.TRUE.equals(corsConfig.getAllowCredentials()));
     }
 }
