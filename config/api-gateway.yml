@@ -29,34 +29,90 @@ spring:
               uri: ${RESEARCH_SERVICE_URL:http://research-service:9741}
               predicates:
                 - Path=/api/v1/research
+              filters:
+                - RemoveResponseHeader=Access-Control-Allow-Origin
+                - RemoveResponseHeader=Access-Control-Allow-Credentials
+                - RemoveResponseHeader=Access-Control-Allow-Headers
+                - RemoveResponseHeader=Access-Control-Allow-Methods
+                - RemoveResponseHeader=Access-Control-Expose-Headers
+                - RemoveResponseHeader=Access-Control-Max-Age
             - id: research-service-jobs
               uri: ${RESEARCH_SERVICE_URL:http://research-service:9741}
               predicates:
                 - Path=/api/v1/research/jobs/**
+              filters:
+                - RemoveResponseHeader=Access-Control-Allow-Origin
+                - RemoveResponseHeader=Access-Control-Allow-Credentials
+                - RemoveResponseHeader=Access-Control-Allow-Headers
+                - RemoveResponseHeader=Access-Control-Allow-Methods
+                - RemoveResponseHeader=Access-Control-Expose-Headers
+                - RemoveResponseHeader=Access-Control-Max-Age
             - id: ai-service-v1
               uri: ${AI_INTELLIGENT_SERVICE_URL:http://ai-intelligent-service:9742}
               predicates:
                 - Path=/api/v1/ai/**
+              filters:
+                - RemoveResponseHeader=Access-Control-Allow-Origin
+                - RemoveResponseHeader=Access-Control-Allow-Credentials
+                - RemoveResponseHeader=Access-Control-Allow-Headers
+                - RemoveResponseHeader=Access-Control-Allow-Methods
+                - RemoveResponseHeader=Access-Control-Expose-Headers
+                - RemoveResponseHeader=Access-Control-Max-Age
             - id: ai-service-v2
               uri: ${AI_INTELLIGENT_SERVICE_URL:http://ai-intelligent-service:9742}
               predicates:
                 - Path=/api/v2/ai/**
+              filters:
+                - RemoveResponseHeader=Access-Control-Allow-Origin
+                - RemoveResponseHeader=Access-Control-Allow-Credentials
+                - RemoveResponseHeader=Access-Control-Allow-Headers
+                - RemoveResponseHeader=Access-Control-Allow-Methods
+                - RemoveResponseHeader=Access-Control-Expose-Headers
+                - RemoveResponseHeader=Access-Control-Max-Age
             - id: dataset-service-v2-datasets
               uri: ${DATASET_SERVICE_URL:http://dataset-service:9743}
               predicates:
                 - Path=/api/v2/datasets/**
+              filters:
+                - RemoveResponseHeader=Access-Control-Allow-Origin
+                - RemoveResponseHeader=Access-Control-Allow-Credentials
+                - RemoveResponseHeader=Access-Control-Allow-Headers
+                - RemoveResponseHeader=Access-Control-Allow-Methods
+                - RemoveResponseHeader=Access-Control-Expose-Headers
+                - RemoveResponseHeader=Access-Control-Max-Age
             - id: dataset-service-v1-enrichment
               uri: ${DATASET_SERVICE_URL:http://dataset-service:9743}
               predicates:
                 - Path=/api/v1/enrichment/**
+              filters:
+                - RemoveResponseHeader=Access-Control-Allow-Origin
+                - RemoveResponseHeader=Access-Control-Allow-Credentials
+                - RemoveResponseHeader=Access-Control-Allow-Headers
+                - RemoveResponseHeader=Access-Control-Allow-Methods
+                - RemoveResponseHeader=Access-Control-Expose-Headers
+                - RemoveResponseHeader=Access-Control-Max-Age
             - id: dataset-service-v1-entities
               uri: ${DATASET_SERVICE_URL:http://dataset-service:9743}
               predicates:
                 - Path=/api/v1/entities/**
+              filters:
+                - RemoveResponseHeader=Access-Control-Allow-Origin
+                - RemoveResponseHeader=Access-Control-Allow-Credentials
+                - RemoveResponseHeader=Access-Control-Allow-Headers
+                - RemoveResponseHeader=Access-Control-Allow-Methods
+                - RemoveResponseHeader=Access-Control-Expose-Headers
+                - RemoveResponseHeader=Access-Control-Max-Age
             - id: auth-service
               uri: ${AUTH_SERVICE_URL:http://auth-service:9739}
               predicates:
                 - Path=/api/v1/auth/**
+              filters:
+                - RemoveResponseHeader=Access-Control-Allow-Origin
+                - RemoveResponseHeader=Access-Control-Allow-Credentials
+                - RemoveResponseHeader=Access-Control-Allow-Headers
+                - RemoveResponseHeader=Access-Control-Allow-Methods
+                - RemoveResponseHeader=Access-Control-Expose-Headers
+                - RemoveResponseHeader=Access-Control-Max-Age
 
 jwt:
   secret: ${JWT_SECRET:enrichment-platform-super-secret-jwt-signing-key-256-bits-minimum-required}

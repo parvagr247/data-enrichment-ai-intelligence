@@ -327,6 +327,8 @@ class ApiGatewayRoutingAndSecurityTest {
                 } else {
                     byte[] resp = "{\"datasetName\":\"test.csv\",\"totalRows\":5}".getBytes(java.nio.charset.StandardCharsets.UTF_8);
                     exchange.getResponseHeaders().set("Content-Type", "application/json");
+                    exchange.getResponseHeaders().set("Access-Control-Allow-Origin", "http://downstream-service-sent-this");
+                    exchange.getResponseHeaders().set("Access-Control-Allow-Credentials", "true");
                     exchange.sendResponseHeaders(200, resp.length);
                     try (java.io.OutputStream os = exchange.getResponseBody()) {
                         os.write(resp);
@@ -357,7 +359,9 @@ class ApiGatewayRoutingAndSecurityTest {
             System.out.println("POST 200 CORS Allow-Origin (all values): " + postResp.getHeaders().get("Access-Control-Allow-Origin"));
             System.out.println("POST 200 CORS Allow-Credentials (all values): " + postResp.getHeaders().get("Access-Control-Allow-Credentials"));
             assertEquals(1, postResp.getHeaders().get("Access-Control-Allow-Origin").size(), "Access-Control-Allow-Origin must not be duplicated");
+            assertEquals("http://34.93.207.65:3000", postResp.getHeaders().getAccessControlAllowOrigin());
             assertEquals(1, postResp.getHeaders().get("Access-Control-Allow-Credentials").size(), "Access-Control-Allow-Credentials must not be duplicated");
+            assertTrue(postResp.getHeaders().getAccessControlAllowCredentials());
             System.out.println("POST 200 response body: " + postResp.getBody());
 
             // Test 3B: POST when downstream returns 500
