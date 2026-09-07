@@ -6,12 +6,6 @@ spring:
     name: ai-intelligent-service
   config:
     import: optional:configserver:${CONFIG_SERVER_URL:http://localhost:9736}
-
-eureka:
-  client:
-    enabled: ${EUREKA_CLIENT_ENABLED:true}
-    service-url:
-      defaultZone: ${EUREKA_SERVER_URL:http://localhost:9737/eureka/}
   ai:
     google:
       genai:
@@ -19,6 +13,12 @@ eureka:
         chat:
           options:
             model: ${AI_MODEL:gemini-3.5-flash-lite}
+
+eureka:
+  client:
+    enabled: ${EUREKA_CLIENT_ENABLED:true}
+    service-url:
+      defaultZone: ${EUREKA_SERVER_URL:http://localhost:9737/eureka/}
 
 ai:
   extraction:

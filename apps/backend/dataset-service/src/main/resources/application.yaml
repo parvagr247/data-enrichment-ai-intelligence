@@ -4,6 +4,11 @@ server:
 spring:
   application:
     name: dataset-service
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 50MB
+      max-request-size: 50MB
   config:
     import: optional:configserver:${CONFIG_SERVER_URL:http://localhost:9736}
   datasource:

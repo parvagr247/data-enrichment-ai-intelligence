@@ -1,0 +1,36 @@
+server:
+  port: 9742
+
+spring:
+  application:
+    name: ai-intelligent-service
+  cloud:
+    config:
+      enabled: false
+  config:
+    import: optional:configserver:http://localhost:9736
+  ai:
+    google:
+      genai:
+        api-key: mock-key
+        chat:
+          options:
+            model: gemini-2.0-flash
+
+eureka:
+  client:
+    enabled: false
+    register-with-eureka: false
+    fetch-registry: false
+
+ai:
+  extraction:
+    model: gemini-2.0-flash
+    temperature: 0.1
+    mock-mode: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

@@ -23,10 +23,9 @@ import org.springframework.security.core.context.SecurityContextHolder;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-@SpringBootTest
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @TestPropertySource(properties = {
-        "server.port=0",
-        "gateway.security.api-key=test-secret-key-12345",
+        "gateway.security.api-key=",
         "eureka.client.enabled=false",
         "spring.cloud.config.enabled=false",
         "jwt.secret=enrichment-platform-super-secret-jwt-signing-key-256-bits-minimum-required"
@@ -249,5 +248,136 @@ class ApiGatewayRoutingAndSecurityTest {
         assertTrue(corsConfig.getAllowedOrigins().contains("http://localhost:3000"));
         assertFalse(corsConfig.getAllowedOrigins().contains("*"));
         assertTrue(Boolean.TRUE.equals(corsConfig.getAllowCredentials()));
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    private org.springframework.context.ApplicationContext applicationContext;
+
+    @Test
+    @DisplayName("Inspect Gateway Beans and RequestFactory")
+    void inspectGatewayBeans() {
+        assertNotNull(applicationContext);
+        String[] beanNames = applicationContext.getBeanNamesForType(org.springframework.http.client.ClientHttpRequestFactory.class);
+        System.out.println("=== ClientHttpRequestFactory Beans ===");
+        for (String name : beanNames) {
+            System.out.println("Bean: " + name + " -> " + applicationContext.getBean(name).getClass().getName());
+        }
+
+        String[] multipartResolvers = applicationContext.getBeanNamesForType(org.springframework.web.multipart.MultipartResolver.class);
+        System.out.println("=== MultipartResolver Beans ===");
+        for (String name : multipartResolvers) {
+            System.out.println("Bean: " + name + " -> " + applicationContext.getBean(name).getClass().getName());
+        }
+    }
+
+    @org.springframework.boot.test.web.server.LocalServerPort
+    private int port;
+
+    @Test
+    @DisplayName("Diagnostic: Test OPTIONS and POST Upload routing")
+    void testOptionsAndPostUpload() throws Exception {
+        System.out.println("=== Gateway running on port: " + port + " ===");
+
+        // Test 1: OPTIONS with allowed origin http://34.93.207.65:3000
+        org.springframework.web.client.RestClient client = org.springframework.web.client.RestClient.create("http://localhost:" + port);
+        org.springframework.http.ResponseEntity<Void> optionsResp = client.options()
+                .uri("/api/v2/datasets/upload")
+                .header("Origin", "http://34.93.207.65:3000")
+                .header("Access-Control-Request-Method", "POST")
+                .header("Access-Control-Request-Headers", "authorization,content-type")
+                .retrieve()
+                .toBodilessEntity();
+
+        System.out.println("OPTIONS status with VM origin: " + optionsResp.getStatusCode());
+        System.out.println("OPTIONS Allow-Origin: " + optionsResp.getHeaders().getAccessControlAllowOrigin());
+
+        // Test 2: OPTIONS with Cloudflare / HTTPS origin
+        try {
+            org.springframework.http.ResponseEntity<Void> cfOptions = client.options()
+                    .uri("/api/v2/datasets/upload")
+                    .header("Origin", "https://subdual.ai")
+                    .header("Access-Control-Request-Method", "POST")
+                    .header("Access-Control-Request-Headers", "authorization,content-type")
+                    .retrieve()
+                    .toBodilessEntity();
+            System.out.println("OPTIONS status with Cloudflare origin: " + cfOptions.getStatusCode());
+            System.out.println("OPTIONS Allow-Origin: " + cfOptions.getHeaders().getAccessControlAllowOrigin());
+        } catch (org.springframework.web.client.HttpClientErrorException e) {
+            System.out.println("OPTIONS with Cloudflare origin FAILED: " + e.getStatusCode() + " - " + e.getMessage());
+        }
+
+        // Test 3: Start mock downstream service for dataset-service on port 9743
+        com.sun.net.httpserver.HttpServer mockDatasetService = null;
+        try {
+            mockDatasetService = com.sun.net.httpserver.HttpServer.create(new java.net.InetSocketAddress(9743), 0);
+            final java.util.concurrent.atomic.AtomicBoolean return500 = new java.util.concurrent.atomic.AtomicBoolean(false);
+            mockDatasetService.createContext("/api/v2/datasets/upload", exchange -> {
+                System.out.println("--> Mock DatasetService received request: " + exchange.getRequestMethod());
+                System.out.println("--> Headers: " + exchange.getRequestHeaders().entrySet());
+                byte[] bodyBytes = exchange.getRequestBody().readAllBytes();
+                System.out.println("--> Body length: " + bodyBytes.length);
+
+                if (return500.get()) {
+                    byte[] err = "{\"code\":\"INTERNAL_SERVER_ERROR\",\"message\":\"Failure in dataset service\"}".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                    exchange.getResponseHeaders().set("Content-Type", "application/json");
+                    exchange.sendResponseHeaders(500, err.length);
+                    try (java.io.OutputStream os = exchange.getResponseBody()) {
+                        os.write(err);
+                    }
+                } else {
+                    byte[] resp = "{\"datasetName\":\"test.csv\",\"totalRows\":5}".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                    exchange.getResponseHeaders().set("Content-Type", "application/json");
+                    exchange.sendResponseHeaders(200, resp.length);
+                    try (java.io.OutputStream os = exchange.getResponseBody()) {
+                        os.write(resp);
+                    }
+                }
+            });
+            mockDatasetService.start();
+
+            // Test 3A: POST 200 OK
+            String token = createTestToken("test-user", "test@example.com", 60000);
+            org.springframework.http.HttpHeaders fileHeaders = new org.springframework.http.HttpHeaders();
+            fileHeaders.setContentType(org.springframework.http.MediaType.TEXT_PLAIN);
+            fileHeaders.setContentDispositionFormData("file", "test.csv");
+            org.springframework.http.HttpEntity<String> fileEntity = new org.springframework.http.HttpEntity<>("name,email\nAlice,alice@test.com", fileHeaders);
+
+            org.springframework.util.MultiValueMap<String, Object> body = new org.springframework.util.LinkedMultiValueMap<>();
+            body.add("file", fileEntity);
+
+            org.springframework.http.ResponseEntity<String> postResp = client.post()
+                    .uri("/api/v2/datasets/upload")
+                    .header("Origin", "http://34.93.207.65:3000")
+                    .header("Authorization", "Bearer " + token)
+                    .contentType(org.springframework.http.MediaType.MULTIPART_FORM_DATA)
+                    .body(body)
+                    .retrieve()
+                    .toEntity(String.class);
+            System.out.println("POST 200 status: " + postResp.getStatusCode());
+            System.out.println("POST 200 CORS Allow-Origin: " + postResp.getHeaders().getAccessControlAllowOrigin());
+            System.out.println("POST 200 response body: " + postResp.getBody());
+
+            // Test 3B: POST when downstream returns 500
+            return500.set(true);
+            try {
+                client.post()
+                        .uri("/api/v2/datasets/upload")
+                        .header("Origin", "http://34.93.207.65:3000")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(org.springframework.http.MediaType.MULTIPART_FORM_DATA)
+                        .body(body)
+                        .retrieve()
+                        .toEntity(String.class);
+            } catch (org.springframework.web.client.HttpServerErrorException e) {
+                System.out.println("POST 500 status: " + e.getStatusCode());
+                System.out.println("POST 500 CORS Allow-Origin: " + e.getResponseHeaders().getAccessControlAllowOrigin());
+                System.out.println("POST 500 response body: " + e.getResponseBodyAsString());
+            }
+
+        } finally {
+            if (mockDatasetService != null) {
+                mockDatasetService.stop(0);
+            }
+        }
     }
 }
