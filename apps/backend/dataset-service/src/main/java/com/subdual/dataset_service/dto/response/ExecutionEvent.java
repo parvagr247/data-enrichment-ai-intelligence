@@ -1,4 +1,4 @@
-package com.subdual.dataset_service.dto;
+package com.subdual.dataset_service.dto.response;
 
 import java.util.Map;
 

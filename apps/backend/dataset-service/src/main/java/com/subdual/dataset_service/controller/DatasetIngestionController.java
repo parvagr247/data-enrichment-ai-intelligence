@@ -1,6 +1,6 @@
 package com.subdual.dataset_service.controller;
 
-import com.subdual.dataset_service.dto.DatasetProfileRequest;
+import com.subdual.dataset_service.dto.request.DatasetProfileRequest;
 import com.subdual.dataset_service.ingestion.model.DatasetProfileReport;
 import com.subdual.dataset_service.ingestion.service.DatasetIngestionService;
 import lombok.RequiredArgsConstructor;
@@ -13,8 +13,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 
 /**
- * V2 Controller for dataset ingestion, parsing, and intelligence profiling (Tasks 11-30).
- * Strictly thin controller adhering to Rule 2.
+ * V2 Controller for dataset ingestion, parsing, and intelligence profiling.
  */
 @RestController
 @RequestMapping("/api/v2/datasets")

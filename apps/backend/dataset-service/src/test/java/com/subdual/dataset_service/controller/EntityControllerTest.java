@@ -1,8 +1,8 @@
 package com.subdual.dataset_service.controller;
 
-import com.subdual.dataset_service.dto.EntityDetailResponse;
-import com.subdual.dataset_service.dto.EntitySummaryResponse;
-import com.subdual.dataset_service.dto.PersistEntityRequest;
+import com.subdual.dataset_service.dto.request.PersistEntityRequest;
+import com.subdual.dataset_service.dto.response.EntityDetailResponse;
+import com.subdual.dataset_service.dto.response.EntitySummaryResponse;
 import com.subdual.dataset_service.exception.GlobalExceptionHandler;
 import com.subdual.dataset_service.service.EntityPersistenceService;
 import org.junit.jupiter.api.BeforeEach;

@@ -5,6 +5,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.client.RestClient;
 
+import com.subdual.dataset_service.common.interceptor.CorrelationIdClientInterceptor;
+
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadFactory;
@@ -17,7 +19,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class DatasetServiceConfiguration {
 
     @Bean
-    public RestClient restClient(RestClient.Builder builder, com.subdual.dataset_service.common.interceptor.CorrelationIdClientInterceptor interceptor) {
+    public RestClient restClient(RestClient.Builder builder, CorrelationIdClientInterceptor interceptor) {
         return builder
                 .requestInterceptor(interceptor)
                 .build();
@@ -28,6 +30,7 @@ public class DatasetServiceConfiguration {
         return RestClient.builder();
     }
 
+    // Stop accepting new tasks, but allow already-submitted tasks(Queue Tasks) to finish
     @Bean(destroyMethod = "shutdown")
     public ExecutorService enrichmentJobExecutor() {
         AtomicInteger workerNumber = new AtomicInteger(1);

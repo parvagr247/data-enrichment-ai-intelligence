@@ -1,56 +1,41 @@
-package com.subdual.dataset_service.dto;
+package com.subdual.dataset_service.dto.response;
 
-import jakarta.validation.constraints.NotBlank;
+import com.subdual.dataset_service.dto.common.EntityAttributeDto;
+import com.subdual.dataset_service.dto.common.EntitySourceDto;
+
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
-public record PersistEntityRequest(
-        @NotBlank(message = "Field 'entityId' must not be blank")
+public record EntityDetailResponse(
         String entityId,
-
-        @NotBlank(message = "Field 'displayName' must not be blank")
         String displayName,
-
         String entityType,
-
-        @NotBlank(message = "Field 'canonicalUrl' must not be blank")
         String canonicalUrl,
-
         List<EntitySourceDto> sources,
-
         Map<String, EntityAttributeDto> attributes,
-
+        Instant createdAt,
+        Instant updatedAt,
         String executionStatus,
-
         String executionMessage,
-
         String priorityTier,
-
         Integer relevanceScore,
-
         String profileJson,
-
         String assessmentJson,
-
         String recommendationJson,
-
         String findingsJson
 ) {
-    public PersistEntityRequest {
-        if (sources == null) sources = List.of();
-        if (attributes == null) attributes = Map.of();
-        if (entityType == null || entityType.isBlank()) entityType = "OTHER";
-    }
-
-    public PersistEntityRequest(
+    public EntityDetailResponse(
             String entityId,
             String displayName,
             String entityType,
             String canonicalUrl,
             List<EntitySourceDto> sources,
-            Map<String, EntityAttributeDto> attributes
+            Map<String, EntityAttributeDto> attributes,
+            Instant createdAt,
+            Instant updatedAt
     ) {
-        this(entityId, displayName, entityType, canonicalUrl, sources, attributes,
+        this(entityId, displayName, entityType, canonicalUrl, sources, attributes, createdAt, updatedAt,
                 null, null, null, null, null, null, null, null);
     }
 }

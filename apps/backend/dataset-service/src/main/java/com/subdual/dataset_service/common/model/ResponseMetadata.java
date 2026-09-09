@@ -3,7 +3,7 @@ package com.subdual.dataset_service.common.model;
 import java.time.Instant;
 
 /**
- * Standardized response metadata (Task 8).
+ * Standardized response metadata (
  */
 public record ResponseMetadata(
         String requestId,

@@ -1,16 +1,16 @@
 package com.subdual.dataset_service.service;
 
-import com.subdual.dataset_service.dto.EntityAttributeDto;
-import com.subdual.dataset_service.dto.EntitySourceDto;
-import com.subdual.dataset_service.dto.EnrichmentJobRequest;
-import com.subdual.dataset_service.dto.EnrichmentJobResponse;
-import com.subdual.dataset_service.dto.ExecutionEvent;
-import com.subdual.dataset_service.dto.FactEvidenceDto;
-import com.subdual.dataset_service.dto.PersistEntityRequest;
-import com.subdual.dataset_service.dto.ProfileAssessmentRequest;
-import com.subdual.dataset_service.dto.ProfileAssessmentResponse;
-import com.subdual.dataset_service.dto.RowEnrichmentResult;
-import com.subdual.dataset_service.dto.SingleEnrichmentRequest;
+import com.subdual.dataset_service.dto.common.EntityAttributeDto;
+import com.subdual.dataset_service.dto.common.EntitySourceDto;
+import com.subdual.dataset_service.dto.request.EnrichmentJobRequest;
+import com.subdual.dataset_service.dto.request.FactEvidenceDto;
+import com.subdual.dataset_service.dto.request.PersistEntityRequest;
+import com.subdual.dataset_service.dto.request.ProfileAssessmentRequest;
+import com.subdual.dataset_service.dto.request.SingleEnrichmentRequest;
+import com.subdual.dataset_service.dto.response.EnrichmentJobResponse;
+import com.subdual.dataset_service.dto.response.ExecutionEvent;
+import com.subdual.dataset_service.dto.response.ProfileAssessmentResponse;
+import com.subdual.dataset_service.dto.response.RowEnrichmentResult;
 import com.subdual.dataset_service.profile.model.ObjectiveAssessment;
 import com.subdual.dataset_service.profile.model.RecommendedApproach;
 import com.subdual.dataset_service.profile.model.ResearchFinding;

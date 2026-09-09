@@ -3,7 +3,7 @@ package com.subdual.dataset_service.common.model;
 import java.time.Instant;
 
 /**
- * Standardized error response model across all microservices (Task 7).
+ * Standardized error response model across all microservices.
  */
 public record ApiErrorResponse(
         String code,

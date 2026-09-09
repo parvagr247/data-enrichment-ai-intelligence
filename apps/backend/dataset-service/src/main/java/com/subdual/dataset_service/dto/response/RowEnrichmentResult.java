@@ -1,5 +1,7 @@
-package com.subdual.dataset_service.dto;
+package com.subdual.dataset_service.dto.response;
 
+import com.subdual.dataset_service.dto.common.EntityAttributeDto;
+import com.subdual.dataset_service.dto.common.EntitySourceDto;
 import com.subdual.dataset_service.profile.model.ObjectiveAssessment;
 import com.subdual.dataset_service.profile.model.RecommendedApproach;
 import com.subdual.dataset_service.profile.model.ResearchFinding;

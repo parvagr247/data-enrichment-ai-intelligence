@@ -120,7 +120,7 @@ public class AiServiceClient {
         }
     }
 
-    public com.subdual.dataset_service.dto.ProfileAssessmentResponse assessProfile(com.subdual.dataset_service.dto.ProfileAssessmentRequest request) {
+    public com.subdual.dataset_service.dto.response.ProfileAssessmentResponse assessProfile(com.subdual.dataset_service.dto.request.ProfileAssessmentRequest request) {
         try {
             return restClient.post()
                     .uri("/api/v2/ai/profile/assess")
@@ -128,7 +128,7 @@ public class AiServiceClient {
                     .accept(MediaType.APPLICATION_JSON)
                     .body(request)
                     .retrieve()
-                    .body(com.subdual.dataset_service.dto.ProfileAssessmentResponse.class);
+                    .body(com.subdual.dataset_service.dto.response.ProfileAssessmentResponse.class);
         } catch (Exception ex) {
             log.warn("Failed calling AI profile assessment ({}), falling back to deterministic synthesis", ex.getMessage());
             return null;

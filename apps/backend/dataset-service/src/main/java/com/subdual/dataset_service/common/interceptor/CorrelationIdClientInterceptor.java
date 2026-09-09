@@ -18,11 +18,8 @@ import java.util.UUID;
 public class CorrelationIdClientInterceptor implements ClientHttpRequestInterceptor {
 
     @Override
-    public ClientHttpResponse intercept(
-            HttpRequest request,
-            byte[] body,
-            ClientHttpRequestExecution execution
-    ) throws IOException {
+    public ClientHttpResponse intercept( HttpRequest request, byte[] body, ClientHttpRequestExecution execution ) throws IOException {
+
         String correlationId = MDC.get(CorrelationIdFilter.MDC_KEY);
         if (correlationId == null || correlationId.isBlank()) {
             correlationId = UUID.randomUUID().toString();

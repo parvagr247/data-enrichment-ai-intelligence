@@ -2,10 +2,11 @@ package com.subdual.dataset_service.service;
 
 import com.subdual.dataset_service.config.EnrichmentProperties;
 import com.subdual.dataset_service.domain.EnrichedEntity;
-import com.subdual.dataset_service.dto.EntityDetailResponse;
-import com.subdual.dataset_service.dto.PersistEntityRequest;
-import com.subdual.dataset_service.dto.EnrichmentJobRequest;
-import com.subdual.dataset_service.dto.EnrichmentJobResponse;
+import com.subdual.dataset_service.dto.request.EnrichmentJobRequest;
+import com.subdual.dataset_service.dto.request.PersistEntityRequest;
+import com.subdual.dataset_service.dto.response.EnrichmentJobResponse;
+import com.subdual.dataset_service.dto.response.EntityDetailResponse;
+import com.subdual.dataset_service.dto.response.EntitySummaryResponse;
 import com.subdual.dataset_service.integration.client.AiServiceClient;
 import com.subdual.dataset_service.integration.client.ResearchServiceClient;
 import com.subdual.dataset_service.repository.EnrichedEntityRepository;
@@ -147,16 +148,16 @@ class UserIsolationAndOwnershipTest {
                 .thenReturn(List.of());
 
         // Alice lists her catalog -> only Alice entity
-        List<com.subdual.dataset_service.dto.EntitySummaryResponse> aliceList = persistenceService.listAll("user-alice");
+        List<EntitySummaryResponse> aliceList = persistenceService.listAll("user-alice");
         assertThat(aliceList).hasSize(1);
         assertThat(aliceList.get(0).entityId()).isEqualTo("ent-alice");
 
         // Bob lists his catalog -> 0 entities (no legacy records, no Alice records)
-        List<com.subdual.dataset_service.dto.EntitySummaryResponse> bobList = persistenceService.listAll("user-bob");
+        List<EntitySummaryResponse> bobList = persistenceService.listAll("user-bob");
         assertThat(bobList).isEmpty();
 
         // Unauthenticated list call -> 0 entities
-        List<com.subdual.dataset_service.dto.EntitySummaryResponse> unauthList = persistenceService.listAll(null);
+        List<EntitySummaryResponse> unauthList = persistenceService.listAll(null);
         assertThat(unauthList).isEmpty();
     }
 

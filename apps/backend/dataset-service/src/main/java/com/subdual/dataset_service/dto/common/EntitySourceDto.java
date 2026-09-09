@@ -1,4 +1,4 @@
-package com.subdual.dataset_service.dto;
+package com.subdual.dataset_service.dto.common;
 
 import java.time.Instant;
 

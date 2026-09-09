@@ -1,4 +1,4 @@
-package com.subdual.dataset_service.dto;
+package com.subdual.dataset_service.dto.request;
 
 import com.subdual.dataset_service.profile.model.ResearchObjective;
 

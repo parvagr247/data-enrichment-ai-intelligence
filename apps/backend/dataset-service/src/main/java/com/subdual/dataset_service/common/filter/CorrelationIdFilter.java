@@ -14,9 +14,8 @@ import java.io.IOException;
 import java.util.UUID;
 
 /**
- * Standard correlation/request ID filter (Task 9).
- * Captures or generates an X-Correlation-ID header, registers it with SLF4J MDC,
- * and sets it on the HTTP response.
+ * Resolves a correlation ID for each request, stores it in SLF4J MDC,
+ * and returns it in the response headers for request tracing.
  */
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE + 10)
@@ -32,13 +31,8 @@ public class CorrelationIdFilter extends OncePerRequestFilter {
             HttpServletResponse response,
             FilterChain filterChain
     ) throws ServletException, IOException {
-        String correlationId = request.getHeader(CORRELATION_ID_HEADER);
-        if (correlationId == null || correlationId.isBlank()) {
-            correlationId = request.getHeader(REQUEST_ID_HEADER);
-        }
-        if (correlationId == null || correlationId.isBlank()) {
-            correlationId = UUID.randomUUID().toString();
-        }
+
+        String correlationId = resolveCorrelationId(request);
 
         MDC.put(MDC_KEY, correlationId);
         request.setAttribute(MDC_KEY, correlationId);
@@ -49,5 +43,20 @@ public class CorrelationIdFilter extends OncePerRequestFilter {
         } finally {
             MDC.remove(MDC_KEY);
         }
+    }
+
+    private String resolveCorrelationId(HttpServletRequest request) {
+
+        String correlationId = request.getHeader(CORRELATION_ID_HEADER);
+
+        if (correlationId == null || correlationId.isBlank()) {
+            correlationId = request.getHeader(REQUEST_ID_HEADER);
+        }
+
+        if (correlationId == null || correlationId.isBlank()) {
+            correlationId = UUID.randomUUID().toString();
+        }
+
+        return correlationId;
     }
 }
