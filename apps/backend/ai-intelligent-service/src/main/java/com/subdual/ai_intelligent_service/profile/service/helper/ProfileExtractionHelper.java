@@ -1,7 +1,7 @@
 package com.subdual.ai_intelligent_service.profile.service.helper;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.subdual.ai_intelligent_service.enrichment.api.dto.FactEvidenceDto;
+import com.subdual.ai_intelligent_service.enrichment.api.dto.common.FactEvidenceDto;
 import com.subdual.ai_intelligent_service.profile.model.ObjectiveAssessment;
 import com.subdual.ai_intelligent_service.profile.model.ResearchFinding;
 import com.subdual.ai_intelligent_service.profile.model.ResearchFinding.FindingType;

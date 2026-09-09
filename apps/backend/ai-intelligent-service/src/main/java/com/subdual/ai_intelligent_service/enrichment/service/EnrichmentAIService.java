@@ -1,11 +1,11 @@
 package com.subdual.ai_intelligent_service.enrichment.service;
 
-import com.subdual.ai_intelligent_service.enrichment.api.dto.AIEnrichmentResult;
-import com.subdual.ai_intelligent_service.enrichment.api.dto.EnrichmentSynthesisRequest;
-import com.subdual.ai_intelligent_service.enrichment.api.dto.InputCleansingRequest;
-import com.subdual.ai_intelligent_service.enrichment.api.dto.InputCleansingResponse;
-import com.subdual.ai_intelligent_service.enrichment.api.dto.RequirementInterpretationRequest;
-import com.subdual.ai_intelligent_service.enrichment.api.dto.RequirementInterpretationResponse;
+import com.subdual.ai_intelligent_service.enrichment.api.dto.request.EnrichmentSynthesisRequest;
+import com.subdual.ai_intelligent_service.enrichment.api.dto.request.InputCleansingRequest;
+import com.subdual.ai_intelligent_service.enrichment.api.dto.request.RequirementInterpretationRequest;
+import com.subdual.ai_intelligent_service.enrichment.api.dto.response.AIEnrichmentResult;
+import com.subdual.ai_intelligent_service.enrichment.api.dto.response.InputCleansingResponse;
+import com.subdual.ai_intelligent_service.enrichment.api.dto.response.RequirementInterpretationResponse;
 
 public interface EnrichmentAIService {
 

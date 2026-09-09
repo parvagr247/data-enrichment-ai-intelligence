@@ -2,12 +2,12 @@ package com.subdual.ai_intelligent_service.ai.impl;
 
 import com.subdual.ai_intelligent_service.ai.AiIntelligence;
 import com.subdual.ai_intelligent_service.ai.dto.AiExecutionMetrics;
-import com.subdual.ai_intelligent_service.enrichment.api.dto.InputCleansingRequest;
-import com.subdual.ai_intelligent_service.enrichment.api.dto.InputCleansingResponse;
-import com.subdual.ai_intelligent_service.enrichment.api.dto.RequirementInterpretationRequest;
-import com.subdual.ai_intelligent_service.enrichment.api.dto.RequirementInterpretationResponse;
-import com.subdual.ai_intelligent_service.extraction.api.dto.ExtractionRequest;
-import com.subdual.ai_intelligent_service.extraction.api.dto.ExtractionResponse;
+import com.subdual.ai_intelligent_service.enrichment.api.dto.request.InputCleansingRequest;
+import com.subdual.ai_intelligent_service.enrichment.api.dto.request.RequirementInterpretationRequest;
+import com.subdual.ai_intelligent_service.enrichment.api.dto.response.InputCleansingResponse;
+import com.subdual.ai_intelligent_service.enrichment.api.dto.response.RequirementInterpretationResponse;
+import com.subdual.ai_intelligent_service.extraction.api.dto.request.ExtractionRequest;
+import com.subdual.ai_intelligent_service.extraction.api.dto.response.ExtractionResponse;
 import com.subdual.ai_intelligent_service.extraction.model.ExtractedFact;
 import org.springframework.stereotype.Component;
 

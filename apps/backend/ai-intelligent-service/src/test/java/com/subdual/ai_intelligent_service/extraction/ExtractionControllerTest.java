@@ -2,8 +2,8 @@ package com.subdual.ai_intelligent_service.extraction;
 
 import com.subdual.ai_intelligent_service.exception.GlobalExceptionHandler;
 import com.subdual.ai_intelligent_service.extraction.api.controller.ExtractionController;
-import com.subdual.ai_intelligent_service.extraction.api.dto.ExtractionRequest;
-import com.subdual.ai_intelligent_service.extraction.api.dto.ExtractionResponse;
+import com.subdual.ai_intelligent_service.extraction.api.dto.request.ExtractionRequest;
+import com.subdual.ai_intelligent_service.extraction.api.dto.response.ExtractionResponse;
 import com.subdual.ai_intelligent_service.extraction.model.ExtractedFact;
 import com.subdual.ai_intelligent_service.extraction.service.ExtractionService;
 import org.junit.jupiter.api.BeforeEach;

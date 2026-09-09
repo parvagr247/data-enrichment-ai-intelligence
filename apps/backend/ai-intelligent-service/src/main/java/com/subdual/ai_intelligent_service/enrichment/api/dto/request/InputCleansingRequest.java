@@ -1,4 +1,4 @@
-package com.subdual.ai_intelligent_service.enrichment.api.dto;
+package com.subdual.ai_intelligent_service.enrichment.api.dto.request;
 
 import java.util.Map;
 

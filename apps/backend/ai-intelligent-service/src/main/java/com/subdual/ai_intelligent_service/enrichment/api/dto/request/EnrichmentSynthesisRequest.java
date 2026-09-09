@@ -1,4 +1,6 @@
-package com.subdual.ai_intelligent_service.enrichment.api.dto;
+package com.subdual.ai_intelligent_service.enrichment.api.dto.request;
+
+import com.subdual.ai_intelligent_service.enrichment.api.dto.common.FactEvidenceDto;
 
 import java.util.List;
 import java.util.Map;

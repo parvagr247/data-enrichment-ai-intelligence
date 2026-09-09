@@ -1,4 +1,4 @@
-package com.subdual.ai_intelligent_service.profile.api.dto;
+package com.subdual.ai_intelligent_service.profile.api.dto.response;
 
 import com.subdual.ai_intelligent_service.ai.dto.AiExecutionMetrics;
 import com.subdual.ai_intelligent_service.profile.model.ObjectiveAssessment;

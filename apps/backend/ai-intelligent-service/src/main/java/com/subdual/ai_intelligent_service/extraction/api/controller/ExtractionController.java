@@ -1,7 +1,7 @@
 package com.subdual.ai_intelligent_service.extraction.api.controller;
 
-import com.subdual.ai_intelligent_service.extraction.api.dto.ExtractionRequest;
-import com.subdual.ai_intelligent_service.extraction.api.dto.ExtractionResponse;
+import com.subdual.ai_intelligent_service.extraction.api.dto.request.ExtractionRequest;
+import com.subdual.ai_intelligent_service.extraction.api.dto.response.ExtractionResponse;
 import com.subdual.ai_intelligent_service.extraction.service.ExtractionService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;

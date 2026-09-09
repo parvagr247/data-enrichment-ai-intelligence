@@ -1,8 +1,8 @@
 package com.subdual.ai_intelligent_service.profile;
 
-import com.subdual.ai_intelligent_service.enrichment.api.dto.FactEvidenceDto;
-import com.subdual.ai_intelligent_service.profile.api.dto.ProfileAssessmentRequest;
-import com.subdual.ai_intelligent_service.profile.api.dto.ProfileAssessmentResponse;
+import com.subdual.ai_intelligent_service.enrichment.api.dto.common.FactEvidenceDto;
+import com.subdual.ai_intelligent_service.profile.api.dto.request.ProfileAssessmentRequest;
+import com.subdual.ai_intelligent_service.profile.api.dto.response.ProfileAssessmentResponse;
 import com.subdual.ai_intelligent_service.profile.model.ObjectiveAssessment.PriorityTier;
 import com.subdual.ai_intelligent_service.profile.model.RecommendedApproach.ApproachType;
 import com.subdual.ai_intelligent_service.profile.model.ResearchFinding.FindingType;

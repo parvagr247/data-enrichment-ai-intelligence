@@ -1,12 +1,12 @@
 package com.subdual.ai_intelligent_service.enrichment.service.helper;
 
-import com.subdual.ai_intelligent_service.enrichment.api.dto.AIEnrichmentResult;
-import com.subdual.ai_intelligent_service.enrichment.api.dto.EnrichedAttributeResult;
-import com.subdual.ai_intelligent_service.enrichment.api.dto.EnrichmentSynthesisRequest;
-import com.subdual.ai_intelligent_service.enrichment.api.dto.FactEvidenceDto;
-import com.subdual.ai_intelligent_service.enrichment.api.dto.InputCleansingRequest;
-import com.subdual.ai_intelligent_service.enrichment.api.dto.InputCleansingResponse;
-import com.subdual.ai_intelligent_service.enrichment.api.dto.RequirementInterpretationResponse;
+import com.subdual.ai_intelligent_service.enrichment.api.dto.common.FactEvidenceDto;
+import com.subdual.ai_intelligent_service.enrichment.api.dto.request.EnrichmentSynthesisRequest;
+import com.subdual.ai_intelligent_service.enrichment.api.dto.request.InputCleansingRequest;
+import com.subdual.ai_intelligent_service.enrichment.api.dto.response.AIEnrichmentResult;
+import com.subdual.ai_intelligent_service.enrichment.api.dto.response.EnrichedAttributeResult;
+import com.subdual.ai_intelligent_service.enrichment.api.dto.response.InputCleansingResponse;
+import com.subdual.ai_intelligent_service.enrichment.api.dto.response.RequirementInterpretationResponse;
 import com.subdual.ai_intelligent_service.normalization.AiOutputNormalizer;
 import org.springframework.stereotype.Component;
 

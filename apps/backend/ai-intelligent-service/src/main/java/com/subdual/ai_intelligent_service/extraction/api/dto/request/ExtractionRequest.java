@@ -1,4 +1,4 @@
-package com.subdual.ai_intelligent_service.extraction.api.dto;
+package com.subdual.ai_intelligent_service.extraction.api.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
 import java.util.List;

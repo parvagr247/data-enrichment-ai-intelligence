@@ -1,7 +1,8 @@
 package com.subdual.ai_intelligent_service.profile.api.controller;
 
-import com.subdual.ai_intelligent_service.profile.api.dto.ProfileAssessmentRequest;
-import com.subdual.ai_intelligent_service.profile.api.dto.ProfileAssessmentResponse;
+import com.subdual.ai_intelligent_service.profile.api.dto.request.ObjectiveParseRequest;
+import com.subdual.ai_intelligent_service.profile.api.dto.request.ProfileAssessmentRequest;
+import com.subdual.ai_intelligent_service.profile.api.dto.response.ProfileAssessmentResponse;
 import com.subdual.ai_intelligent_service.profile.model.ResearchObjective;
 import com.subdual.ai_intelligent_service.profile.service.ProfileAssessmentEngine;
 import jakarta.validation.Valid;
@@ -21,8 +22,6 @@ import org.springframework.web.bind.annotation.RestController;
 public class ProfileAssessmentController {
 
     private final ProfileAssessmentEngine profileAssessmentEngine;
-
-    public record ObjectiveParseRequest(String objective) {}
 
     @PostMapping(value = "/objective/parse", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<ResearchObjective> parseObjective(@RequestBody ObjectiveParseRequest request) {

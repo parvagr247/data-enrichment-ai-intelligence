@@ -1,6 +1,6 @@
-package com.subdual.ai_intelligent_service.profile.api.dto;
+package com.subdual.ai_intelligent_service.profile.api.dto.request;
 
-import com.subdual.ai_intelligent_service.enrichment.api.dto.FactEvidenceDto;
+import com.subdual.ai_intelligent_service.enrichment.api.dto.common.FactEvidenceDto;
 import com.subdual.ai_intelligent_service.profile.model.ResearchObjective;
 
 import java.util.List;
