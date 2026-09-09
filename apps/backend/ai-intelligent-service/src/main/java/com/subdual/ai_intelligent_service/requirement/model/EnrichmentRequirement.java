@@ -3,7 +3,7 @@ package com.subdual.ai_intelligent_service.requirement.model;
 import java.util.List;
 
 /**
- * User-provided or system enrichment requirement input (Tasks 31, 32, 33).
+ * User-provided or system enrichment requirement input.
  */
 public record EnrichmentRequirement(
         String userObjective,

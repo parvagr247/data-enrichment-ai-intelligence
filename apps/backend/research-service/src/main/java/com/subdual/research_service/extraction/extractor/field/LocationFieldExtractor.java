@@ -16,7 +16,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Field-specific extractor for location / headquarters (Task 62).
+ * Field-specific extractor for location / headquarters.
  */
 @Component
 public class LocationFieldExtractor implements FieldExtractor {

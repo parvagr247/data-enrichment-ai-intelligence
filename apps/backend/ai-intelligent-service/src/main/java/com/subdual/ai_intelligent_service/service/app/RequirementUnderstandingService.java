@@ -6,7 +6,7 @@ import com.subdual.ai_intelligent_service.service.ai.AiIntelligence;
 import org.springframework.stereotype.Service;
 
 /**
- * Application service for requirement interpretation (Task 73).
+ * Application service for requirement interpretation.
  */
 @Service
 public class RequirementUnderstandingService {

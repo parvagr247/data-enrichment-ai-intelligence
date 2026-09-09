@@ -8,7 +8,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Deterministic rule-based fallback implementation of AiIntelligence (Task 78).
+ * Deterministic rule-based fallback implementation of AiIntelligence.
  * Provides reliable, fast heuristics when AI model is in mock mode or experiences transient failures.
  */
 @Component

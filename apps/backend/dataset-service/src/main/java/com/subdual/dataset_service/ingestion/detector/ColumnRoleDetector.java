@@ -8,7 +8,7 @@ import java.util.Locale;
 import java.util.regex.Pattern;
 
 /**
- * Intelligent column role detector (Tasks 18, 23, 24, 25, 26).
+ * Intelligent column role detector.
  * Analyzes both header names and sample cell values to infer semantic column roles.
  */
 @Component

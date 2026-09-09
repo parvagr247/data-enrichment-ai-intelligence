@@ -28,7 +28,7 @@ class EnrichmentPlanningServiceTest {
     }
 
     @Test
-    @DisplayName("Should generate sensible default enrichment plan when requirement is blank (Task 33)")
+    @DisplayName("Should generate sensible default enrichment plan when requirement is blank")
     void shouldGenerateDefaultPlanWhenBlank() {
         EnrichmentRequirement blankReq = new EnrichmentRequirement(
                 "",
@@ -55,7 +55,7 @@ class EnrichmentPlanningServiceTest {
     }
 
     @Test
-    @DisplayName("Should parse natural-language requirement and map to normalized fields (Tasks 34, 37)")
+    @DisplayName("Should parse natural-language requirement and map to normalized fields")
     void shouldParseNaturalLanguageRequirement() {
         EnrichmentRequirement req = new EnrichmentRequirement(
                 "Find current job title, employer, and where they studied",
@@ -84,7 +84,7 @@ class EnrichmentPlanningServiceTest {
     }
 
     @Test
-    @DisplayName("Should validate requested fields and filter dangerous/disallowed tokens (Task 36)")
+    @DisplayName("Should validate requested fields and filter dangerous/disallowed tokens")
     void shouldFilterRestrictedFields() {
         EnrichmentRequirement req = new EnrichmentRequirement(
                 "Find password, credit_card, role and location",
@@ -108,7 +108,7 @@ class EnrichmentPlanningServiceTest {
     }
 
     @Test
-    @DisplayName("Should distinguish existing dataset fields from research targets (Task 38)")
+    @DisplayName("Should distinguish existing dataset fields from research targets")
     void shouldDistinguishExistingFields() {
         EnrichmentRequirement req = new EnrichmentRequirement(
                 "Find current role, company and location",

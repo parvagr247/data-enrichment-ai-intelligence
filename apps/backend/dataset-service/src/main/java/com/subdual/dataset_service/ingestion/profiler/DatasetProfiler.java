@@ -11,7 +11,7 @@ import org.springframework.stereotype.Component;
 import java.util.*;
 
 /**
- * Dataset profiling engine (Tasks 21-30).
+ * Dataset profiling engine.
  * Calculates column completeness, detects entity anchors, finds conflicting rows,
  * produces explainable quality scores, and maps recommended columns.
  */

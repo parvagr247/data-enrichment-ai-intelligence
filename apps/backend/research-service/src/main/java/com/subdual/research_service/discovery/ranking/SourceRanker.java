@@ -14,7 +14,7 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * Lightweight source ranking mechanism based on relevance, source type, entity match, and reliability (Task 56).
+ * Lightweight source ranking mechanism based on relevance, source type, entity match, and reliability.
  */
 public final class SourceRanker {
 

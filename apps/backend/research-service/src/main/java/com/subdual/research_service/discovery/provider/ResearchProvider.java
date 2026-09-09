@@ -4,7 +4,7 @@ import com.subdual.research_service.research.model.DiscoveredSource;
 import java.util.List;
 
 /**
- * Top-level provider abstraction for research source discovery (Task 51).
+ * Top-level provider abstraction for research source discovery.
  * Decouples the research engine from specific search providers (Tavily, Mock, etc.).
  */
 public interface ResearchProvider {

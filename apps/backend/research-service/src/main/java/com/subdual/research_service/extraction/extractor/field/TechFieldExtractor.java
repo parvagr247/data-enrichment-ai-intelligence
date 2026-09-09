@@ -16,7 +16,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Field-specific extractor for technologies / skills / programming languages (Task 62).
+ * Field-specific extractor for technologies / skills / programming languages.
  */
 @Component
 public class TechFieldExtractor implements FieldExtractor {

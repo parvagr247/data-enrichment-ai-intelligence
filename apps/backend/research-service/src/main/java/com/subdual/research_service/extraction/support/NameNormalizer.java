@@ -5,7 +5,7 @@ import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
- * Standardized entity name normalizer (Task 42).
+ * Standardized entity name normalizer.
  * Strips honorifics, academic titles, punctuation, emojis, and normalizes whitespace.
  */
 public final class NameNormalizer {

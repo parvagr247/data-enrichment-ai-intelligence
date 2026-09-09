@@ -5,7 +5,7 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Raw parsed dataset output preserving all columns and row states (Tasks 17, 20).
+ * Raw parsed dataset output preserving all columns and row states.
  */
 public record RawDataset(
         String fileName,

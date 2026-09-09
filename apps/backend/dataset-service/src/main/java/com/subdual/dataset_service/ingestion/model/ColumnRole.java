@@ -1,7 +1,7 @@
 package com.subdual.dataset_service.ingestion.model;
 
 /**
- * Semantic role of a column detected in an uploaded dataset (Task 18).
+ * Semantic role of a column detected in an uploaded dataset.
  */
 public enum ColumnRole {
     NAME,

@@ -1,7 +1,7 @@
 package com.subdual.ai_intelligent_service.requirement.model;
 
 /**
- * Strategy for how an enrichment field will be fulfilled in the execution plan (Task 38).
+ * Strategy for how an enrichment field will be fulfilled in the execution plan.
  */
 public enum FieldSourceStrategy {
     EXISTING_DATASET_FIELD, // Field already present in input dataset; no discovery needed

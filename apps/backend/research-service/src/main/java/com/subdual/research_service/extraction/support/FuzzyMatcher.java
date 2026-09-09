@@ -3,7 +3,7 @@ package com.subdual.research_service.extraction.support;
 import java.util.*;
 
 /**
- * Lightweight fuzzy matching utility for entity and organization disambiguation (Task 46).
+ * Lightweight fuzzy matching utility for entity and organization disambiguation.
  * Employs Token Jaccard overlap and normalized Levenshtein distance without heavy NLP dependencies.
  */
 public final class FuzzyMatcher {

@@ -1,7 +1,7 @@
 package com.subdual.research_service.discovery.model;
 
 /**
- * Represents the informational purpose/intent of a research query (Task 54).
+ * Represents the informational purpose/intent of a research query.
  */
 public enum QueryIntent {
     IDENTITY,

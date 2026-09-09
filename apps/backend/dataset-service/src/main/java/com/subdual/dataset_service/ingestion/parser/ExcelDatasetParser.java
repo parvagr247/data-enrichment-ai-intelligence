@@ -19,7 +19,7 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
 /**
- * Resilient Excel (.xlsx) parser implemented via OpenXML Zip streaming (Task 12).
+ * Resilient Excel (.xlsx) parser implemented via OpenXML Zip streaming.
  * Reads xl/sharedStrings.xml and xl/worksheets/sheet1.xml without external dependency risks.
  */
 @Component

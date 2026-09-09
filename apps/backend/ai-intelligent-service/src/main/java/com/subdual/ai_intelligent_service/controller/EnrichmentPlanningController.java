@@ -13,8 +13,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * V2 Controller for requirement understanding and enrichment planning (Tasks 31-40).
- * Thin controller adhering to Rule 2.
+ * V2 Controller for requirement understanding and enrichment planning.
+ * Delegates planning logic to {@link EnrichmentPlanningService}.
  */
 @RestController
 @RequestMapping("/api/v2/ai/requirements")

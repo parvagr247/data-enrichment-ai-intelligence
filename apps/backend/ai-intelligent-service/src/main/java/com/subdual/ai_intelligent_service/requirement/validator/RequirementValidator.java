@@ -6,7 +6,7 @@ import java.util.*;
 import java.util.regex.Pattern;
 
 /**
- * Validates requested enrichment fields and guards against unbounded operations (Task 36).
+ * Validates requested enrichment fields and guards against unbounded operations.
  */
 @Component
 public class RequirementValidator {

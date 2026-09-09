@@ -5,7 +5,7 @@ import org.springframework.stereotype.Component;
 import java.util.*;
 
 /**
- * Maps natural language requirement phrases to standardized field keys (Task 37).
+ * Maps natural language requirement phrases to standardized field keys.
  */
 @Component
 public class RequirementNormalizer {

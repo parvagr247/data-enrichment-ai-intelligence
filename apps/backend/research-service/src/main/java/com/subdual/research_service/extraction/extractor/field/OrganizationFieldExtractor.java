@@ -16,7 +16,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Field-specific extractor for organization / company (Task 62).
+ * Field-specific extractor for organization / company.
  */
 @Component
 public class OrganizationFieldExtractor implements FieldExtractor {

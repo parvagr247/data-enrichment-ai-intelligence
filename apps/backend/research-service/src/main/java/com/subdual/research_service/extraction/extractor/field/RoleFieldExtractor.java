@@ -16,7 +16,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Field-specific extractor for role / job title (Task 62).
+ * Field-specific extractor for role / job title.
  */
 @Component
 public class RoleFieldExtractor implements FieldExtractor {

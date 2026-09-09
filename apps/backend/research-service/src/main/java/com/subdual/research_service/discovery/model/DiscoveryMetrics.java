@@ -1,7 +1,7 @@
 package com.subdual.research_service.discovery.model;
 
 /**
- * Operational metrics capturing source discovery execution performance and quality (Task 60).
+ * Operational metrics capturing source discovery execution performance and quality.
  */
 public record DiscoveryMetrics(
         int queryCount,

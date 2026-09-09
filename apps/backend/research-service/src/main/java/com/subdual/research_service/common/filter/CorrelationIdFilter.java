@@ -14,7 +14,7 @@ import java.io.IOException;
 import java.util.UUID;
 
 /**
- * Standard correlation/request ID filter in research-service (Task 9).
+ * Standard correlation/request ID filter in research-service.
  */
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE + 10)

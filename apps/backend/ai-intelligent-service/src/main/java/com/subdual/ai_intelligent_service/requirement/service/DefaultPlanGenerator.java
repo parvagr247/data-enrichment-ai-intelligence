@@ -8,7 +8,7 @@ import org.springframework.stereotype.Component;
 import java.util.*;
 
 /**
- * Generates intelligent default enrichment plans when no explicit requirement is provided (Task 33).
+ * Generates intelligent default enrichment plans when no explicit requirement is provided.
  */
 @Component
 @lombok.RequiredArgsConstructor

@@ -1,7 +1,7 @@
 package com.subdual.ai_intelligent_service.dto;
 
 /**
- * Telemetry and token usage diagnostics for AI invocations (Tasks 79, 80).
+ * Telemetry and token usage diagnostics for AI invocations.
  */
 public record AiExecutionMetrics(
         String model,

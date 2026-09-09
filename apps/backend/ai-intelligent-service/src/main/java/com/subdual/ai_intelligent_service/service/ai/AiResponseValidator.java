@@ -11,7 +11,7 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Validates AI structured output against schema constraints and target field boundaries (Task 77).
+ * Validates AI structured output against schema constraints and target field boundaries.
  */
 @Component
 public class AiResponseValidator {

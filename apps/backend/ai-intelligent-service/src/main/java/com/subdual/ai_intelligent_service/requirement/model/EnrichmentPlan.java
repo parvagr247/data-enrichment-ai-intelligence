@@ -3,7 +3,7 @@ package com.subdual.ai_intelligent_service.requirement.model;
 import java.util.List;
 
 /**
- * Complete, structured enrichment execution plan (Tasks 38, 39, 40).
+ * Complete, structured enrichment execution plan.
  * Clearly specifies what fields are needed, existing, research-based, or AI-synthesized.
  */
 public record EnrichmentPlan(

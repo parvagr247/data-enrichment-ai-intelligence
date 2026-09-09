@@ -16,7 +16,7 @@ import java.util.*;
 
 /**
  * Primary AI intelligence implementation utilizing Spring AI, prompt templates, structured output,
- * response validation, bounded retries, and telemetry (Tasks 71, 72, 76, 77, 78, 79, 80).
+ * response validation, bounded retries, and telemetry.
  */
 @Component
 @Primary

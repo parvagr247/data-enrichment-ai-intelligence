@@ -1,7 +1,7 @@
 package com.subdual.research_service.discovery.model;
 
 /**
- * Encapsulates a search query with its classification and strategy (Tasks 52-54).
+ * Encapsulates a search query with its classification and strategy.
  */
 public record ResearchQuery(
         String queryText,

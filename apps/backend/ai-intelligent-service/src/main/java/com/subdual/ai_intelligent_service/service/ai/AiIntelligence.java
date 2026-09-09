@@ -9,7 +9,7 @@ import com.subdual.ai_intelligent_service.dto.RequirementInterpretationRequest;
 import com.subdual.ai_intelligent_service.dto.RequirementInterpretationResponse;
 
 /**
- * Clean AI model/provider abstraction (Task 72).
+ * Clean AI model/provider abstraction.
  */
 public interface AiIntelligence {
 

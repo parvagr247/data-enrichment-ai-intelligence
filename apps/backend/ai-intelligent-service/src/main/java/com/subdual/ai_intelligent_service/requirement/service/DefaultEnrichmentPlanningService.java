@@ -15,7 +15,7 @@ import org.springframework.stereotype.Service;
 import java.util.*;
 
 /**
- * Production implementation of requirement understanding and enrichment planning (Tasks 31-40).
+ * Production implementation of requirement understanding and enrichment planning.
  * Decoupled from research execution: AI determines WHAT is needed, research determines HOW to find it.
  */
 @Service
@@ -36,7 +36,7 @@ public class DefaultEnrichmentPlanningService implements EnrichmentPlanningServi
                 ? requirement.entityType().trim().toUpperCase(Locale.ROOT)
                 : "PERSON";
 
-        // 1. Task 33: Blank requirement generates intelligent default plan
+        // 1. Blank requirement generates intelligent default plan
         if (requirement.isBlankRequirement()) {
             log.info("Enrichment requirement is blank; generating default plan for entity type '{}'", entityType);
             return defaultPlanGenerator.generateDefaultPlan(entityType, requirement.existingDatasetColumns());
@@ -100,7 +100,7 @@ public class DefaultEnrichmentPlanningService implements EnrichmentPlanningServi
             );
         }
 
-        // 4. Task 36: Validate and filter fields
+        // 4. Validate and filter fields
         List<String> validatedFields = requirementValidator.validateAndFilterFields(candidateFields, validationNotes);
 
         // 5. Partition into existing vs needed vs research vs AI

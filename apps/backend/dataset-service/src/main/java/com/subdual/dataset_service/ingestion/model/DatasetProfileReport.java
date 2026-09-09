@@ -4,7 +4,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Comprehensive dataset profiling report (Tasks 21-30).
+ * Comprehensive dataset profiling report.
  */
 public record DatasetProfileReport(
         String datasetName,

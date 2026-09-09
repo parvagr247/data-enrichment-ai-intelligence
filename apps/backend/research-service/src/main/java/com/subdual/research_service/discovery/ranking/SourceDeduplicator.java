@@ -9,7 +9,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Deduplicates discovered sources based on normalized URL without losing query context (Task 57).
+ * Deduplicates discovered sources based on normalized URL without losing query context.
  */
 public final class SourceDeduplicator {
 

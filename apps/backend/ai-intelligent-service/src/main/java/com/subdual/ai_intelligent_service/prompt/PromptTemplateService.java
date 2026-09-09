@@ -10,7 +10,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Loads, caches, and renders externalized prompt templates from resources/prompts/ (Tasks 74, 75).
+ * Loads, caches, and renders externalized prompt templates from resources/prompts/.
  */
 @Service
 public class PromptTemplateService {

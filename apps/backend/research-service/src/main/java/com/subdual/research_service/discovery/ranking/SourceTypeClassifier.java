@@ -8,7 +8,7 @@ import java.util.Locale;
 import java.util.Set;
 
 /**
- * Classifies discovered URLs into SourceType and determines baseline SourceReliability (Tasks 58, 59).
+ * Classifies discovered URLs into SourceType and determines baseline SourceReliability.
  */
 public final class SourceTypeClassifier {
 

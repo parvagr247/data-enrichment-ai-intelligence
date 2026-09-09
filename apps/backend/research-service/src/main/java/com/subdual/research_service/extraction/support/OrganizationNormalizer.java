@@ -4,7 +4,7 @@ import java.util.Locale;
 import java.util.regex.Pattern;
 
 /**
- * Standardized organization/company normalizer (Task 43).
+ * Standardized organization/company normalizer.
  * Strips corporate legal suffixes and normalizes formatting.
  */
 public final class OrganizationNormalizer {

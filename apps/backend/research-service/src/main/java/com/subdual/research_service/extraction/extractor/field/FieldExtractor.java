@@ -6,7 +6,7 @@ import com.subdual.research_service.research.model.EntityType;
 import com.subdual.research_service.research.model.ResearchTarget;
 
 /**
- * Reusable contract for field-specific deterministic extraction (Task 62).
+ * Reusable contract for field-specific deterministic extraction.
  */
 public interface FieldExtractor {
 

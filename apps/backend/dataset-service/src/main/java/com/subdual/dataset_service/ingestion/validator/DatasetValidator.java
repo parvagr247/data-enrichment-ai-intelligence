@@ -6,7 +6,7 @@ import org.springframework.stereotype.Component;
 import java.util.Locale;
 
 /**
- * Dataset validation rules (Tasks 13, 16).
+ * Dataset validation rules.
  */
 @Component
 public class DatasetValidator {

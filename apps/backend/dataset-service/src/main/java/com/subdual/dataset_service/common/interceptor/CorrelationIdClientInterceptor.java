@@ -12,7 +12,7 @@ import java.io.IOException;
 import java.util.UUID;
 
 /**
- * Propagates X-Correlation-ID across outbound microservice calls (Task 9).
+ * Propagates X-Correlation-ID across outbound microservice calls.
  */
 @Component
 public class CorrelationIdClientInterceptor implements ClientHttpRequestInterceptor {

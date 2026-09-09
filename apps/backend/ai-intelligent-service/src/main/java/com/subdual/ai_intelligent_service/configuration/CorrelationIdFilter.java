@@ -14,7 +14,7 @@ import java.io.IOException;
 import java.util.UUID;
 
 /**
- * Standard correlation/request ID filter in ai-intelligent-service (Task 9).
+ * Standard correlation/request ID filter in ai-intelligent-service.
  */
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE + 10)
