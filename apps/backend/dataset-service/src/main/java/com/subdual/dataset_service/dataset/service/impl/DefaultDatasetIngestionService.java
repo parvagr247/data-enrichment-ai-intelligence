@@ -25,7 +25,7 @@ public class DefaultDatasetIngestionService implements DatasetIngestionService {
     private final DatasetValidator datasetValidator;
     private final DatasetProfiler datasetProfiler;
 
-    @Override
+    @Override // Parses, validates, and returns the uploaded dataset.
     public RawDataset parseFile(InputStream inputStream, String fileName) {
         datasetValidator.validateFileName(fileName);
         String lower = fileName.toLowerCase(Locale.ROOT);
@@ -49,39 +49,42 @@ public class DefaultDatasetIngestionService implements DatasetIngestionService {
         }
     }
 
-    @Override
+    @Override // Generates statistical profile and column semantic mapping report.
     public DatasetProfileReport profileDataset(RawDataset rawDataset) {
         return datasetProfiler.profile(rawDataset);
     }
 
-    @Override
+    @Override // Ingests raw file stream and immediately executes profiling.
     public DatasetProfileReport ingestAndProfile(InputStream inputStream, String fileName) {
         RawDataset rawDataset = parseFile(inputStream, fileName);
         return profileDataset(rawDataset);
     }
 
-    @Override
+    @Override // Profiles in-memory row data with reconstructed header schemas.
     public DatasetProfileReport profileRawRows(String datasetName, List<Map<String, String>> rows) {
         if (rows == null || rows.isEmpty()) {
             throw new IllegalArgumentException("Dataset rows list must not be empty");
         }
 
-        // Reconstruct headers from all distinct keys in order
-        Set<String> headerSet = new LinkedHashSet<>();
-        for (Map<String, String> row : rows) {
-            if (row != null) {
-                headerSet.addAll(row.keySet());
-            }
-        }
-
+        List<String> headers = extractHeadersFromRows(rows);
         RawDataset raw = new RawDataset(
                 datasetName != null ? datasetName : "dataset.csv",
-                new ArrayList<>(headerSet),
+                headers,
                 rows,
                 List.of(),
                 Set.of()
         );
 
         return profileDataset(raw);
+    }
+
+    private List<String> extractHeadersFromRows(List<Map<String, String>> rows) {
+        Set<String> headerSet = new LinkedHashSet<>(); // Collects distinct headers in order.
+        for (Map<String, String> row : rows) {
+            if (row != null) {
+                headerSet.addAll(row.keySet());
+            }
+        }
+        return new ArrayList<>(headerSet);
     }
 }

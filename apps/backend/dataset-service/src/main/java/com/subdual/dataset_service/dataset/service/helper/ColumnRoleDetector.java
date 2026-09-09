@@ -21,7 +21,15 @@ public class ColumnRoleDetector {
         if (headerName == null) return ColumnRole.UNKNOWN;
         String cleanHeader = headerName.trim().toLowerCase(Locale.ROOT).replaceAll("[\\s_-]+", "");
 
-        // 1. Specific specialized roles by header
+        ColumnRole headerRole = detectFromHeader(cleanHeader);
+        if (headerRole != ColumnRole.UNKNOWN) {
+            return headerRole;
+        }
+
+        return detectFromSampleValues(sampleValues);
+    }
+
+    private ColumnRole detectFromHeader(String cleanHeader) {
         if (cleanHeader.contains("linkedin")) {
             return ColumnRole.LINKEDIN_URL;
         }
@@ -66,34 +74,38 @@ public class ColumnRoleDetector {
                 || cleanHeader.contains("domain") || cleanHeader.contains("webpage") || cleanHeader.contains("homepage")) {
             return ColumnRole.URL;
         }
+        return ColumnRole.UNKNOWN;
+    }
 
-        // 2. Inspect sample values if header was ambiguous
-        if (sampleValues != null && !sampleValues.isEmpty()) {
-            int urlMatches = 0;
-            int linkedinMatches = 0;
-            int emailMatches = 0;
-            int totalSamples = 0;
+    private ColumnRole detectFromSampleValues(List<String> sampleValues) {
+        if (sampleValues == null || sampleValues.isEmpty()) {
+            return ColumnRole.UNKNOWN;
+        }
 
-            for (String val : sampleValues) {
-                if (val == null || val.isBlank()) continue;
-                totalSamples++;
-                String v = val.trim();
-                if (v.toLowerCase(Locale.ROOT).contains("linkedin.com/")) {
-                    linkedinMatches++;
-                }
-                if (URL_PATTERN.matcher(v).matches()) {
-                    urlMatches++;
-                }
-                if (EMAIL_PATTERN.matcher(v).matches()) {
-                    emailMatches++;
-                }
+        int urlMatches = 0;
+        int linkedinMatches = 0;
+        int emailMatches = 0;
+        int totalSamples = 0;
+
+        for (String val : sampleValues) {
+            if (val == null || val.isBlank()) continue;
+            totalSamples++;
+            String v = val.trim();
+            if (v.toLowerCase(Locale.ROOT).contains("linkedin.com/")) {
+                linkedinMatches++;
             }
-
-            if (totalSamples > 0) {
-                if ((double) linkedinMatches / totalSamples >= 0.5) return ColumnRole.LINKEDIN_URL;
-                if ((double) emailMatches / totalSamples >= 0.5) return ColumnRole.EMAIL;
-                if ((double) urlMatches / totalSamples >= 0.5) return ColumnRole.URL;
+            if (URL_PATTERN.matcher(v).matches()) {
+                urlMatches++;
             }
+            if (EMAIL_PATTERN.matcher(v).matches()) {
+                emailMatches++;
+            }
+        }
+
+        if (totalSamples > 0) {
+            if ((double) linkedinMatches / totalSamples >= 0.5) return ColumnRole.LINKEDIN_URL;
+            if ((double) emailMatches / totalSamples >= 0.5) return ColumnRole.EMAIL;
+            if ((double) urlMatches / totalSamples >= 0.5) return ColumnRole.URL;
         }
 
         return ColumnRole.UNKNOWN;

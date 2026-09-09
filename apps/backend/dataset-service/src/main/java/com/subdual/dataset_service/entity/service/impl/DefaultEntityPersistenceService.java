@@ -10,7 +10,6 @@ import com.subdual.dataset_service.entity.repository.EnrichedEntityRepository;
 import com.subdual.dataset_service.entity.service.EntityPersistenceService;
 import com.subdual.dataset_service.entity.service.helper.EntityIdResolver;
 import com.subdual.dataset_service.entity.service.helper.EntityMapper;
-import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -51,7 +50,7 @@ public class DefaultEntityPersistenceService implements EntityPersistenceService
         return persistOrUpdate(request, null);
     }
 
-    @Override
+    @Override // Persists or merges enriched entity, attributes, and source evidence.
     public EntityDetailResponse persistOrUpdate(PersistEntityRequest request, String userId) {
         String effectiveEntityId = resolveScopedEntityId(request.entityId(), userId);
         EnrichedEntity entity = findOrCreateEntity(effectiveEntityId, userId);
@@ -130,7 +129,7 @@ public class DefaultEntityPersistenceService implements EntityPersistenceService
         return findById(entityId, null);
     }
 
-    @Override
+    @Override // Retrieves enriched entity details isolated to the requesting user.
     @Transactional(readOnly = true)
     public Optional<EntityDetailResponse> findById(String entityId, String userId) {
         if (userId == null || userId.isBlank()) {
@@ -146,7 +145,7 @@ public class DefaultEntityPersistenceService implements EntityPersistenceService
         return List.of();
     }
 
-    @Override
+    @Override // Lists all enriched entities belonging to the specified user.
     @Transactional(readOnly = true)
     public List<EntitySummaryResponse> listAll(String userId) {
         if (userId == null || userId.isBlank()) {
@@ -166,7 +165,7 @@ public class DefaultEntityPersistenceService implements EntityPersistenceService
         return List.of();
     }
 
-    @Override
+    @Override // Fetches paginated enriched entity summaries for the specified user.
     @Transactional(readOnly = true)
     public List<EntitySummaryResponse> list(int page, int size, String userId) {
         if (userId == null || userId.isBlank()) {

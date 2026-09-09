@@ -51,9 +51,6 @@ public class EnrichmentTaskExecutor {
                 concurrency, queueCapacity);
     }
 
-    /**
-     * Submits an asynchronous enrichment task isolated to this bounded executor.
-     */
     public <T> CompletableFuture<T> submitTask(Supplier<T> task) {
         return CompletableFuture.supplyAsync(task, executor);
     }

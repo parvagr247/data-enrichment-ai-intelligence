@@ -96,13 +96,33 @@ public class EnrichmentJobManager {
         SseEmitter emitter = new SseEmitter(10 * 60 * 1000L); // 10 minutes timeout
 
         if (state == null || (userId != null && !userId.isBlank() && state.userId != null && !state.userId.equals(userId))) {
-            try {
-                emitter.send(SseEmitter.event().name("error").data(Map.of("message", "Job not found or access denied: " + jobId)));
-                emitter.complete();
-            } catch (Exception ignored) {}
+            rejectSubscription(emitter, jobId);
             return emitter;
         }
 
+        Runnable cleanup = configureEmitterLifecycle(emitter, jobId);
+        jobEmitters.computeIfAbsent(jobId, k -> new CopyOnWriteArrayList<>()).add(emitter);
+
+        try {
+            sendInitialHandshake(emitter, jobId, state, concurrency);
+            replayEventHistory(emitter, jobId);
+            handleTerminalJobState(emitter, jobId, state, cleanup);
+        } catch (Exception ex) {
+            log.warn("Error sending initial SSE handshake for job {}: {}", jobId, ex.getMessage());
+            cleanup.run();
+        }
+
+        return emitter;
+    }
+
+    private void rejectSubscription(SseEmitter emitter, String jobId) {
+        try {
+            emitter.send(SseEmitter.event().name("error").data(Map.of("message", "Job not found or access denied: " + jobId)));
+            emitter.complete();
+        } catch (Exception ignored) {}
+    }
+
+    private Runnable configureEmitterLifecycle(SseEmitter emitter, String jobId) {
         Runnable cleanup = () -> {
             List<SseEmitter> list = jobEmitters.get(jobId);
             if (list != null) {
@@ -116,49 +136,44 @@ public class EnrichmentJobManager {
             cleanup.run();
         });
         emitter.onError(e -> cleanup.run());
+        return cleanup;
+    }
 
-        jobEmitters.computeIfAbsent(jobId, k -> new CopyOnWriteArrayList<>()).add(emitter);
+    private void sendInitialHandshake(SseEmitter emitter, String jobId, JobState state, int concurrency) throws Exception {
+        emitter.send(SseEmitter.event().name("init").data(Map.of(
+                "jobId", jobId,
+                "datasetName", state.datasetName != null ? state.datasetName : "",
+                "concurrency", concurrency,
+                "totalRows", state.totalRows,
+                "completedRows", state.completedRows.get(),
+                "failedRows", state.failedRows.get(),
+                "status", state.status
+        )));
+    }
 
-        try {
-            // Handshake with job initial configuration
-            emitter.send(SseEmitter.event().name("init").data(Map.of(
-                    "jobId", jobId,
-                    "datasetName", state.datasetName != null ? state.datasetName : "",
-                    "concurrency", concurrency,
-                    "totalRows", state.totalRows,
-                    "completedRows", state.completedRows.get(),
-                    "failedRows", state.failedRows.get(),
-                    "status", state.status
-            )));
-
-            // Replay existing events in order for newly connected or reconnected client
-            List<ExecutionEvent> history = jobEventHistory.get(jobId);
-            if (history != null) {
-                synchronized (history) {
-                    for (ExecutionEvent ev : history) {
-                        emitter.send(SseEmitter.event().name("execution-event").data(ev));
-                    }
+    private void replayEventHistory(SseEmitter emitter, String jobId) throws Exception {
+        List<ExecutionEvent> history = jobEventHistory.get(jobId);
+        if (history != null) {
+            synchronized (history) {
+                for (ExecutionEvent ev : history) {
+                    emitter.send(SseEmitter.event().name("execution-event").data(ev));
                 }
             }
+        }
+    }
 
-            // If job is already in a terminal state, inform client and close
-            if ("COMPLETED".equalsIgnoreCase(state.status) || "FAILED".equalsIgnoreCase(state.status) || "CANCELLED".equalsIgnoreCase(state.status)) {
-                emitter.send(SseEmitter.event().name("job-completed").data(Map.of(
-                        "jobId", jobId,
-                        "status", state.status,
-                        "completedRows", state.completedRows.get(),
-                        "failedRows", state.failedRows.get(),
-                        "durationMs", state.durationMs != null ? state.durationMs : 0L
-                )));
-                emitter.complete();
-                cleanup.run();
-            }
-        } catch (Exception ex) {
-            log.warn("Error sending initial SSE handshake for job {}: {}", jobId, ex.getMessage());
+    private void handleTerminalJobState(SseEmitter emitter, String jobId, JobState state, Runnable cleanup) throws Exception {
+        if ("COMPLETED".equalsIgnoreCase(state.status) || "FAILED".equalsIgnoreCase(state.status) || "CANCELLED".equalsIgnoreCase(state.status)) {
+            emitter.send(SseEmitter.event().name("job-completed").data(Map.of(
+                    "jobId", jobId,
+                    "status", state.status,
+                    "completedRows", state.completedRows.get(),
+                    "failedRows", state.failedRows.get(),
+                    "durationMs", state.durationMs != null ? state.durationMs : 0L
+            )));
+            emitter.complete();
             cleanup.run();
         }
-
-        return emitter;
     }
 
     public void emitExecutionEvent(
@@ -177,19 +192,14 @@ public class EnrichmentJobManager {
         }
 
         ExecutionEvent event = new ExecutionEvent(
-                jobId,
-                rowId,
-                rowIndex,
-                entity,
-                status,
-                stage,
-                workerId,
-                message,
-                Instant.now().toString(),
-                metadata
+                jobId, rowId, rowIndex, entity, status, stage, workerId, message, Instant.now().toString(), metadata
         );
 
-        // Record bounded history (latest 500 events)
+        recordEventHistory(jobId, event);
+        broadcastEventToEmitters(jobId, event);
+    }
+
+    private void recordEventHistory(String jobId, ExecutionEvent event) {
         List<ExecutionEvent> history = jobEventHistory.computeIfAbsent(jobId, k -> Collections.synchronizedList(new ArrayList<>()));
         synchronized (history) {
             if (history.size() >= 500) {
@@ -197,8 +207,9 @@ public class EnrichmentJobManager {
             }
             history.add(event);
         }
+    }
 
-        // Broadcast to live SSE emitters
+    private void broadcastEventToEmitters(String jobId, ExecutionEvent event) {
         List<SseEmitter> emitters = jobEmitters.get(jobId);
         if (emitters != null && !emitters.isEmpty()) {
             List<SseEmitter> deadEmitters = new ArrayList<>();

@@ -26,66 +26,79 @@ public class CsvDatasetParser {
         }
 
         char delimiter = detectDelimiter(rawLines.get(0));
+        List<String> headers = parseHeaders(rawLines.get(0), delimiter);
 
-        // 1. Parse header row
-        List<String> rawHeaderTokens = parseCsvTokens(rawLines.get(0), delimiter);
-        List<String> headers = new ArrayList<>();
-        for (int i = 0; i < rawHeaderTokens.size(); i++) {
-            String h = rawHeaderTokens.get(i).trim();
-            if (h.isBlank()) {
-                h = "Column_" + (i + 1);
-            }
-            headers.add(h);
-        }
-
-        List<Map<String, String>> validRows = new ArrayList<>();
         List<MalformedRow> malformedRows = new ArrayList<>();
         Set<Integer> duplicateIndices = new LinkedHashSet<>();
-        Set<String> seenFingerprints = new HashSet<>();
-
-        // 2. Parse data rows
-        for (int i = 1; i < rawLines.size(); i++) {
-            String line = rawLines.get(i);
-            if (line.trim().isEmpty()) {
-                continue; // Skip blank lines
-            }
-
-            List<String> tokens = parseCsvTokens(line, delimiter);
-            if (tokens.size() != headers.size()) {
-                malformedRows.add(new MalformedRow(
-                        i,
-                        line,
-                        "Expected " + headers.size() + " columns but found " + tokens.size()
-                ));
-                continue;
-            }
-
-            Map<String, String> row = new LinkedHashMap<>();
-            boolean allEmpty = true;
-            StringBuilder fingerprint = new StringBuilder();
-
-            for (int c = 0; c < headers.size(); c++) {
-                String val = tokens.get(c).trim();
-                row.put(headers.get(c), val);
-                if (!val.isEmpty()) {
-                    allEmpty = false;
-                }
-                fingerprint.append(val.toLowerCase(Locale.ROOT)).append("|");
-            }
-
-            if (allEmpty) {
-                continue; // Skip completely empty data rows
-            }
-
-            String fp = fingerprint.toString();
-            if (!seenFingerprints.add(fp)) {
-                duplicateIndices.add(validRows.size());
-            }
-
-            validRows.add(row);
-        }
+        List<Map<String, String>> validRows = parseDataRows(rawLines, headers, delimiter, malformedRows, duplicateIndices);
 
         return new RawDataset(fileName, headers, validRows, malformedRows, duplicateIndices);
+    }
+
+    private List<String> parseHeaders(String headerLine, char delimiter) {
+        List<String> rawHeaderTokens = parseCsvTokens(headerLine, delimiter);
+        List<String> headers = new ArrayList<>(rawHeaderTokens.size());
+        for (int i = 0; i < rawHeaderTokens.size(); i++) {
+            String h = rawHeaderTokens.get(i).trim();
+            headers.add(h.isBlank() ? "Column_" + (i + 1) : h);
+        }
+        return headers;
+    }
+
+    private List<Map<String, String>> parseDataRows(
+            List<String> rawLines,
+            List<String> headers,
+            char delimiter,
+            List<MalformedRow> malformedRows,
+            Set<Integer> duplicateIndices
+    ) {
+        List<Map<String, String>> validRows = new ArrayList<>();
+        Set<String> seenFingerprints = new HashSet<>();
+
+        for (int i = 1; i < rawLines.size(); i++) {
+            String line = rawLines.get(i);
+            if (!line.trim().isEmpty()) {
+                processDataRow(line, i, headers, delimiter, validRows, malformedRows, seenFingerprints, duplicateIndices);
+            }
+        }
+        return validRows;
+    }
+
+    private void processDataRow(
+            String line,
+            int lineIndex,
+            List<String> headers,
+            char delimiter,
+            List<Map<String, String>> validRows,
+            List<MalformedRow> malformedRows,
+            Set<String> seenFingerprints,
+            Set<Integer> duplicateIndices
+    ) {
+        List<String> tokens = parseCsvTokens(line, delimiter);
+        if (tokens.size() != headers.size()) {
+            malformedRows.add(new MalformedRow(lineIndex, line, "Expected " + headers.size() + " columns but found " + tokens.size()));
+            return;
+        }
+
+        Map<String, String> row = new LinkedHashMap<>();
+        StringBuilder fingerprint = new StringBuilder();
+        boolean allEmpty = true;
+
+        for (int c = 0; c < headers.size(); c++) {
+            String val = tokens.get(c).trim();
+            row.put(headers.get(c), val);
+            if (!val.isEmpty()) {
+                allEmpty = false;
+            }
+            fingerprint.append(val.toLowerCase(Locale.ROOT)).append("|");
+        }
+
+        if (!allEmpty) {
+            if (!seenFingerprints.add(fingerprint.toString())) {
+                duplicateIndices.add(validRows.size());
+            }
+            validRows.add(row);
+        }
     }
 
     private char detectDelimiter(String headerLine) {

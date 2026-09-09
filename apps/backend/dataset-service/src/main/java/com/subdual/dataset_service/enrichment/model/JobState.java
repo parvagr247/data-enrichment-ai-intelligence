@@ -28,3 +28,5 @@ public class JobState {
     public String errorMessage;
     public volatile boolean cancelled = false;
 }
+
+// volatile guarantees that when one thread changes the variable, other threads reading that variable see the latest value rather than potentially seeing a stale cached value.

@@ -35,51 +35,62 @@ public class ExcelDatasetParser {
             return new RawDataset(fileName, List.of(), List.of(), List.of(), Set.of());
         }
 
-        // 1. Extract headers from first non-empty row
-        List<String> rawHeaders = sheetRows.get(0);
-        List<String> headers = new ArrayList<>();
+        List<String> headers = parseHeaders(sheetRows.get(0));
+        Set<Integer> duplicateIndices = new LinkedHashSet<>();
+        List<Map<String, String>> validRows = parseDataRows(sheetRows, headers, duplicateIndices);
+
+        return new RawDataset(fileName, headers, validRows, List.of(), duplicateIndices);
+    }
+
+    private List<String> parseHeaders(List<String> rawHeaders) {
+        List<String> headers = new ArrayList<>(rawHeaders.size());
         for (int i = 0; i < rawHeaders.size(); i++) {
             String h = rawHeaders.get(i).trim();
-            if (h.isBlank()) {
-                h = "Column_" + (i + 1);
-            }
-            headers.add(h);
+            headers.add(h.isBlank() ? "Column_" + (i + 1) : h);
         }
+        return headers;
+    }
 
+    private List<Map<String, String>> parseDataRows(
+            List<List<String>> sheetRows,
+            List<String> headers,
+            Set<Integer> duplicateIndices
+    ) {
         List<Map<String, String>> validRows = new ArrayList<>();
-        List<MalformedRow> malformedRows = new ArrayList<>();
-        Set<Integer> duplicateIndices = new LinkedHashSet<>();
         Set<String> seenFingerprints = new HashSet<>();
 
-        // 2. Extract data rows
         for (int r = 1; r < sheetRows.size(); r++) {
-            List<String> cells = sheetRows.get(r);
-            Map<String, String> row = new LinkedHashMap<>();
-            boolean allEmpty = true;
-            StringBuilder fingerprint = new StringBuilder();
+            processSheetRow(sheetRows.get(r), headers, validRows, seenFingerprints, duplicateIndices);
+        }
+        return validRows;
+    }
 
-            for (int c = 0; c < headers.size(); c++) {
-                String val = c < cells.size() ? cells.get(c).trim() : "";
-                row.put(headers.get(c), val);
-                if (!val.isEmpty()) {
-                    allEmpty = false;
-                }
-                fingerprint.append(val.toLowerCase(Locale.ROOT)).append("|");
+    private void processSheetRow(
+            List<String> cells,
+            List<String> headers,
+            List<Map<String, String>> validRows,
+            Set<String> seenFingerprints,
+            Set<Integer> duplicateIndices
+    ) {
+        Map<String, String> row = new LinkedHashMap<>();
+        StringBuilder fingerprint = new StringBuilder();
+        boolean allEmpty = true;
+
+        for (int c = 0; c < headers.size(); c++) {
+            String val = c < cells.size() ? cells.get(c).trim() : "";
+            row.put(headers.get(c), val);
+            if (!val.isEmpty()) {
+                allEmpty = false;
             }
-
-            if (allEmpty) {
-                continue; // Skip blank rows
-            }
-
-            String fp = fingerprint.toString();
-            if (!seenFingerprints.add(fp)) {
-                duplicateIndices.add(validRows.size());
-            }
-
-            validRows.add(row);
+            fingerprint.append(val.toLowerCase(Locale.ROOT)).append("|");
         }
 
-        return new RawDataset(fileName, headers, validRows, malformedRows, duplicateIndices);
+        if (!allEmpty) {
+            if (!seenFingerprints.add(fingerprint.toString())) {
+                duplicateIndices.add(validRows.size());
+            }
+            validRows.add(row);
+        }
     }
 
     private List<String> extractSharedStrings(InputStream in) {

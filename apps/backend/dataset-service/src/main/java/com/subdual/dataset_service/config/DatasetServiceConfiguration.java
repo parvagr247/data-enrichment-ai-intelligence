@@ -30,8 +30,7 @@ public class DatasetServiceConfiguration {
         return RestClient.builder();
     }
 
-    // Stop accepting new tasks, but allow already-submitted tasks(Queue Tasks) to finish
-    @Bean(destroyMethod = "shutdown")
+    @Bean(destroyMethod = "shutdown") // Allows already-submitted queued tasks to finish on shutdown.
     public ExecutorService enrichmentJobExecutor() {
         AtomicInteger workerNumber = new AtomicInteger(1);
         ThreadFactory threadFactory = runnable -> {

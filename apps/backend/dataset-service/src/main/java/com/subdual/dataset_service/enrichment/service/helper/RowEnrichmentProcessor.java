@@ -49,6 +49,75 @@ public class RowEnrichmentProcessor {
             long startedAtMs,
             String explicitUserId
     ) {
+        RowIdentity identity = resolveRowIdentity(rawRow, mapping, defaultEntityType);
+        if (!identity.isValid()) {
+            return buildMissingIdentifierResult(rowId, rowIndex, rawRow, identity.entityType(), targetFields, workerId, startedAtMs);
+        }
+
+        logIdentityPipeline(rowIndex, identity);
+
+        jobManager.emitExecutionEvent(
+                jobId, rowId, rowIndex, identity.displayName(), "PROCESSING", "DISCOVERING", workerId,
+                "Querying verified web sources & search indexes...", Map.of("name", identity.displayName(), "url", identity.canonicalUrl())
+        );
+
+        ResearchOutcome researchOutcome = executeResearch(identity, rawRow, targetFields, requirement, rowIndex);
+        if (researchOutcome.response() == null) {
+            return buildResearchFailureResult(rowId, rowIndex, rawRow, identity.displayName(), identity.canonicalUrl(),
+                    identity.entityType(), targetFields, workerId, startedAtMs, researchOutcome.errorMessage());
+        }
+
+        ResearchServiceClient.ResearchCallResponse researchResp = researchOutcome.response();
+        String effectiveDisplayName = resolveDisplayName(researchResp, identity.displayName());
+        String effectiveUrl = resolveCanonicalUrl(researchResp, identity.canonicalUrl());
+
+        EvidenceData evidence = extractDiscoveredEvidence(researchResp);
+        emitEvidenceDiscoveryEvents(jobId, rowId, rowIndex, effectiveDisplayName, workerId, evidence, targetFields);
+
+        SynthesizedAttributes synthesized = synthesizeAttributes(rawRow, effectiveDisplayName, identity.entityType(),
+                effectiveUrl, requirement, targetFields, evidence, rowIndex);
+
+        jobManager.emitExecutionEvent(
+                jobId, rowId, rowIndex, synthesized.displayName(), "PROCESSING", "ASSESSING", workerId,
+                "Evaluating profile relevance against research objective...", Map.of("objective", requirement != null ? requirement : "")
+        );
+
+        ProfileAssessmentData assessmentData = evaluateObjectiveAssessment(rawRow, synthesized.displayName(),
+                effectiveUrl, identity.entityType(), requirement, evidence, synthesized.attributes(), rowIndex);
+
+        jobManager.emitExecutionEvent(
+                jobId, rowId, rowIndex, synthesized.displayName(), "PROCESSING", "PERSISTING", workerId,
+                "Persisting canonical profile (" + synthesized.attributes().size() + " attributes) to catalog...",
+                Map.of("attributesCount", synthesized.attributes().size())
+        );
+
+        EnrichmentStatus status = resolveEnrichmentStatus(researchResp, evidence.sourceUrls(),
+                synthesized.attributes(), synthesized.unresolvedFields(), synthesized.aiSucceeded(),
+                assessmentData.aiSucceeded(), requirement, assessmentData.assessment());
+
+        persistCanonicalProfileSafe(jobId, explicitUserId, researchResp.entityId(), synthesized.displayName(),
+                identity.entityType(), effectiveUrl, evidence.entitySources(), synthesized.attributes(),
+                status, assessmentData);
+
+        return buildRowResult(rowId, rowIndex, rawRow, status, synthesized, effectiveUrl, identity.entityType(),
+                evidence.entitySources(), workerId, startedAtMs, assessmentData);
+    }
+
+    private record RowIdentity(
+            String displayName,
+            String firstName,
+            String lastName,
+            String fullName,
+            String canonicalUrl,
+            String org,
+            String role,
+            String email,
+            String location,
+            String entityType,
+            boolean isValid
+    ) {}
+
+    private RowIdentity resolveRowIdentity(Map<String, String> rawRow, Map<String, String> mapping, String defaultEntityType) {
         String firstName = rowIdentityResolver.extractMappedValue(rawRow, mapping, "firstNameColumn");
         String lastName = rowIdentityResolver.extractMappedValue(rawRow, mapping, "lastNameColumn");
         String fullName = rowIdentityResolver.extractMappedValue(rawRow, mapping, "fullNameColumn");
@@ -64,112 +133,138 @@ public class RowEnrichmentProcessor {
         String rawType = rowIdentityResolver.extractMappedValue(rawRow, mapping, "entityTypeColumn");
         String entityType = (rawType != null && !rawType.isBlank()) ? rawType.trim().toUpperCase(Locale.ROOT) : defaultEntityType;
 
-        if ((compositeName == null || compositeName.isBlank()) && (url == null || url.isBlank())) {
-            return new RowEnrichmentResult(
-                    rowId,
-                    rowIndex,
-                    rawRow,
-                    "FAILED",
-                    "Missing Identifier",
-                    "",
-                    entityType,
-                    Map.of(),
-                    targetFields,
-                    List.of(),
-                    0.0,
-                    List.of(),
-                    "Row missing required name or url identifier",
-                    "FAILED",
-                    workerId,
-                    "Row missing required name or url identifier",
-                    startedAtMs,
-                    System.currentTimeMillis()
-            );
-        }
-
+        boolean isValid = (compositeName != null && !compositeName.isBlank()) || (url != null && !url.isBlank());
         String displayName = (compositeName != null && !compositeName.isBlank()) ? compositeName : "Unknown";
         String canonicalUrl = url != null ? url : "";
 
-        log.info("[Pipeline: IDENTITY] Row #{} Constructed identity: fullName='{}', firstName='{}', lastName='{}', profileUrl='{}', organization='{}', role='{}', email='{}', location='{}'",
-                rowIndex, displayName, firstName, lastName, canonicalUrl, org, role, email, location);
+        return new RowIdentity(displayName, firstName, lastName, fullName, canonicalUrl, org, role, email, location, entityType, isValid);
+    }
 
-        // 1. Discover Sources via Research Service
-        jobManager.emitExecutionEvent(
-                jobId,
+    private void logIdentityPipeline(int rowIndex, RowIdentity identity) {
+        log.info("[Pipeline: IDENTITY] Row #{} Constructed identity: fullName='{}', firstName='{}', lastName='{}', profileUrl='{}', organization='{}', role='{}', email='{}', location='{}'",
+                rowIndex, identity.displayName(), identity.firstName(), identity.lastName(), identity.canonicalUrl(),
+                identity.org(), identity.role(), identity.email(), identity.location());
+    }
+
+    private RowEnrichmentResult buildMissingIdentifierResult(
+            String rowId, int rowIndex, Map<String, String> rawRow, String entityType,
+            List<String> targetFields, String workerId, long startedAtMs
+    ) {
+        return new RowEnrichmentResult(
                 rowId,
                 rowIndex,
-                displayName,
-                "PROCESSING",
-                "DISCOVERING",
+                rawRow,
+                "FAILED",
+                "Missing Identifier",
+                "",
+                entityType,
+                Map.of(),
+                targetFields,
+                List.of(),
+                0.0,
+                List.of(),
+                "Row missing required name or url identifier",
+                "FAILED",
                 workerId,
-                "Querying verified web sources & search indexes...",
-                Map.of("name", displayName, "url", canonicalUrl)
+                "Row missing required name or url identifier",
+                startedAtMs,
+                System.currentTimeMillis()
         );
+    }
 
-        ResearchServiceClient.ResearchCallResponse researchResp = null;
-        String researchError = null;
+    private record ResearchOutcome(ResearchServiceClient.ResearchCallResponse response, String errorMessage) {}
+
+    private ResearchOutcome executeResearch(
+            RowIdentity identity,
+            Map<String, String> rawRow,
+            List<String> targetFields,
+            String requirement,
+            int rowIndex
+    ) {
         try {
             Map<String, Object> metadata = new LinkedHashMap<>();
             if (rawRow != null) {
                 metadata.putAll(rawRow);
             }
-            if (firstName != null && !firstName.isBlank()) metadata.put("firstName", firstName);
-            if (lastName != null && !lastName.isBlank()) metadata.put("lastName", lastName);
-            if (fullName != null && !fullName.isBlank()) metadata.put("fullName", fullName);
-            if (email != null && !email.isBlank()) metadata.put("email", email);
-            if (location != null && !location.isBlank()) metadata.put("location", location);
+            if (identity.firstName() != null && !identity.firstName().isBlank()) metadata.put("firstName", identity.firstName());
+            if (identity.lastName() != null && !identity.lastName().isBlank()) metadata.put("lastName", identity.lastName());
+            if (identity.fullName() != null && !identity.fullName().isBlank()) metadata.put("fullName", identity.fullName());
+            if (identity.email() != null && !identity.email().isBlank()) metadata.put("email", identity.email());
+            if (identity.location() != null && !identity.location().isBlank()) metadata.put("location", identity.location());
 
-            researchResp = researchServiceClient.executeResearch(new ResearchServiceClient.ResearchCallRequest(
-                    url,
-                    entityType,
-                    displayName,
-                    org,
-                    role,
-                    targetFields,
-                    requirement,
-                    metadata,
-                    firstName,
-                    lastName,
-                    fullName != null ? fullName : displayName,
-                    email,
-                    location
-            ));
+            ResearchServiceClient.ResearchCallResponse response = researchServiceClient.executeResearch(
+                    new ResearchServiceClient.ResearchCallRequest(
+                            identity.canonicalUrl(),
+                            identity.entityType(),
+                            identity.displayName(),
+                            identity.org(),
+                            identity.role(),
+                            targetFields,
+                            requirement,
+                            metadata,
+                            identity.firstName(),
+                            identity.lastName(),
+                            identity.fullName() != null ? identity.fullName() : identity.displayName(),
+                            identity.email(),
+                            identity.location()
+                    )
+            );
+            return new ResearchOutcome(response, null);
         } catch (Exception ex) {
             log.warn("Research call failed for row {}: {}", rowIndex, ex.getMessage());
-            researchError = ex.getMessage();
+            return new ResearchOutcome(null, ex.getMessage());
         }
+    }
 
-        if (researchResp == null) {
-            return new RowEnrichmentResult(
-                    rowId,
-                    rowIndex,
-                    rawRow,
-                    "FAILED",
-                    displayName,
-                    canonicalUrl,
-                    entityType,
-                    Map.of(),
-                    targetFields,
-                    List.of(),
-                    0.0,
-                    List.of(),
-                    "Research service error: " + (researchError != null ? researchError : "No response"),
-                    "FAILED",
-                    workerId,
-                    "Research service failed: " + (researchError != null ? researchError : "No response"),
-                    startedAtMs,
-                    System.currentTimeMillis()
-            );
-        }
+    private RowEnrichmentResult buildResearchFailureResult(
+            String rowId, int rowIndex, Map<String, String> rawRow, String displayName,
+            String canonicalUrl, String entityType, List<String> targetFields, String workerId,
+            long startedAtMs, String researchError
+    ) {
+        String errorDesc = researchError != null ? researchError : "No response";
+        return new RowEnrichmentResult(
+                rowId,
+                rowIndex,
+                rawRow,
+                "FAILED",
+                displayName,
+                canonicalUrl,
+                entityType,
+                Map.of(),
+                targetFields,
+                List.of(),
+                0.0,
+                List.of(),
+                "Research service error: " + errorDesc,
+                "FAILED",
+                workerId,
+                "Research service failed: " + errorDesc,
+                startedAtMs,
+                System.currentTimeMillis()
+        );
+    }
 
-        if (researchResp.result() != null && researchResp.result().displayName() != null) {
-            displayName = researchResp.result().displayName();
-        }
-        if (researchResp.result() != null && researchResp.result().canonicalUrl() != null) {
-            canonicalUrl = researchResp.result().canonicalUrl();
-        }
+    private String resolveDisplayName(ResearchServiceClient.ResearchCallResponse researchResp, String fallback) {
+        return (researchResp.result() != null && researchResp.result().displayName() != null)
+                ? researchResp.result().displayName()
+                : fallback;
+    }
 
-        // 2. Extract Evidence & Sources from Research
+    private String resolveCanonicalUrl(ResearchServiceClient.ResearchCallResponse researchResp, String fallback) {
+        return (researchResp.result() != null && researchResp.result().canonicalUrl() != null)
+                ? researchResp.result().canonicalUrl()
+                : fallback;
+    }
+
+    private record EvidenceData(
+            Map<String, AiServiceClient.FactEvidenceCallDto> evidenceMap,
+            Map<String, FactEvidenceDto> profileEvidenceMap,
+            List<String> sourceUrls,
+            List<String> sourceSnippets,
+            List<EntitySourceDto> entitySources
+    ) {}
+
+    private EvidenceData extractDiscoveredEvidence(ResearchServiceClient.ResearchCallResponse researchResp) {
         Map<String, AiServiceClient.FactEvidenceCallDto> evidenceMap = new LinkedHashMap<>();
         Map<String, FactEvidenceDto> profileEvidenceMap = new LinkedHashMap<>();
         List<String> sourceUrls = new ArrayList<>();
@@ -219,43 +314,51 @@ public class RowEnrichmentProcessor {
             }
         }
 
+        return new EvidenceData(evidenceMap, profileEvidenceMap, sourceUrls, sourceSnippets, entitySources);
+    }
+
+    private void emitEvidenceDiscoveryEvents(
+            String jobId, String rowId, int rowIndex, String displayName,
+            String workerId, EvidenceData evidence, List<String> targetFields
+    ) {
         jobManager.emitExecutionEvent(
-                jobId,
-                rowId,
-                rowIndex,
-                displayName,
-                "PROCESSING",
-                "COLLECTING_SOURCES",
-                workerId,
-                "Collected and deduplicated " + sourceUrls.size() + " candidate sources...",
-                Map.of("sourcesCount", sourceUrls.size())
+                jobId, rowId, rowIndex, displayName, "PROCESSING", "COLLECTING_SOURCES", workerId,
+                "Collected and deduplicated " + evidence.sourceUrls().size() + " candidate sources...",
+                Map.of("sourcesCount", evidence.sourceUrls().size())
         );
 
         jobManager.emitExecutionEvent(
-                jobId,
-                rowId,
-                rowIndex,
-                displayName,
-                "PROCESSING",
-                "EXTRACTING_EVIDENCE",
-                workerId,
-                "Extracting grounded evidence from " + sourceUrls.size() + " discovered sources...",
-                Map.of("sourcesCount", sourceUrls.size(), "evidenceCount", evidenceMap.size())
+                jobId, rowId, rowIndex, displayName, "PROCESSING", "EXTRACTING_EVIDENCE", workerId,
+                "Extracting grounded evidence from " + evidence.sourceUrls().size() + " discovered sources...",
+                Map.of("sourcesCount", evidence.sourceUrls().size(), "evidenceCount", evidence.evidenceMap().size())
         );
 
-        // 3. AI Enrichment
         jobManager.emitExecutionEvent(
-                jobId,
-                rowId,
-                rowIndex,
-                displayName,
-                "PROCESSING",
-                "AI_ENRICHMENT",
-                workerId,
+                jobId, rowId, rowIndex, displayName, "PROCESSING", "AI_ENRICHMENT", workerId,
                 "Synthesizing grounded attributes with AI intelligence...",
-                Map.of("evidenceCount", evidenceMap.size(), "targetFields", targetFields)
+                Map.of("evidenceCount", evidence.evidenceMap().size(), "targetFields", targetFields)
         );
+    }
 
+    private record SynthesizedAttributes(
+            String displayName,
+            double confidence,
+            Map<String, EntityAttributeDto> attributes,
+            List<String> unresolvedFields,
+            List<String> conflicts,
+            boolean aiSucceeded
+    ) {}
+
+    private SynthesizedAttributes synthesizeAttributes(
+            Map<String, String> rawRow,
+            String displayName,
+            String entityType,
+            String canonicalUrl,
+            String requirement,
+            List<String> targetFields,
+            EvidenceData evidence,
+            int rowIndex
+    ) {
         AiServiceClient.SynthesisCallResponse aiResp = null;
         try {
             aiResp = aiServiceClient.synthesizeEnrichment(new AiServiceClient.SynthesisCallRequest(
@@ -265,21 +368,23 @@ public class RowEnrichmentProcessor {
                     canonicalUrl,
                     requirement,
                     targetFields,
-                    evidenceMap,
-                    sourceUrls
+                    evidence.evidenceMap(),
+                    evidence.sourceUrls()
             ));
         } catch (Exception ex) {
             log.warn("AI synthesis call failed for row {}: {}", rowIndex, ex.getMessage());
         }
 
-        // Assemble final attributes
         Map<String, EntityAttributeDto> finalAttributes = new LinkedHashMap<>();
         List<String> unresolvedFields = new ArrayList<>();
         List<String> conflicts = new ArrayList<>();
         double confidence = 0.85;
+        String resolvedName = displayName;
+        boolean aiSucceeded = false;
 
         if (aiResp != null && aiResp.attributes() != null && !aiResp.attributes().isEmpty()) {
-            displayName = aiResp.displayName();
+            aiSucceeded = true;
+            resolvedName = aiResp.displayName();
             confidence = aiResp.overallConfidence();
             unresolvedFields.addAll(aiResp.unresolvedFields());
             conflicts.addAll(aiResp.conflicts());
@@ -294,8 +399,7 @@ public class RowEnrichmentProcessor {
                 ));
             }
         } else {
-            // Fallback directly from research evidence
-            for (Map.Entry<String, AiServiceClient.FactEvidenceCallDto> entry : evidenceMap.entrySet()) {
+            for (Map.Entry<String, AiServiceClient.FactEvidenceCallDto> entry : evidence.evidenceMap().entrySet()) {
                 AiServiceClient.FactEvidenceCallDto fact = entry.getValue();
                 finalAttributes.put(entry.getKey(), new EntityAttributeDto(
                         fact.value(),
@@ -309,19 +413,27 @@ public class RowEnrichmentProcessor {
             }
         }
 
-        // 4. Assess Objective
-        jobManager.emitExecutionEvent(
-                jobId,
-                rowId,
-                rowIndex,
-                displayName,
-                "PROCESSING",
-                "ASSESSING",
-                workerId,
-                "Evaluating profile relevance against research objective...",
-                Map.of("objective", requirement != null ? requirement : "")
-        );
+        return new SynthesizedAttributes(resolvedName, confidence, finalAttributes, unresolvedFields, conflicts, aiSucceeded);
+    }
 
+    private record ProfileAssessmentData(
+            ResearchProfile profile,
+            ObjectiveAssessment assessment,
+            RecommendedApproach recommendation,
+            List<ResearchFinding> findings,
+            boolean aiSucceeded
+    ) {}
+
+    private ProfileAssessmentData evaluateObjectiveAssessment(
+            Map<String, String> rawRow,
+            String displayName,
+            String canonicalUrl,
+            String entityType,
+            String requirement,
+            EvidenceData evidence,
+            Map<String, EntityAttributeDto> finalAttributes,
+            int rowIndex
+    ) {
         ResearchObjective objectiveObj = ResearchObjective.from(requirement);
         ProfileAssessmentResponse profileAssessment = null;
         try {
@@ -331,169 +443,194 @@ public class RowEnrichmentProcessor {
                     canonicalUrl,
                     entityType,
                     objectiveObj,
-                    profileEvidenceMap,
-                    sourceUrls,
-                    sourceSnippets
+                    evidence.profileEvidenceMap(),
+                    evidence.sourceUrls(),
+                    evidence.sourceSnippets()
             ));
         } catch (Exception ex) {
             log.warn("AI profile assessment call failed for row {}: {}", rowIndex, ex.getMessage());
         }
 
-        ResearchProfile profile;
-        ObjectiveAssessment assessment;
-        RecommendedApproach recommendation;
-        List<ResearchFinding> findings;
-
         if (profileAssessment != null) {
-            profile = profileAssessment.profile();
-            assessment = profileAssessment.assessment();
-            recommendation = profileAssessment.recommendation();
-            findings = profileAssessment.findings() != null ? profileAssessment.findings() : List.of();
-            if (profile != null) {
-                if (!"UNKNOWN".equals(profile.currentRole()) && !finalAttributes.containsKey("currentRole")) {
-                    finalAttributes.put("currentRole", new EntityAttributeDto(profile.currentRole(), canonicalUrl, "Extracted from profile", "HIGH"));
-                }
-                if (!"UNKNOWN".equals(profile.currentOrganization()) && !finalAttributes.containsKey("currentOrganization")) {
-                    finalAttributes.put("currentOrganization", new EntityAttributeDto(profile.currentOrganization(), canonicalUrl, "Extracted from profile", "HIGH"));
-                }
-                if (!"UNKNOWN".equals(profile.location()) && !finalAttributes.containsKey("location")) {
-                    finalAttributes.put("location", new EntityAttributeDto(profile.location(), canonicalUrl, "Extracted from profile", "HIGH"));
-                }
-            }
-        } else {
-            // Deterministic local fallback if AI service assessment endpoint is unreachable
-            boolean hasObj = !objectiveObj.isBlank();
-            int score = hasObj ? 50 : 0;
-            ObjectiveAssessment.PriorityTier tier = hasObj ? ObjectiveAssessment.PriorityTier.MEDIUM : ObjectiveAssessment.PriorityTier.NONE;
-            String whyRel = hasObj ? "Profile identified during enrichment matching basic criteria." : "General profile research completed (no specific objective specified).";
-
-            assessment = new ObjectiveAssessment(score, tier, whyRel, Map.of(), List.of(), List.of());
-            recommendation = new RecommendedApproach(
-                    RecommendedApproach.ApproachType.NETWORKING_CONVERSATION,
-                    "Professional networking outreach",
-                    "Ground outreach in verified background.",
-                    List.of("Connect referencing current professional role.")
-            );
-            profile = new ResearchProfile(
-                    finalAttributes.containsKey("currentRole") ? finalAttributes.get("currentRole").value() : "UNKNOWN",
-                    finalAttributes.containsKey("currentOrganization") ? finalAttributes.get("currentOrganization").value() : "UNKNOWN",
-                    finalAttributes.containsKey("location") ? finalAttributes.get("location").value() : "UNKNOWN",
-                    displayName + " is a professional identified during enrichment.",
-                    "Identified from public professional sources.",
-                    List.of(),
-                    List.of(),
-                    List.of(),
-                    List.of()
-            );
-            findings = List.of();
+            ResearchProfile profile = profileAssessment.profile();
+            ObjectiveAssessment assessment = profileAssessment.assessment();
+            RecommendedApproach recommendation = profileAssessment.recommendation();
+            List<ResearchFinding> findings = profileAssessment.findings() != null ? profileAssessment.findings() : List.of();
+            enrichAttributesFromProfile(profile, canonicalUrl, finalAttributes);
+            return new ProfileAssessmentData(profile, assessment, recommendation, findings, true);
         }
 
-        // 5. Persist canonical entity
-        String entityId = (researchResp.entityId() != null)
-                ? researchResp.entityId()
-                : UUID.randomUUID().toString();
+        return buildFallbackAssessmentData(displayName, objectiveObj, finalAttributes);
+    }
 
-        jobManager.emitExecutionEvent(
-                jobId,
-                rowId,
-                rowIndex,
-                displayName,
-                "PROCESSING",
-                "PERSISTING",
-                workerId,
-                "Persisting canonical profile (" + finalAttributes.size() + " attributes) to catalog...",
-                Map.of("attributesCount", finalAttributes.size())
+    private void enrichAttributesFromProfile(ResearchProfile profile, String canonicalUrl, Map<String, EntityAttributeDto> finalAttributes) {
+        if (profile != null) {
+            if (!"UNKNOWN".equals(profile.currentRole()) && !finalAttributes.containsKey("currentRole")) {
+                finalAttributes.put("currentRole", new EntityAttributeDto(profile.currentRole(), canonicalUrl, "Extracted from profile", "HIGH"));
+            }
+            if (!"UNKNOWN".equals(profile.currentOrganization()) && !finalAttributes.containsKey("currentOrganization")) {
+                finalAttributes.put("currentOrganization", new EntityAttributeDto(profile.currentOrganization(), canonicalUrl, "Extracted from profile", "HIGH"));
+            }
+            if (!"UNKNOWN".equals(profile.location()) && !finalAttributes.containsKey("location")) {
+                finalAttributes.put("location", new EntityAttributeDto(profile.location(), canonicalUrl, "Extracted from profile", "HIGH"));
+            }
+        }
+    }
+
+    private ProfileAssessmentData buildFallbackAssessmentData(
+            String displayName, ResearchObjective objectiveObj, Map<String, EntityAttributeDto> finalAttributes
+    ) {
+        boolean hasObj = !objectiveObj.isBlank();
+        int score = hasObj ? 50 : 0;
+        ObjectiveAssessment.PriorityTier tier = hasObj ? ObjectiveAssessment.PriorityTier.MEDIUM : ObjectiveAssessment.PriorityTier.NONE;
+        String whyRel = hasObj ? "Profile identified during enrichment matching basic criteria." : "General profile research completed (no specific objective specified).";
+
+        ObjectiveAssessment assessment = new ObjectiveAssessment(score, tier, whyRel, Map.of(), List.of(), List.of());
+        RecommendedApproach recommendation = new RecommendedApproach(
+                RecommendedApproach.ApproachType.NETWORKING_CONVERSATION,
+                "Professional networking outreach",
+                "Ground outreach in verified background.",
+                List.of("Connect referencing current professional role.")
         );
+        ResearchProfile profile = new ResearchProfile(
+                finalAttributes.containsKey("currentRole") ? finalAttributes.get("currentRole").value() : "UNKNOWN",
+                finalAttributes.containsKey("currentOrganization") ? finalAttributes.get("currentOrganization").value() : "UNKNOWN",
+                finalAttributes.containsKey("location") ? finalAttributes.get("location").value() : "UNKNOWN",
+                displayName + " is a professional identified during enrichment.",
+                "Identified from public professional sources.",
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of()
+        );
+        return new ProfileAssessmentData(profile, assessment, recommendation, List.of(), false);
+    }
 
+    private record EnrichmentStatus(String status, String statusMessage) {}
+
+    private EnrichmentStatus resolveEnrichmentStatus(
+            ResearchServiceClient.ResearchCallResponse researchResp,
+            List<String> sourceUrls,
+            Map<String, EntityAttributeDto> finalAttributes,
+            List<String> unresolvedFields,
+            boolean aiSucceeded,
+            boolean assessmentAiSucceeded,
+            String requirement,
+            ObjectiveAssessment assessment
+    ) {
         boolean insufficientEvidence = "INSUFFICIENT_EVIDENCE".equalsIgnoreCase(researchResp.status())
                 || "NO_SOURCES".equalsIgnoreCase(researchResp.status())
                 || "NO_RESULTS".equalsIgnoreCase(researchResp.status())
                 || (sourceUrls.isEmpty() && finalAttributes.isEmpty() && !"COMPLETED".equalsIgnoreCase(researchResp.status()));
 
-        boolean aiDegraded = (aiResp == null && profileAssessment == null && !evidenceMap.isEmpty() && (requirement != null && !requirement.isBlank()));
+        boolean aiDegraded = (!aiSucceeded && !assessmentAiSucceeded && !finalAttributes.isEmpty() && (requirement != null && !requirement.isBlank()));
 
-        String status;
-        String statusMessage;
         if ("FAILED".equalsIgnoreCase(researchResp.status())) {
-            status = "FAILED";
-            statusMessage = "Research service failed to locate or resolve entity";
-        } else if (insufficientEvidence) {
-            status = "INSUFFICIENT_EVIDENCE";
-            statusMessage = "Sources returned insufficient grounded evidence";
-        } else if (aiDegraded) {
-            status = "AI_DEGRADED";
-            statusMessage = "Deterministic fallback used; AI intelligence service unavailable or degraded";
-        } else if ("PARTIAL".equalsIgnoreCase(researchResp.status()) || !unresolvedFields.isEmpty()) {
-            status = "PARTIAL";
-            statusMessage = "Enrichment partially completed (" + unresolvedFields.size() + " unresolved fields)";
-        } else {
-            status = "COMPLETED";
-            statusMessage = "Enrichment completed (" + finalAttributes.size() + " attributes, tier: " + assessment.priorityTier() + ")";
+            return new EnrichmentStatus("FAILED", "Research service failed to locate or resolve entity");
         }
+        if (insufficientEvidence) {
+            return new EnrichmentStatus("INSUFFICIENT_EVIDENCE", "Sources returned insufficient grounded evidence");
+        }
+        if (aiDegraded) {
+            return new EnrichmentStatus("AI_DEGRADED", "Deterministic fallback used; AI intelligence service unavailable or degraded");
+        }
+        if ("PARTIAL".equalsIgnoreCase(researchResp.status()) || !unresolvedFields.isEmpty()) {
+            return new EnrichmentStatus("PARTIAL", "Enrichment partially completed (" + unresolvedFields.size() + " unresolved fields)");
+        }
+        return new EnrichmentStatus("COMPLETED", "Enrichment completed (" + finalAttributes.size() + " attributes, tier: " + assessment.priorityTier() + ")");
+    }
 
-        String profileJson = null;
-        String assessmentJson = null;
-        String recommendationJson = null;
-        String findingsJson = null;
-        try {
-            if (profile != null) profileJson = objectMapper.writeValueAsString(profile);
-            if (assessment != null) assessmentJson = objectMapper.writeValueAsString(assessment);
-            if (recommendation != null) recommendationJson = objectMapper.writeValueAsString(recommendation);
-            if (findings != null) findingsJson = objectMapper.writeValueAsString(findings);
-        } catch (Exception ex) {
-            log.warn("Failed serializing rich profile JSON for entity {}: {}", entityId, ex.getMessage());
-        }
+    private void persistCanonicalProfileSafe(
+            String jobId,
+            String explicitUserId,
+            String entityId,
+            String displayName,
+            String entityType,
+            String canonicalUrl,
+            List<EntitySourceDto> entitySources,
+            Map<String, EntityAttributeDto> finalAttributes,
+            EnrichmentStatus status,
+            ProfileAssessmentData assessmentData
+    ) {
+        String effectiveEntityId = (entityId != null) ? entityId : UUID.randomUUID().toString();
+        String profileJson = serializeToJsonSafe(assessmentData.profile(), effectiveEntityId);
+        String assessmentJson = serializeToJsonSafe(assessmentData.assessment(), effectiveEntityId);
+        String recommendationJson = serializeToJsonSafe(assessmentData.recommendation(), effectiveEntityId);
+        String findingsJson = serializeToJsonSafe(assessmentData.findings(), effectiveEntityId);
 
         try {
             JobState jobState = jobId != null ? jobManager.getJobState(jobId) : null;
             String rowUserId = (explicitUserId != null && !explicitUserId.isBlank())
                     ? explicitUserId
                     : (jobState != null ? jobState.userId : null);
+
             persistenceService.persistOrUpdate(new PersistEntityRequest(
-                    entityId,
+                    effectiveEntityId,
                     displayName,
                     entityType,
                     canonicalUrl,
                     entitySources,
                     finalAttributes,
-                    status,
-                    statusMessage,
-                    assessment.priorityTier() != null ? assessment.priorityTier().name() : "NONE",
-                    assessment.overallScore(),
+                    status.status(),
+                    status.statusMessage(),
+                    assessmentData.assessment().priorityTier() != null ? assessmentData.assessment().priorityTier().name() : "NONE",
+                    assessmentData.assessment().overallScore(),
                     profileJson,
                     assessmentJson,
                     recommendationJson,
                     findingsJson
             ), rowUserId);
         } catch (Exception ex) {
-            log.warn("Failed persisting entity {} in database: {}", entityId, ex.getMessage());
+            log.warn("Failed persisting entity {} in database: {}", effectiveEntityId, ex.getMessage());
         }
+    }
 
-        long completedAtMs = System.currentTimeMillis();
+    private String serializeToJsonSafe(Object value, String entityId) {
+        if (value == null) return null;
+        try {
+            return objectMapper.writeValueAsString(value);
+        } catch (Exception ex) {
+            log.warn("Failed serializing rich profile JSON for entity {}: {}", entityId, ex.getMessage());
+            return null;
+        }
+    }
 
+    private RowEnrichmentResult buildRowResult(
+            String rowId,
+            int rowIndex,
+            Map<String, String> rawRow,
+            EnrichmentStatus status,
+            SynthesizedAttributes synthesized,
+            String canonicalUrl,
+            String entityType,
+            List<EntitySourceDto> entitySources,
+            String workerId,
+            long startedAtMs,
+            ProfileAssessmentData assessmentData
+    ) {
         return new RowEnrichmentResult(
                 rowId,
                 rowIndex,
                 rawRow,
-                status,
-                displayName,
+                status.status(),
+                synthesized.displayName(),
                 canonicalUrl,
                 entityType,
-                finalAttributes,
-                unresolvedFields,
-                conflicts,
-                confidence,
+                synthesized.attributes(),
+                synthesized.unresolvedFields(),
+                synthesized.conflicts(),
+                synthesized.confidence(),
                 entitySources,
                 null,
-                status,
+                status.status(),
                 workerId,
-                statusMessage,
+                status.statusMessage(),
                 startedAtMs,
-                completedAtMs,
-                profile,
-                assessment,
-                recommendation,
-                findings
+                System.currentTimeMillis(),
+                assessmentData.profile(),
+                assessmentData.assessment(),
+                assessmentData.recommendation(),
+                assessmentData.findings()
         );
     }
 
