@@ -154,19 +154,16 @@ A complete Postman collection is located in `postman/`:
 
 ---
 
-## 5. Frontend Docker Hot-Reload & Volume Mechanics
+## 5. Frontend & Backend Docker Hot-Reload & Compose Watch Mechanics
 
-When running under `docker-compose-dev-all.yml`, the frontend container mounts host source code while preserving Linux-native dependencies via anonymous volume shadowing:
+When running under `docker-compose-dev-all.yml` with Docker Compose Watch (`docker compose watch` or `docker compose up --watch`):
 
-```yaml
-volumes:
-  - ../../apps/frontend:/app         # Live source code bind mount
-  - /app/node_modules                # Shadowing: keeps Linux Alpine node_modules
-  - /app/.next                       # Shadowing: keeps container Turbopack build cache
-```
-
-* **Filesystem Polling**: `WATCHPACK_POLLING: "true"` is enabled to ensure file modifications on Windows hosts trigger instant hot-module reload inside the Linux container.
-* No container rebuild is needed when modifying frontend `.tsx` or `.css` files.
+* **Docker Compose Watch (`develop.watch`)**: Monitors host source trees and syncs changes directly into containers:
+  * **Backend services**: Edit changes under `src/` trigger `sync+restart` to `/app/src`. Manifest modifications (`pom.xml`, `Dockerfile`) trigger automatic container rebuilds (`action: rebuild`).
+  * **Frontend**: Code edits trigger `sync` to `/app` with Next.js Turbopack fast refresh. Manifest modifications (`package.json`, `package-lock.json`, `Dockerfile`, `next.config.ts`) trigger container rebuilds (`action: rebuild`).
+* **Volume Isolation**: Source directories are managed by `develop.watch` rather than host bind mounts under `volumes:`. This eliminates the Docker Compose warning (`path also declared by a bind mount volume, this path won't be monitored`) and ensures reliable cross-platform file monitoring.
+* **Anonymous Volume Shadowing**: Anonymous volumes (`/app/node_modules` and `/app/.next`) protect containerized Linux binaries and the Turbopack cache.
+* **Filesystem Polling**: `WATCHPACK_POLLING: "true"` is enabled for Windows/WSL2 filesystem event consistency.
 
 ---
 

@@ -39,8 +39,6 @@ services:
     volumes:
       - maven_cache:/root/.m2
       - ../../config:/config:ro
-      - ../../apps/backend/config-server/pom.xml:/app/pom.xml
-      - ../../apps/backend/config-server/src:/app/src
     develop:
       watch:
         - path: ../../apps/backend/config-server/pom.xml
@@ -67,8 +65,6 @@ services:
       CONFIG_SERVER_URL: http://config-server:9736
     volumes:
       - maven_cache:/root/.m2
-      - ../../apps/backend/discovery-server/pom.xml:/app/pom.xml
-      - ../../apps/backend/discovery-server/src:/app/src
     develop:
       watch:
         - path: ../../apps/backend/discovery-server/pom.xml
@@ -102,8 +98,6 @@ services:
       GATEWAY_CORS_ALLOWED_ORIGINS: ${GATEWAY_CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
     volumes:
       - maven_cache:/root/.m2
-      - ../../apps/backend/api-gateway/pom.xml:/app/pom.xml
-      - ../../apps/backend/api-gateway/src:/app/src
     develop:
       watch:
         - path: ../../apps/backend/api-gateway/pom.xml
@@ -139,8 +133,6 @@ services:
         condition: service_healthy
     volumes:
       - maven_cache:/root/.m2
-      - ../../apps/backend/auth-service/pom.xml:/app/pom.xml
-      - ../../apps/backend/auth-service/src:/app/src
     develop:
       watch:
         - path: ../../apps/backend/auth-service/pom.xml
@@ -180,8 +172,6 @@ services:
       RESEARCH_MAX_CONTENT_LENGTH: ${RESEARCH_MAX_CONTENT_LENGTH:-50000}
     volumes:
       - maven_cache:/root/.m2
-      - ../../apps/backend/research-service/pom.xml:/app/pom.xml
-      - ../../apps/backend/research-service/src:/app/src
     develop:
       watch:
         - path: ../../apps/backend/research-service/pom.xml
@@ -212,8 +202,6 @@ services:
       AI_MODEL: ${AI_MODEL:-gemini-3.5-flash-lite}
     volumes:
       - maven_cache:/root/.m2
-      - ../../apps/backend/ai-intelligent-service/pom.xml:/app/pom.xml
-      - ../../apps/backend/ai-intelligent-service/src:/app/src
     develop:
       watch:
         - path: ../../apps/backend/ai-intelligent-service/pom.xml
@@ -249,8 +237,6 @@ services:
         condition: service_healthy
     volumes:
       - maven_cache:/root/.m2
-      - ../../apps/backend/dataset-service/pom.xml:/app/pom.xml
-      - ../../apps/backend/dataset-service/src:/app/src
     develop:
       watch:
         - path: ../../apps/backend/dataset-service/pom.xml
@@ -283,7 +269,6 @@ services:
       NEXT_PUBLIC_AUTH_SERVICE_URL: ${NEXT_PUBLIC_AUTH_SERVICE_URL:-http://localhost:9738}
       NEXT_PUBLIC_GATEWAY_API_KEY: ${GATEWAY_API_KEY:-}
     volumes:
-      - ../../apps/frontend:/app
       - /app/node_modules
       - /app/.next
     develop:
