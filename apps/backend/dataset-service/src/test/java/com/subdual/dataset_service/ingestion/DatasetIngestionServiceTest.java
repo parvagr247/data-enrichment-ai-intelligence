@@ -1,12 +1,12 @@
 package com.subdual.dataset_service.ingestion;
 
-import com.subdual.dataset_service.ingestion.detector.ColumnRoleDetector;
-import com.subdual.dataset_service.ingestion.model.DatasetProfileReport;
-import com.subdual.dataset_service.ingestion.parser.CsvDatasetParser;
-import com.subdual.dataset_service.ingestion.parser.ExcelDatasetParser;
-import com.subdual.dataset_service.ingestion.profiler.DatasetProfiler;
-import com.subdual.dataset_service.ingestion.service.DefaultDatasetIngestionService;
-import com.subdual.dataset_service.ingestion.validator.DatasetValidator;
+import com.subdual.dataset_service.dataset.api.dto.response.DatasetProfileReport;
+import com.subdual.dataset_service.dataset.service.helper.ColumnRoleDetector;
+import com.subdual.dataset_service.dataset.service.helper.CsvDatasetParser;
+import com.subdual.dataset_service.dataset.service.helper.DatasetProfiler;
+import com.subdual.dataset_service.dataset.service.helper.DatasetValidator;
+import com.subdual.dataset_service.dataset.service.helper.ExcelDatasetParser;
+import com.subdual.dataset_service.dataset.service.impl.DefaultDatasetIngestionService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

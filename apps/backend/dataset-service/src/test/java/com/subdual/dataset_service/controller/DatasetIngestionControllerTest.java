@@ -1,10 +1,11 @@
 package com.subdual.dataset_service.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.subdual.dataset_service.dto.request.DatasetProfileRequest;
+import com.subdual.dataset_service.dataset.api.controller.DatasetIngestionController;
+import com.subdual.dataset_service.dataset.api.dto.request.DatasetProfileRequest;
+import com.subdual.dataset_service.dataset.api.dto.response.DatasetProfileReport;
+import com.subdual.dataset_service.dataset.service.DatasetIngestionService;
 import com.subdual.dataset_service.exception.GlobalExceptionHandler;
-import com.subdual.dataset_service.ingestion.model.DatasetProfileReport;
-import com.subdual.dataset_service.ingestion.service.DatasetIngestionService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

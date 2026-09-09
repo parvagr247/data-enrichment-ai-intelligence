@@ -1,17 +1,20 @@
 package com.subdual.dataset_service.service;
 
-import com.subdual.dataset_service.dto.request.EnrichmentJobRequest;
-import com.subdual.dataset_service.dto.request.ProfileAssessmentRequest;
-import com.subdual.dataset_service.dto.request.SingleEnrichmentRequest;
-import com.subdual.dataset_service.dto.response.EnrichmentJobResponse;
-import com.subdual.dataset_service.dto.response.ProfileAssessmentResponse;
-import com.subdual.dataset_service.dto.response.RowEnrichmentResult;
-import com.subdual.dataset_service.integration.client.AiServiceClient;
-import com.subdual.dataset_service.integration.client.ResearchServiceClient;
-import com.subdual.dataset_service.profile.model.ObjectiveAssessment;
-import com.subdual.dataset_service.profile.model.RecommendedApproach;
-import com.subdual.dataset_service.profile.model.ResearchFinding;
-import com.subdual.dataset_service.profile.model.ResearchProfile;
+import com.subdual.dataset_service.enrichment.api.dto.request.EnrichmentJobRequest;
+import com.subdual.dataset_service.enrichment.api.dto.request.ProfileAssessmentRequest;
+import com.subdual.dataset_service.enrichment.api.dto.request.SingleEnrichmentRequest;
+import com.subdual.dataset_service.enrichment.api.dto.response.EnrichmentJobResponse;
+import com.subdual.dataset_service.enrichment.api.dto.response.ProfileAssessmentResponse;
+import com.subdual.dataset_service.enrichment.api.dto.response.RowEnrichmentResult;
+import com.subdual.dataset_service.enrichment.integration.AiServiceClient;
+import com.subdual.dataset_service.enrichment.integration.ResearchServiceClient;
+import com.subdual.dataset_service.enrichment.model.ObjectiveAssessment;
+import com.subdual.dataset_service.enrichment.model.RecommendedApproach;
+import com.subdual.dataset_service.enrichment.model.ResearchFinding;
+import com.subdual.dataset_service.enrichment.model.ResearchProfile;
+import com.subdual.dataset_service.enrichment.service.helper.EnrichmentTaskExecutor;
+import com.subdual.dataset_service.enrichment.service.impl.DefaultDatasetEnrichmentService;
+import com.subdual.dataset_service.entity.service.EntityPersistenceService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -42,11 +45,11 @@ class DatasetEnrichmentServiceTest {
 
     private DefaultDatasetEnrichmentService enrichmentService;
 
-    private com.subdual.dataset_service.service.executor.EnrichmentTaskExecutor taskExecutor;
+    private EnrichmentTaskExecutor taskExecutor;
 
     @BeforeEach
     void setUp() {
-        taskExecutor = new com.subdual.dataset_service.service.executor.EnrichmentTaskExecutor(
+        taskExecutor = new EnrichmentTaskExecutor(
                 new com.subdual.dataset_service.config.EnrichmentProperties(
                         new com.subdual.dataset_service.config.EnrichmentProperties.Execution(3, 100),
                         new com.subdual.dataset_service.config.EnrichmentProperties.Research(5),
