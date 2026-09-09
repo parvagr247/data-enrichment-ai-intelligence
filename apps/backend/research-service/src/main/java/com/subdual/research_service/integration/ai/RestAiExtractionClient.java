@@ -1,9 +1,6 @@
 package com.subdual.research_service.integration.ai;
 
 import com.subdual.research_service.config.ServiceMeshProperties;
-import com.subdual.research_service.integration.ai.dto.AiExtractedFact;
-import com.subdual.research_service.integration.ai.dto.AiExtractionRequest;
-import com.subdual.research_service.integration.ai.dto.AiExtractionResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
@@ -28,7 +25,7 @@ public class RestAiExtractionClient implements AiExtractionClient {
         this.restClient = createHttpClient(this.serviceUrl, restClientBuilder);
     }
 
-    @Override
+    @Override // Invokes remote AI intelligent service to extract structured facts.
     public Map<String, AiExtractedFact> extractFacts(
             String entityName,
             String entityType,

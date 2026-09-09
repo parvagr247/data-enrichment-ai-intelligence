@@ -1,7 +1,7 @@
-package com.subdual.research_service.research;
+package com.subdual.research_service.research.service;
 
-import com.subdual.research_service.api.dto.ResearchRequest;
-import com.subdual.research_service.api.dto.ResearchResponse;
+import com.subdual.research_service.research.api.ResearchRequest;
+import com.subdual.research_service.research.api.ResearchResponse;
 
 public interface ResearchService {
 

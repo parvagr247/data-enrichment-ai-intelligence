@@ -1,9 +1,8 @@
-package com.subdual.research_service.discovery.service;
+package com.subdual.research_service.discovery;
 
 import com.subdual.research_service.common.exception.BusinessRuleException;
 import com.subdual.research_service.common.exception.ExternalServiceException;
 import com.subdual.research_service.config.ResearchDiscoveryProperties;
-import com.subdual.research_service.discovery.QueryBuilder;
 import com.subdual.research_service.discovery.provider.SearchProvider;
 import com.subdual.research_service.research.model.DiscoveredSource;
 import com.subdual.research_service.research.model.EntityType;

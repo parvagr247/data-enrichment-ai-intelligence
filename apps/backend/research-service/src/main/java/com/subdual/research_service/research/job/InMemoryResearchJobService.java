@@ -1,11 +1,9 @@
 package com.subdual.research_service.research.job;
 
-import com.subdual.research_service.api.dto.ResearchJobResponse;
-import com.subdual.research_service.api.dto.ResearchRequest;
-import com.subdual.research_service.api.dto.ResearchResponse;
-import com.subdual.research_service.research.ResearchService;
-import com.subdual.research_service.research.model.ResearchJob;
-import com.subdual.research_service.research.model.ResearchJobStatus;
+import com.subdual.research_service.research.api.ResearchJobResponse;
+import com.subdual.research_service.research.api.ResearchRequest;
+import com.subdual.research_service.research.api.ResearchResponse;
+import com.subdual.research_service.research.service.ResearchService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
@@ -31,12 +29,12 @@ public class InMemoryResearchJobService implements ResearchJobService, Disposabl
     private final ExecutorService executor;
     private final Map<String, ResearchJob> jobs = new ConcurrentHashMap<>();
 
-    @Override
+    @Override // Submits a research request asynchronously with default user context.
     public ResearchJobResponse submitJob(ResearchRequest request) {
         return submitJob(request, null);
     }
 
-    @Override
+    @Override // Submits a research request asynchronously for background execution.
     public ResearchJobResponse submitJob(ResearchRequest request, String userId) {
         String jobId = UUID.randomUUID().toString();
         ResearchJob initialJob = ResearchJob.submitted(jobId, userId, request);
@@ -49,12 +47,12 @@ public class InMemoryResearchJobService implements ResearchJobService, Disposabl
         return toResponse(initialJob);
     }
 
-    @Override
+    @Override // Retrieves an asynchronous research job by identifier.
     public Optional<ResearchJobResponse> getJob(String jobId) {
         return getJob(jobId, null);
     }
 
-    @Override
+    @Override // Retrieves an asynchronous research job with owner authorization.
     public Optional<ResearchJobResponse> getJob(String jobId, String userId) {
         ResearchJob job = jobs.get(jobId);
         if (job == null) {
@@ -113,7 +111,7 @@ public class InMemoryResearchJobService implements ResearchJobService, Disposabl
         );
     }
 
-    @Override
+    @Override // Gracefully terminates the background execution worker pool.
     public void destroy() {
         log.info("Shutting down ResearchJobService executor pool");
         executor.shutdown();

@@ -1,6 +1,6 @@
 package com.subdual.research_service.common.validation;
 
-import com.subdual.research_service.api.dto.ResearchRequest;
+import com.subdual.research_service.research.api.ResearchRequest;
 import com.subdual.research_service.common.exception.BusinessRuleException;
 import com.subdual.research_service.research.model.EntityType;
 import org.junit.jupiter.api.BeforeEach;

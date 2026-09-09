@@ -1,6 +1,5 @@
 package com.subdual.research_service.integration.ai;
 
-import com.subdual.research_service.integration.ai.dto.AiExtractedFact;
 
 import java.util.List;
 import java.util.Map;

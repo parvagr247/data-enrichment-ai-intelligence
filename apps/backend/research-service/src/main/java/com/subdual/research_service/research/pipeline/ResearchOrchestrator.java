@@ -1,28 +1,24 @@
-package com.subdual.research_service.research;
+package com.subdual.research_service.research.pipeline;
 
-import com.subdual.research_service.api.dto.EvidenceTuple;
-import com.subdual.research_service.api.dto.ResearchRequest;
-import com.subdual.research_service.api.dto.ResearchResponse;
 import com.subdual.research_service.common.validation.ResearchRequestValidator;
 import com.subdual.research_service.config.ResearchDiscoveryProperties;
 import com.subdual.research_service.config.ResearchPipelineProperties;
-import com.subdual.research_service.discovery.service.ResearchDiscoveryService;
+import com.subdual.research_service.discovery.ResearchDiscoveryService;
 import com.subdual.research_service.extraction.SourceEvidenceService;
 import com.subdual.research_service.integration.persistence.ResearchSnapshotPersister;
+import com.subdual.research_service.research.api.EvidenceTuple;
+import com.subdual.research_service.research.api.ResearchRequest;
+import com.subdual.research_service.research.api.ResearchResponse;
+import com.subdual.research_service.research.model.ConfidenceTier;
 import com.subdual.research_service.research.model.DiscoveredSource;
 import com.subdual.research_service.research.model.ResearchSource;
 import com.subdual.research_service.research.model.ResearchTarget;
-import com.subdual.research_service.research.pipeline.EntityNormalizer;
-import com.subdual.research_service.research.pipeline.ResearchContext;
-import com.subdual.research_service.research.pipeline.ResearchDiagnostics;
-import com.subdual.research_service.research.pipeline.ResearchResponseFactory;
-import com.subdual.research_service.research.pipeline.SourceProcessor;
+import com.subdual.research_service.research.service.ResearchService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
 import org.springframework.stereotype.Service;
 
-import com.subdual.research_service.research.model.ConfidenceTier;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -45,7 +41,7 @@ public class ResearchOrchestrator implements ResearchService {
     private final ResearchDiscoveryProperties discoveryProperties;
     private final ResearchPipelineProperties pipelineProperties;
 
-    @Override
+    @Override // Executes the end-to-end research pipeline for the requested entity.
     public ResearchResponse executeResearch(ResearchRequest request) {
         return execute(new ResearchContext(request));
     }

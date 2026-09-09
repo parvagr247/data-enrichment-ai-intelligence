@@ -1,4 +1,4 @@
-package com.subdual.research_service.api.dto;
+package com.subdual.research_service.research.api;
 
 import java.net.URI;
 import java.time.Instant;

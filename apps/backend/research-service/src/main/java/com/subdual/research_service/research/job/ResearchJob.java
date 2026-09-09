@@ -1,7 +1,7 @@
-package com.subdual.research_service.research.model;
+package com.subdual.research_service.research.job;
 
-import com.subdual.research_service.api.dto.ResearchRequest;
-import com.subdual.research_service.api.dto.ResearchResponse;
+import com.subdual.research_service.research.api.ResearchRequest;
+import com.subdual.research_service.research.api.ResearchResponse;
 
 import java.time.Instant;
 

@@ -1,4 +1,4 @@
-package com.subdual.research_service.api.dto;
+package com.subdual.research_service.research.api;
 
 import com.subdual.research_service.research.model.ResearchStatus;
 import java.util.List;

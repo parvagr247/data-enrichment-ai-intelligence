@@ -1,6 +1,6 @@
 package com.subdual.research_service.research.pipeline;
 
-import com.subdual.research_service.api.dto.ResearchRequest;
+import com.subdual.research_service.research.api.ResearchRequest;
 import com.subdual.research_service.research.model.EntityType;
 import com.subdual.research_service.research.model.ResearchTarget;
 import org.springframework.stereotype.Component;
@@ -16,7 +16,7 @@ import java.util.Map;
 @Component
 public class DefaultEntityNormalizer implements EntityNormalizer {
 
-    @Override
+    @Override // Normalizes raw research request into canonical research target.
     public ResearchTarget normalize(ResearchRequest request) {
         if (request == null) throw new IllegalArgumentException("ResearchRequest must not be null");
         

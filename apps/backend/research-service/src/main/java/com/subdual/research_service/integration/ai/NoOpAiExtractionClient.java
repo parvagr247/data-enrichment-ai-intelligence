@@ -1,7 +1,5 @@
 package com.subdual.research_service.integration.ai;
 
-import com.subdual.research_service.integration.ai.dto.AiExtractedFact;
-
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -12,7 +10,7 @@ import java.util.Map;
  */
 public class NoOpAiExtractionClient implements AiExtractionClient {
 
-    @Override
+    @Override // Returns an empty facts map for no-op AI extraction.
     public Map<String, AiExtractedFact> extractFacts(
             String entityName,
             String entityType,

@@ -1,4 +1,4 @@
-package com.subdual.research_service.discovery.service;
+package com.subdual.research_service.discovery;
 
 import com.subdual.research_service.research.model.DiscoveredSource;
 import com.subdual.research_service.research.model.ResearchTarget;
@@ -8,10 +8,6 @@ public interface ResearchDiscoveryService {
 
     List<DiscoveredSource> discoverSources(ResearchTarget target);
 
-
-    // It defines a contract for secondary, targeted web search discovery aimed at closing information gaps during entity research.
-    // Search Query focused on the entity plus the missing fields (uses SearchProvider) & returns Candidate Sources.
+    // Defines a contract for secondary, targeted web search discovery aimed at closing information gaps during entity research.
     List<DiscoveredSource> discoverAdaptiveSources(ResearchTarget target, List<String> missingFields, int maxResults);
-
-
 }

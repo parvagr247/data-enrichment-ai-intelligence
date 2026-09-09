@@ -1,19 +1,20 @@
 package com.subdual.research_service.research;
 
-import com.subdual.research_service.api.dto.EvidenceTuple;
-import com.subdual.research_service.api.dto.ResearchRequest;
-import com.subdual.research_service.api.dto.ResearchResponse;
-import com.subdual.research_service.api.dto.SourceItem;
+import com.subdual.research_service.research.api.EvidenceTuple;
+import com.subdual.research_service.research.api.ResearchRequest;
+import com.subdual.research_service.research.api.ResearchResponse;
+import com.subdual.research_service.research.api.SourceItem;
 import com.subdual.research_service.common.validation.ResearchRequestValidator;
 import com.subdual.research_service.config.ResearchDiscoveryProperties;
 import com.subdual.research_service.config.ResearchPipelineProperties;
 import com.subdual.research_service.config.WebFetchProperties;
 import com.subdual.research_service.discovery.QueryBuilder;
 import com.subdual.research_service.discovery.provider.MockSearchProvider;
-import com.subdual.research_service.discovery.service.DefaultResearchDiscoveryService;
-import com.subdual.research_service.discovery.service.ResearchDiscoveryService;
+import com.subdual.research_service.discovery.DefaultResearchDiscoveryService;
+import com.subdual.research_service.discovery.ResearchDiscoveryService;
 import com.subdual.research_service.extraction.DefaultSourceEvidenceService;
-import com.subdual.research_service.extraction.EvidenceExtractor;
+import com.subdual.research_service.extraction.extractor.EvidenceExtractor;
+import com.subdual.research_service.research.pipeline.ResearchOrchestrator;
 import com.subdual.research_service.extraction.SourceEvidenceService;
 import com.subdual.research_service.extraction.document.ContentExtractor;
 import com.subdual.research_service.extraction.document.ExtractedDocument;

@@ -1,4 +1,4 @@
-package com.subdual.research_service.integration.persistence.dto;
+package com.subdual.research_service.integration.persistence;
 
 import java.time.Instant;
 

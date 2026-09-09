@@ -1,7 +1,7 @@
 package com.subdual.research_service.research.job;
 
-import com.subdual.research_service.api.dto.ResearchJobResponse;
-import com.subdual.research_service.api.dto.ResearchRequest;
+import com.subdual.research_service.research.api.ResearchJobResponse;
+import com.subdual.research_service.research.api.ResearchRequest;
 
 import java.util.Optional;
 

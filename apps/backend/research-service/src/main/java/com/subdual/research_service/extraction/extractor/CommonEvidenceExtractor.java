@@ -1,6 +1,6 @@
 package com.subdual.research_service.extraction.extractor;
 
-import com.subdual.research_service.api.dto.EvidenceTuple;
+import com.subdual.research_service.research.api.EvidenceTuple;
 import com.subdual.research_service.extraction.document.ExtractedDocument;
 import com.subdual.research_service.extraction.support.EntityResolver;
 import com.subdual.research_service.research.model.ConfidenceTier;

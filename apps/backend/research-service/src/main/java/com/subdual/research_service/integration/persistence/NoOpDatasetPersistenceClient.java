@@ -1,6 +1,6 @@
 package com.subdual.research_service.integration.persistence;
 
-import com.subdual.research_service.api.dto.EvidenceTuple;
+import com.subdual.research_service.research.api.EvidenceTuple;
 import com.subdual.research_service.research.model.ResearchSource;
 import com.subdual.research_service.research.model.ResearchTarget;
 import lombok.extern.slf4j.Slf4j;
@@ -15,7 +15,7 @@ import java.util.Map;
 @Slf4j
 public class NoOpDatasetPersistenceClient implements DatasetPersistenceClient {
 
-    @Override
+    @Override // Safely ignores snapshot persistence in no-op environments.
     public void persistEntity(ResearchTarget target, List<ResearchSource> sources, Map<String, EvidenceTuple> attributes) {
         log.debug("[Persistence: NOOP] Skipping snapshot persistence for entityId: '{}'",
                 target != null ? target.entityId() : "unknown");

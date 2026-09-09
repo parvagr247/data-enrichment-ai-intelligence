@@ -1,9 +1,9 @@
 package com.subdual.research_service.research.pipeline;
 
-import com.subdual.research_service.api.dto.EvidenceTuple;
-import com.subdual.research_service.api.dto.ResearchResponse;
-import com.subdual.research_service.api.dto.ResearchResult;
-import com.subdual.research_service.api.dto.SourceItem;
+import com.subdual.research_service.research.api.EvidenceTuple;
+import com.subdual.research_service.research.api.ResearchResponse;
+import com.subdual.research_service.research.api.ResearchResult;
+import com.subdual.research_service.research.api.SourceItem;
 import com.subdual.research_service.research.model.ResearchSource;
 import com.subdual.research_service.research.model.ResearchStatus;
 import com.subdual.research_service.research.model.ResearchTarget;

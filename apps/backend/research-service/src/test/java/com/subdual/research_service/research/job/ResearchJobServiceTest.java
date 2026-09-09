@@ -1,13 +1,12 @@
 package com.subdual.research_service.research.job;
 
-import com.subdual.research_service.api.dto.ResearchJobResponse;
-import com.subdual.research_service.api.dto.ResearchRequest;
-import com.subdual.research_service.api.dto.ResearchResponse;
-import com.subdual.research_service.api.dto.ResearchResult;
-import com.subdual.research_service.research.ResearchService;
+import com.subdual.research_service.research.api.ResearchJobResponse;
+import com.subdual.research_service.research.api.ResearchRequest;
+import com.subdual.research_service.research.api.ResearchResponse;
+import com.subdual.research_service.research.api.ResearchResult;
 import com.subdual.research_service.research.model.EntityType;
-import com.subdual.research_service.research.model.ResearchJobStatus;
 import com.subdual.research_service.research.model.ResearchStatus;
+import com.subdual.research_service.research.service.ResearchService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

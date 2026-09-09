@@ -1,11 +1,7 @@
-package com.subdual.research_service.api;
+package com.subdual.research_service.research.api;
 
-import com.subdual.research_service.api.dto.ResearchJobResponse;
-import com.subdual.research_service.api.dto.ResearchRequest;
-import com.subdual.research_service.api.dto.ResearchResponse;
 import com.subdual.research_service.research.job.ResearchJobService;
-import com.subdual.research_service.research.ResearchService;
-import java.util.Optional;
+import com.subdual.research_service.research.service.ResearchService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -16,10 +12,12 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/v1/research")
@@ -41,7 +39,7 @@ public class ResearchController {
     @ResponseStatus(HttpStatus.ACCEPTED)
     public ResponseEntity<ResearchJobResponse> submitJob(
             @Valid @RequestBody ResearchRequest request,
-            @org.springframework.web.bind.annotation.RequestHeader(value = "X-User-Id", required = false) String userId
+            @RequestHeader(value = "X-User-Id", required = false) String userId
     ) {
         log.info("Received asynchronous research job request for URL='{}' from user='{}'", request != null ? request.url() : null, userId);
         ResearchJobResponse response = (userId != null && !userId.isBlank())
@@ -53,7 +51,7 @@ public class ResearchController {
     @GetMapping(value = "/jobs/{jobId}", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<ResearchJobResponse> getJob(
             @PathVariable String jobId,
-            @org.springframework.web.bind.annotation.RequestHeader(value = "X-User-Id", required = false) String userId
+            @RequestHeader(value = "X-User-Id", required = false) String userId
     ) {
         Optional<ResearchJobResponse> opt = (userId != null && !userId.isBlank())
                 ? researchJobService.getJob(jobId, userId)

@@ -1,16 +1,21 @@
-package com.subdual.research_service.discovery.service;
+package com.subdual.research_service.discovery;
 
 import com.subdual.research_service.common.exception.BusinessRuleException;
 import com.subdual.research_service.common.exception.ExternalServiceException;
 import com.subdual.research_service.config.ResearchDiscoveryProperties;
-import com.subdual.research_service.discovery.QueryBuilder;
+import com.subdual.research_service.discovery.model.QueryIntent;
+import com.subdual.research_service.discovery.model.QueryStrategy;
+import com.subdual.research_service.discovery.model.ResearchQuery;
 import com.subdual.research_service.discovery.provider.SearchProvider;
+import com.subdual.research_service.discovery.ranking.SourceDeduplicator;
+import com.subdual.research_service.discovery.ranking.SourceRanker;
 import com.subdual.research_service.research.model.DiscoveredSource;
 import com.subdual.research_service.research.model.ResearchTarget;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -22,17 +27,17 @@ public class DefaultResearchDiscoveryService implements ResearchDiscoveryService
     private final QueryBuilder queryBuilder;
     private final ResearchDiscoveryProperties discoveryProperties;
 
-    @Override
+    @Override // Discovers candidate web sources for an entity research target.
     public List<DiscoveredSource> discoverSources(ResearchTarget target) {
         long startTime = System.currentTimeMillis();
-        List<com.subdual.research_service.discovery.model.ResearchQuery> queries = queryBuilder.buildRequirementQueries(target);
+        List<ResearchQuery> queries = queryBuilder.buildRequirementQueries(target);
         if (queries.isEmpty()) {
             String primary = queryBuilder.buildDiscoveryQuery(target);
             if (!primary.isBlank()) {
-                queries = List.of(new com.subdual.research_service.discovery.model.ResearchQuery(
+                queries = List.of(new ResearchQuery(
                         primary,
-                        com.subdual.research_service.discovery.model.QueryIntent.IDENTITY,
-                        com.subdual.research_service.discovery.model.QueryStrategy.CANONICAL_DOMAIN
+                        QueryIntent.IDENTITY,
+                        QueryStrategy.CANONICAL_DOMAIN
                 ));
             }
         }
@@ -40,7 +45,7 @@ public class DefaultResearchDiscoveryService implements ResearchDiscoveryService
         int targetMaxSources = target.depth() != null ? target.depth().maxSources() : discoveryProperties.maxResults();
         int maxBudget = Math.max(targetMaxSources, discoveryProperties.maxResults());
 
-        List<DiscoveredSource> allRaw = new java.util.ArrayList<>();
+        List<DiscoveredSource> allRaw = new ArrayList<>();
         int executedQueries = 0;
         Exception lastException = null;
 
@@ -62,9 +67,9 @@ public class DefaultResearchDiscoveryService implements ResearchDiscoveryService
             throw new ExternalServiceException("All discovery queries failed", lastException);
         }
 
-        var dedupResult = com.subdual.research_service.discovery.ranking.SourceDeduplicator.deduplicate(allRaw);
-        List<DiscoveredSource> ranked = com.subdual.research_service.discovery.ranking.SourceRanker.rankSources(
-                dedupResult.deduplicated(), target, com.subdual.research_service.discovery.model.QueryIntent.GENERAL_PROFILE
+        var dedupResult = SourceDeduplicator.deduplicate(allRaw);
+        List<DiscoveredSource> ranked = SourceRanker.rankSources(
+                dedupResult.deduplicated(), target, QueryIntent.GENERAL_PROFILE
         );
 
         if (ranked.size() > maxBudget) {
@@ -78,7 +83,7 @@ public class DefaultResearchDiscoveryService implements ResearchDiscoveryService
         return ranked;
     }
 
-    @Override
+    @Override // Discovers targeted sources to fill identified attribute gaps.
     public List<DiscoveredSource> discoverAdaptiveSources(ResearchTarget target, List<String> missingFields, int maxResults) {
         long startTime = System.currentTimeMillis();
         String query = queryBuilder.buildAdaptiveQuery(target, missingFields);
@@ -86,9 +91,9 @@ public class DefaultResearchDiscoveryService implements ResearchDiscoveryService
                 searchProvider.providerName(), missingFields, query);
 
         List<DiscoveredSource> raw = searchWithProvider(query, Math.max(1, maxResults));
-        var dedupResult = com.subdual.research_service.discovery.ranking.SourceDeduplicator.deduplicate(raw);
-        List<DiscoveredSource> ranked = com.subdual.research_service.discovery.ranking.SourceRanker.rankSources(
-                dedupResult.deduplicated(), target, com.subdual.research_service.discovery.QueryBuilder.mapFieldToIntent(
+        var dedupResult = SourceDeduplicator.deduplicate(raw);
+        List<DiscoveredSource> ranked = SourceRanker.rankSources(
+                dedupResult.deduplicated(), target, QueryBuilder.mapFieldToIntent(
                         missingFields != null && !missingFields.isEmpty() ? missingFields.get(0) : null
                 )
         );

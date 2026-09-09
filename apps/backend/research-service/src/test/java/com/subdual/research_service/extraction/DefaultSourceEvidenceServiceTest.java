@@ -1,7 +1,8 @@
 package com.subdual.research_service.extraction;
 
-import com.subdual.research_service.api.dto.EvidenceTuple;
+import com.subdual.research_service.research.api.EvidenceTuple;
 import com.subdual.research_service.config.ResearchPipelineProperties;
+import com.subdual.research_service.extraction.extractor.EvidenceExtractor;
 import com.subdual.research_service.integration.web.FetchedContent;
 import com.subdual.research_service.integration.web.WebContentFetcher;
 import com.subdual.research_service.research.model.ConfidenceTier;

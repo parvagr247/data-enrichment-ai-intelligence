@@ -1,9 +1,10 @@
 package com.subdual.research_service.extraction;
 
-import com.subdual.research_service.api.dto.EvidenceTuple;
+import com.subdual.research_service.research.api.EvidenceTuple;
 import com.subdual.research_service.config.ResearchPipelineProperties;
 import com.subdual.research_service.extraction.document.ContentExtractor;
 import com.subdual.research_service.extraction.document.ExtractedDocument;
+import com.subdual.research_service.extraction.extractor.EvidenceExtractor;
 import com.subdual.research_service.extraction.support.EntityResolver;
 import com.subdual.research_service.integration.web.FetchedContent;
 import com.subdual.research_service.integration.web.WebContentFetcher;
@@ -58,7 +59,7 @@ public class DefaultSourceEvidenceService implements SourceEvidenceService {
         this(webContentFetcher, contentExtractor, entityResolver, evidenceExtractor, pipelineProperties, null);
     }
 
-    @Override
+    @Override // Extracts structured evidence from ranked sources and extracted documents.
     public Map<String, EvidenceTuple> extractEvidence(
             ResearchTarget target,
             List<ResearchSource> rankedSources,
@@ -82,7 +83,7 @@ public class DefaultSourceEvidenceService implements SourceEvidenceService {
         return evidenceExtractor.extractEvidence(target, rankedSources, extractedDocuments, resolutions);
     }
 
-    @Override
+    @Override // Filters extracted evidence attributes to requested target fields.
     public void applyTargetFields(ResearchTarget target, Map<String, EvidenceTuple> attributes) {
         evidenceExtractor.applyTargetFields(target, attributes);
     }

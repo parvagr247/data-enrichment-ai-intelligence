@@ -1,4 +1,4 @@
-package com.subdual.research_service.integration.ai.dto;
+package com.subdual.research_service.integration.ai;
 
 import java.util.Map;
 

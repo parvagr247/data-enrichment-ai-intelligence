@@ -1,4 +1,4 @@
-package com.subdual.research_service.research.model;
+package com.subdual.research_service.research.job;
 
 public enum ResearchJobStatus {
     SUBMITTED,

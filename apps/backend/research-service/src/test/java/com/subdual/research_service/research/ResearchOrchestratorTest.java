@@ -1,14 +1,15 @@
 package com.subdual.research_service.research;
 
-import com.subdual.research_service.api.dto.EvidenceTuple;
-import com.subdual.research_service.api.dto.ResearchRequest;
-import com.subdual.research_service.api.dto.ResearchResponse;
-import com.subdual.research_service.api.dto.ResearchResult;
+import com.subdual.research_service.research.api.EvidenceTuple;
+import com.subdual.research_service.research.api.ResearchRequest;
+import com.subdual.research_service.research.api.ResearchResponse;
+import com.subdual.research_service.research.api.ResearchResult;
 import com.subdual.research_service.common.exception.BusinessRuleException;
 import com.subdual.research_service.common.validation.ResearchRequestValidator;
 import com.subdual.research_service.config.ResearchDiscoveryProperties;
 import com.subdual.research_service.config.ResearchPipelineProperties;
-import com.subdual.research_service.discovery.service.ResearchDiscoveryService;
+import com.subdual.research_service.discovery.ResearchDiscoveryService;
+import com.subdual.research_service.research.pipeline.ResearchOrchestrator;
 import com.subdual.research_service.extraction.SourceEvidenceService;
 import com.subdual.research_service.integration.persistence.ResearchSnapshotPersister;
 import com.subdual.research_service.research.model.DiscoveredSource;

@@ -1,19 +1,24 @@
-package com.subdual.research_service.extraction;
+package com.subdual.research_service.extraction.extractor;
 
-import com.subdual.research_service.api.dto.EvidenceTuple;
 import com.subdual.research_service.extraction.ai.AiEvidenceEnricher;
 import com.subdual.research_service.extraction.document.ExtractedDocument;
-import com.subdual.research_service.extraction.extractor.CommonEvidenceExtractor;
-import com.subdual.research_service.extraction.extractor.OrganizationEvidenceExtractor;
-import com.subdual.research_service.extraction.extractor.PersonEvidenceExtractor;
-import com.subdual.research_service.extraction.extractor.ProductEvidenceExtractor;
-import com.subdual.research_service.extraction.extractor.RepositoryEvidenceExtractor;
+import com.subdual.research_service.extraction.extractor.field.ActivityFieldExtractor;
+import com.subdual.research_service.extraction.extractor.field.EducationFieldExtractor;
+import com.subdual.research_service.extraction.extractor.field.ExperienceFieldExtractor;
+import com.subdual.research_service.extraction.extractor.field.FieldExtractor;
+import com.subdual.research_service.extraction.extractor.field.LocationFieldExtractor;
+import com.subdual.research_service.extraction.extractor.field.OrganizationFieldExtractor;
+import com.subdual.research_service.extraction.extractor.field.ProjectFieldExtractor;
+import com.subdual.research_service.extraction.extractor.field.RoleFieldExtractor;
+import com.subdual.research_service.extraction.extractor.field.SkillFieldExtractor;
+import com.subdual.research_service.extraction.extractor.field.TechFieldExtractor;
 import com.subdual.research_service.extraction.support.EntityResolver;
 import com.subdual.research_service.extraction.support.EvidenceMerger;
 import com.subdual.research_service.extraction.support.TargetFieldNormalizer;
+import com.subdual.research_service.integration.ai.AiExtractedFact;
 import com.subdual.research_service.integration.ai.AiExtractionClient;
 import com.subdual.research_service.integration.ai.NoOpAiExtractionClient;
-import com.subdual.research_service.integration.ai.dto.AiExtractedFact;
+import com.subdual.research_service.research.api.EvidenceTuple;
 import com.subdual.research_service.research.model.ConfidenceTier;
 import com.subdual.research_service.research.model.EntityType;
 import com.subdual.research_service.research.model.ResearchSource;
@@ -36,7 +41,7 @@ public class EvidenceExtractor {
     private final ProductEvidenceExtractor productExtractor;
     private final AiEvidenceEnricher aiEvidenceEnricher;
     private final TargetFieldNormalizer targetFieldNormalizer;
-    private final List<com.subdual.research_service.extraction.extractor.field.FieldExtractor> fieldExtractors;
+    private final List<FieldExtractor> fieldExtractors;
 
     @Autowired
     public EvidenceExtractor(
@@ -48,7 +53,7 @@ public class EvidenceExtractor {
             ProductEvidenceExtractor productExtractor,
             AiEvidenceEnricher aiEvidenceEnricher,
             TargetFieldNormalizer targetFieldNormalizer,
-            @Autowired(required = false) List<com.subdual.research_service.extraction.extractor.field.FieldExtractor> fieldExtractors
+            @Autowired(required = false) List<FieldExtractor> fieldExtractors
     ) {
         this.evidenceMerger = evidenceMerger;
         this.commonExtractor = commonExtractor;
@@ -90,17 +95,17 @@ public class EvidenceExtractor {
         this((AiExtractionClient) null);
     }
 
-    private static List<com.subdual.research_service.extraction.extractor.field.FieldExtractor> defaultFieldExtractors() {
+    private static List<FieldExtractor> defaultFieldExtractors() {
         return List.of(
-                new com.subdual.research_service.extraction.extractor.field.RoleFieldExtractor(),
-                new com.subdual.research_service.extraction.extractor.field.OrganizationFieldExtractor(),
-                new com.subdual.research_service.extraction.extractor.field.ExperienceFieldExtractor(),
-                new com.subdual.research_service.extraction.extractor.field.EducationFieldExtractor(),
-                new com.subdual.research_service.extraction.extractor.field.SkillFieldExtractor(),
-                new com.subdual.research_service.extraction.extractor.field.TechFieldExtractor(),
-                new com.subdual.research_service.extraction.extractor.field.ActivityFieldExtractor(),
-                new com.subdual.research_service.extraction.extractor.field.ProjectFieldExtractor(),
-                new com.subdual.research_service.extraction.extractor.field.LocationFieldExtractor()
+                new RoleFieldExtractor(),
+                new OrganizationFieldExtractor(),
+                new ExperienceFieldExtractor(),
+                new EducationFieldExtractor(),
+                new SkillFieldExtractor(),
+                new TechFieldExtractor(),
+                new ActivityFieldExtractor(),
+                new ProjectFieldExtractor(),
+                new LocationFieldExtractor()
         );
     }
 
@@ -139,7 +144,7 @@ public class EvidenceExtractor {
             if (!CommonEvidenceExtractor.isMatchedDocument(doc, resolutions)) {
                 continue;
             }
-            for (com.subdual.research_service.extraction.extractor.field.FieldExtractor fe : fieldExtractors) {
+            for (FieldExtractor fe : fieldExtractors) {
                 boolean isRequested = targetFields == null || targetFields.isEmpty()
                         || targetFields.stream().anyMatch(tf -> fe.supports(tf, target.entityType()));
                 if (isRequested) {
