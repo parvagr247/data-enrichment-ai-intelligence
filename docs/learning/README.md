@@ -68,7 +68,7 @@ flowchart TD
 
 ---
 
-For high-level system topology, see [System Architecture](../architecture.md).  
-For the end-to-end data lifecycle, see [Enrichment Flow](../enrichment-flow.md).  
-For API endpoint documentation, see [API Reference](../api.md).  
-For architectural decisions and ADRs, see [Architecture Decisions](../decisions.md).
+For high-level system topology, see [System Architecture](../architecture/overview.md).  
+For the end-to-end data lifecycle, see [Enrichment Flow](../architecture/data-flow.md).  
+For API endpoint documentation, see [API Reference](../api/overview.md).  
+For architectural decisions and ADRs, see [Architecture Decisions](../decisions/README.md).

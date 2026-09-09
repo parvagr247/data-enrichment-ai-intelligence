@@ -1,8 +1,6 @@
 package com.subdual.research_service.api.controller;
 
 import com.subdual.research_service.api.dto.request.ResearchRequest;
-import com.subdual.research_service.api.dto.response.EvidenceTuple;
-import com.subdual.research_service.api.dto.response.ResearchJobResponse;
 import com.subdual.research_service.api.dto.response.ResearchResponse;
 import com.subdual.research_service.api.dto.response.ResearchResult;
 import com.subdual.research_service.api.dto.response.SourceItem;

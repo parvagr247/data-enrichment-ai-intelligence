@@ -11,11 +11,11 @@ The platform transforms sparse, noisy tabular datasets (CSV/XLSX) into structure
 ```mermaid
 flowchart TB
     Client["Client Browser<br/>(:3000 Next.js)"]
-    Gateway["api-gateway<br/>(:9738 Ingress)"]
+    Gateway["api-gateway<br/>(:8080 / :9738 Ingress)"]
     
     subgraph PlatformInfra ["Platform Infrastructure Layer"]
-        Config["config-server<br/>(:9736)"]
-        Discovery["discovery-server<br/>(:9737 Eureka)"]
+        Config["config-server<br/>(:8888 / :9736)"]
+        Discovery["discovery-server<br/>(:8761 / :9737 Eureka)"]
     end
 
     subgraph BusinessServices ["Isolated Business Services"]
@@ -32,8 +32,10 @@ flowchart TB
     Gateway -->|/api/v1/auth/**| Auth
     Gateway -->|/api/v1/enrichment/**| Dataset
     Gateway -->|/api/v1/entities/**| Dataset
+    Gateway -->|/api/v2/datasets/**| Dataset
     Gateway -->|/api/v1/research/**| Research
     Gateway -->|/api/v1/ai/**| AI
+    Gateway -->|/api/v2/ai/**| AI
 
     BusinessServices -.->|Fetch Config| Config
     BusinessServices -.->|Heartbeat & Register| Discovery
@@ -51,9 +53,9 @@ flowchart TB
 | Service | Port | Scope | Technology | Purpose |
 | :--- | :--- | :--- | :--- | :--- |
 | **`frontend`** | `3000` | **Public Host** | Next.js 15 / React / Tailwind | Interactive spreadsheet upload, live SSE execution dashboard, evidence modal, auth pages |
-| **`api-gateway`** | `9738` | **Public Host** | Spring Cloud Gateway WebMvc | Ingress point, reverse proxy, JWT Bearer auth, anti-spoofing header injection, CORS |
-| **`config-server`** | `9736` | Internal-only | Spring Cloud Config Server | Centralized file-based (`native`) YAML configurations from `config/` |
-| **`discovery-server`** | `9737` | Internal-only | Spring Cloud Eureka Server | Dynamic service registry and health awareness |
+| **`api-gateway`** | `8080` / `9738` | **Public Host** | Spring Cloud Gateway WebMvc | Ingress point, reverse proxy, JWT Bearer auth, anti-spoofing header injection, CORS |
+| **`config-server`** | `8888` / `9736` | Internal-only | Spring Cloud Config Server | Centralized file-based (`native`) YAML configurations from `config/` |
+| **`discovery-server`** | `8761` / `9737` | Internal-only | Spring Cloud Eureka Server | Dynamic service registry and health awareness |
 | **`auth-service`** | `9739` | Internal-only | Spring Boot 4.1.1 / Java 25 | User registration, authentication, BCrypt, HMAC-SHA256 JWT tokens |
 | **`research-service`** | `9741` | Internal-only | Spring Boot 4.1.1 / Java 25 | Web research, scraper guardrails, verbatim extraction, multi-source corroboration |
 | **`ai-intelligent-service`** | `9742` | Internal-only | Spring Boot 4.1.1 / Java 25 | Spring AI (Gemini), prompt templates, zero-hallucination validation, fallback |
@@ -71,10 +73,10 @@ cp .env.example .env
 ```
 *(Optional: Provide `GEMINI_API_KEY` or `SEARCH_PROVIDER_API_KEY`. If omitted, the system seamlessly operates in offline mode with deterministic fallbacks).*
 
-### 2. Run Production VM Stack (Recommended)
-Exposes only Port `3000` (Frontend) and Port `9738` (Gateway) to the host. All internal microservices, Eureka, Config Server, and MySQL run securely inside the private Docker network:
+### 2. Run Production Stack
+Exposes only Port `3000` (Frontend) and Port `9738` (Gateway) to the host. All internal microservices run securely inside the private Docker bridge network:
 ```bash
-docker compose up -d --build
+docker compose -f infrastructure/docker/docker-compose.prod.yml up -d --build
 ```
 
 ### 3. Run Development Stack with Live Watch / Reload
@@ -85,10 +87,9 @@ docker compose -f infrastructure/docker/docker-compose-dev-all.yml up -d --build
 
 ### 4. Service Endpoints
 * **Web UI**: [http://localhost:3000](http://localhost:3000)
-* **Unified API Gateway**: [http://localhost:9738](http://localhost:9738)
-* **API Gateway Health Check**: [http://localhost:9738/actuator/health](http://localhost:9738/actuator/health)
-* **Config Server (Dev)**: [http://localhost:9736/research-service/default](http://localhost:9736/research-service/default)
-* **Eureka Registry Dashboard (Dev)**: [http://localhost:9737](http://localhost:9737)
+* **Unified API Gateway**: [http://localhost:8080](http://localhost:8080) (or `:9738` in production)
+* **API Gateway Health Probe**: [http://localhost:8080/actuator/health](http://localhost:8080/actuator/health)
+* **Eureka Registry Dashboard (Dev)**: [http://localhost:8761](http://localhost:8761)
 
 ---
 
@@ -96,9 +97,35 @@ docker compose -f infrastructure/docker/docker-compose-dev-all.yml up -d --build
 
 All platform documentation is centrally organized under `docs/` (see **[Documentation Hub](docs/README.md)**):
 
-* 🏛️ **[System Architecture](docs/architecture.md)**: 3-microservice topology, platform infrastructure layer, boundaries, domain models, and MySQL schema.
-* 🔄 **[Enrichment Flow](docs/enrichment-flow.md)**: Step-by-step dataset lifecycle through API Gateway, bounded concurrent execution, and export.
-* 🔌 **[API Reference](docs/api.md)**: Comprehensive REST & SSE endpoint contracts, API Gateway routes, and RFC 7807 error models.
-* 🛠️ **[Development & Operations Guide](docs/development.md)**: Local setup, Docker workflows, testing commands, and hot-reload mechanics.
-* 📜 **[Architecture Decisions (ADRs) & Roadmap](docs/decisions.md)**: Foundational ADRs, system evolution history, and strategic roadmap.
-* 🎓 **[Engineering Learning Series](docs/learning/README.md)**: 35 comprehensive engineering concepts covering microservices, evidence pipelines, Spring AI, concurrency, config server, Eureka, API Gateway, and security.
+### 🏛️ System Architecture
+* **[Architecture Overview](docs/architecture/overview.md)**: System topology, relational persistence, and design invariants.
+* **[Service Boundaries](docs/architecture/service-boundaries.md)**: Explicit boundaries, capabilities, and responsibilities per microservice.
+* **[Communication & Resiliency](docs/architecture/communication.md)**: Synchronous orchestration, dynamic Eureka resolution, distributed MDC tracing, and fallback contracts.
+* **[End-to-End Data Flow](docs/architecture/data-flow.md)**: Ingestion lifecycle, sequence diagrams, bounded concurrency, and non-destructive export.
+
+### 🔌 API Reference
+* **[API Architecture & Ingress](docs/api/overview.md)**: Ingress routing, JWT authentication, anti-spoofing security, RFC 7807 problem details, and DTO segregation rules.
+* **[API Endpoints Catalog](docs/api/endpoints.md)**: Complete request and response specifications for REST and SSE interfaces across all services.
+
+### 📦 Services Documentation
+* **[Dataset Service](docs/services/dataset-service/README.md)** ([Internals](docs/services/dataset-service/internals.md))
+* **[AI Intelligent Service](docs/services/ai-intelligent-service/README.md)** ([Internals](docs/services/ai-intelligent-service/internals.md))
+* **[Research Service](docs/services/research-service/README.md)** ([Internals](docs/services/research-service/internals.md))
+* **[Auth Service](docs/services/auth-service/README.md)**
+* **[API Gateway](docs/services/api-gateway/README.md)**
+* **[Config Server](docs/services/config-server/README.md)**
+* **[Discovery Server](docs/services/discovery-server/README.md)**
+* **[Frontend Application](docs/services/frontend/README.md)**
+
+### 🛠️ Development & Deployment
+* **[Local Setup](docs/development/setup.md)**: Prerequisites, environment configuration, and startup instructions.
+* **[Testing & QA](docs/development/testing.md)**: Unit tests, health probes, Postman/Newman collections, and regression flows.
+* **[Codebase Conventions](docs/development/conventions.md)**: Feature-centric package philosophy, small service layers, and DTO segregation.
+* **[Docker Topologies](docs/deployment/docker.md)**: Development watch hot-reload, volume isolation, and production Compose topologies.
+* **[GCP VM Deployment](docs/deployment/gcp-vm-deployment.md)**: GCP Compute Engine provisioning, VPC firewall configuration, and automated CI/CD.
+
+### 📜 Reference & Architecture Decisions
+* **[Architecture Decisions (ADRs)](docs/decisions/README.md)**: ADRs 01 through 09, system evolution timeline, and strategic roadmap.
+* **[Configuration Reference](docs/reference/configuration.md)**: Comprehensive environment variables and Spring properties matrix.
+* **[Domain Glossary](docs/reference/glossary.md)**: Definitions of core domain terms and algorithmic concepts.
+* **[Engineering Learning Series](docs/learning/README.md)**: 35 comprehensive engineering concepts covering microservices, evidence pipelines, Spring AI, concurrency, config server, Eureka, API Gateway, and security.

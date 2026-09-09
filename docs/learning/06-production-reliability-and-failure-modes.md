@@ -113,5 +113,5 @@ By declaring `/app/node_modules` and `/app/.next` as anonymous volumes, Docker C
 
 ---
 
-For architecture principles, see [System Architecture](../architecture.md).  
+For architecture principles, see [System Architecture](../architecture/overview.md).  
 For the complete engineering learning index, see [Learning Series Index](README.md).
