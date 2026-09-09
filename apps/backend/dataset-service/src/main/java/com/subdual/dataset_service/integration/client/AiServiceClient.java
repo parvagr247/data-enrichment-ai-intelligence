@@ -14,14 +14,12 @@ import java.util.Map;
 public class AiServiceClient {
 
     private final RestClient restClient;
-    private final String aiServiceBaseUrl;
 
     public AiServiceClient(
             RestClient.Builder builder,
             @Value("${services.ai.url:${AI_INTELLIGENT_SERVICE_URL:http://ai-intelligent-service:9742}}") String aiServiceBaseUrl
     ) {
         this.restClient = builder.baseUrl(aiServiceBaseUrl).build();
-        this.aiServiceBaseUrl = aiServiceBaseUrl;
     }
 
     public record RequirementCallRequest(String requirement, String entityType, Map<String, String> rawInput) {}

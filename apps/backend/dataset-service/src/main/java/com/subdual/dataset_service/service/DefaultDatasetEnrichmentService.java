@@ -18,8 +18,6 @@ import com.subdual.dataset_service.profile.model.ResearchObjective;
 import com.subdual.dataset_service.profile.model.ResearchProfile;
 import com.subdual.dataset_service.integration.client.AiServiceClient;
 import com.subdual.dataset_service.integration.client.ResearchServiceClient;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -66,7 +64,7 @@ public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService
             EntityPersistenceService persistenceService,
             ExecutorService enrichmentJobExecutor,
             com.subdual.dataset_service.service.executor.EnrichmentTaskExecutor enrichmentTaskExecutor,
-            @org.springframework.lang.Nullable com.fasterxml.jackson.databind.ObjectMapper objectMapper
+            com.fasterxml.jackson.databind.@org.jspecify.annotations.Nullable ObjectMapper objectMapper
     ) {
         this.researchServiceClient = researchServiceClient;
         this.aiServiceClient = aiServiceClient;

@@ -101,6 +101,19 @@ public class GlobalExceptionHandler {
         return rawMessage.replaceAll("(?i)(api[_-]?key|secret|token|password|auth)=[^&\\s]+", "$1=***");
     }
 
+    @ExceptionHandler(org.springframework.web.servlet.resource.NoResourceFoundException.class)
+    public ProblemDetail handleNoResourceFound(org.springframework.web.servlet.resource.NoResourceFoundException ex) {
+        log.debug("Resource not found on {}: {}", ex.getResourcePath(), ex.getMessage());
+        ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(
+                HttpStatus.NOT_FOUND,
+                ex.getMessage()
+        );
+        problemDetail.setType(DEFAULT_TYPE);
+        problemDetail.setTitle("Resource Not Found");
+        problemDetail.setInstance(URI.create("/" + ex.getResourcePath()));
+        return enrichProblemDetail(problemDetail, "RESOURCE_NOT_FOUND");
+    }
+
     @ExceptionHandler(Exception.class)
     public ProblemDetail handleGenericException(Exception ex) {
         log.error("Unhandled server exception on {}: ", INSTANCE_PATH, ex);

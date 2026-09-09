@@ -114,7 +114,7 @@ public class RestAiExtractionClient implements AiExtractionClient {
         return builder
                 .baseUrl(serviceUrl)
                 .requestFactory(requestFactory)
-                .messageConverters(converters -> {
+                .configureMessageConverters(convertersBuilder -> convertersBuilder.configureMessageConvertersList(converters -> {
                     for (var converter : converters) {
                         if (converter instanceof org.springframework.http.converter.AbstractHttpMessageConverter<?> ac) {
                             List<MediaType> types = new ArrayList<>(ac.getSupportedMediaTypes());
@@ -129,7 +129,7 @@ public class RestAiExtractionClient implements AiExtractionClient {
                             }
                         }
                     }
-                })
+                }))
                 .build();
     }
 }

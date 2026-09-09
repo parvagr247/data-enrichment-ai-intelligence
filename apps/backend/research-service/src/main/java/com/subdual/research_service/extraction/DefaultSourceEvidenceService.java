@@ -38,7 +38,7 @@ public class DefaultSourceEvidenceService implements SourceEvidenceService {
             EntityResolver entityResolver,
             EvidenceExtractor evidenceExtractor,
             ResearchPipelineProperties pipelineProperties,
-            @org.springframework.lang.Nullable com.subdual.research_service.discovery.cache.ThreadSafeSourceCache sourceCache
+            com.subdual.research_service.discovery.cache.@org.jspecify.annotations.Nullable ThreadSafeSourceCache sourceCache
     ) {
         this.webContentFetcher = webContentFetcher;
         this.contentExtractor = contentExtractor;

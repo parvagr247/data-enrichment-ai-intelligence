@@ -1,9 +1,7 @@
 package com.subdual.dataset_service.ingestion;
 
 import com.subdual.dataset_service.ingestion.detector.ColumnRoleDetector;
-import com.subdual.dataset_service.ingestion.model.ColumnRole;
 import com.subdual.dataset_service.ingestion.model.DatasetProfileReport;
-import com.subdual.dataset_service.ingestion.model.RawDataset;
 import com.subdual.dataset_service.ingestion.parser.CsvDatasetParser;
 import com.subdual.dataset_service.ingestion.parser.ExcelDatasetParser;
 import com.subdual.dataset_service.ingestion.profiler.DatasetProfiler;
