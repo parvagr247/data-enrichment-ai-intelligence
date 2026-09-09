@@ -1,6 +1,6 @@
 package com.subdual.research_service.research.pipeline;
 
-import com.subdual.research_service.research.api.ResearchRequest;
+import com.subdual.research_service.api.dto.request.ResearchRequest;
 import com.subdual.research_service.research.model.EntityType;
 import com.subdual.research_service.research.model.ResearchTarget;
 import org.springframework.stereotype.Component;

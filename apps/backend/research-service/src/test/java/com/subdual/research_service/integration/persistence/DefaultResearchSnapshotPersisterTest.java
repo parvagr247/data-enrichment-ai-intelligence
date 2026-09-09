@@ -1,5 +1,7 @@
 package com.subdual.research_service.integration.persistence;
 
+import com.subdual.research_service.integration.persistence.client.DatasetPersistenceClient;
+
 import com.subdual.research_service.research.pipeline.ResearchDiagnostics;
 import com.subdual.research_service.research.model.EntityType;
 import com.subdual.research_service.research.model.ResearchTarget;

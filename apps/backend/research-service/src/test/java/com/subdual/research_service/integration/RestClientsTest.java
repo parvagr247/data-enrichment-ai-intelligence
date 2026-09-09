@@ -1,10 +1,10 @@
 package com.subdual.research_service.integration;
 
-import com.subdual.research_service.research.api.EvidenceTuple;
+import com.subdual.research_service.api.dto.response.EvidenceTuple;
 import com.subdual.research_service.config.ServiceMeshProperties;
-import com.subdual.research_service.integration.ai.RestAiExtractionClient;
-import com.subdual.research_service.integration.ai.AiExtractedFact;
-import com.subdual.research_service.integration.persistence.RestDatasetPersistenceClient;
+import com.subdual.research_service.integration.ai.client.RestAiExtractionClient;
+import com.subdual.research_service.integration.ai.dto.AiExtractedFact;
+import com.subdual.research_service.integration.persistence.client.RestDatasetPersistenceClient;
 import com.subdual.research_service.research.model.ConfidenceTier;
 import com.subdual.research_service.research.model.EntityType;
 import com.subdual.research_service.research.model.ResearchSource;

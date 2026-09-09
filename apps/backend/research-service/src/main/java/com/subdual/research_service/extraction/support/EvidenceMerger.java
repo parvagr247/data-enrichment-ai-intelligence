@@ -1,6 +1,6 @@
 package com.subdual.research_service.extraction.support;
 
-import com.subdual.research_service.research.api.EvidenceTuple;
+import com.subdual.research_service.api.dto.response.EvidenceTuple;
 import com.subdual.research_service.research.model.ConfidenceTier;
 import org.springframework.stereotype.Component;
 

@@ -15,10 +15,10 @@ import com.subdual.research_service.extraction.extractor.field.TechFieldExtracto
 import com.subdual.research_service.extraction.support.EntityResolver;
 import com.subdual.research_service.extraction.support.EvidenceMerger;
 import com.subdual.research_service.extraction.support.TargetFieldNormalizer;
-import com.subdual.research_service.integration.ai.AiExtractedFact;
-import com.subdual.research_service.integration.ai.AiExtractionClient;
-import com.subdual.research_service.integration.ai.NoOpAiExtractionClient;
-import com.subdual.research_service.research.api.EvidenceTuple;
+import com.subdual.research_service.api.dto.response.EvidenceTuple;
+import com.subdual.research_service.integration.ai.client.AiExtractionClient;
+import com.subdual.research_service.integration.ai.client.NoOpAiExtractionClient;
+import com.subdual.research_service.integration.ai.dto.AiExtractedFact;
 import com.subdual.research_service.research.model.ConfidenceTier;
 import com.subdual.research_service.research.model.EntityType;
 import com.subdual.research_service.research.model.ResearchSource;

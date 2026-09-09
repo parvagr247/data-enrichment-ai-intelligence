@@ -1,6 +1,6 @@
 package com.subdual.research_service.extraction.extractor.field;
 
-import com.subdual.research_service.research.api.EvidenceTuple;
+import com.subdual.research_service.api.dto.response.EvidenceTuple;
 import com.subdual.research_service.discovery.ranking.SourceTypeClassifier;
 import com.subdual.research_service.extraction.document.ExtractedDocument;
 import com.subdual.research_service.research.model.ConfidenceTier;
