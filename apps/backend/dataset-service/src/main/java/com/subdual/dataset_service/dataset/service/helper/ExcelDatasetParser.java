@@ -1,6 +1,5 @@
 package com.subdual.dataset_service.dataset.service.helper;
 
-import com.subdual.dataset_service.dataset.model.MalformedRow;
 import com.subdual.dataset_service.dataset.model.RawDataset;
 import org.springframework.stereotype.Component;
 

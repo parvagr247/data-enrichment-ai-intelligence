@@ -1,6 +1,6 @@
 package com.subdual.ai_intelligent_service.normalization;
 
-import com.subdual.ai_intelligent_service.dto.EnrichedAttributeResult;
+import com.subdual.ai_intelligent_service.enrichment.api.dto.EnrichedAttributeResult;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
