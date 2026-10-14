@@ -1,21 +1,25 @@
 package com.subdual.research_service.discovery.service.helper;
 
+import java.net.URI;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+import java.util.stream.Collectors;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
+
 import com.subdual.research_service.discovery.model.QueryIntent;
 import com.subdual.research_service.discovery.model.QueryStrategy;
 import com.subdual.research_service.discovery.model.ResearchQuery;
 import com.subdual.research_service.research.model.EntityType;
 import com.subdual.research_service.research.model.ResearchTarget;
-import org.springframework.stereotype.Component;
-
-import java.net.URI;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Locale;
 
 @Component
 public class QueryBuilder {
 
-    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(QueryBuilder.class);
+    private static final Logger log = LoggerFactory.getLogger(QueryBuilder.class);
 
     public List<String> buildDiscoveryQueries(ResearchTarget target) {
         if (!isValidTarget(target)) {
@@ -287,7 +291,7 @@ public class QueryBuilder {
             String fieldsToken = target.targetFields().stream()
                     .limit(4)
                     .map(this::normalizeFieldForQuery)
-                    .collect(java.util.stream.Collectors.joining(" "));
+                    .collect(Collectors.joining(" "));
             queries.add("\"" + name + "\" " + fieldsToken);
         }
     }

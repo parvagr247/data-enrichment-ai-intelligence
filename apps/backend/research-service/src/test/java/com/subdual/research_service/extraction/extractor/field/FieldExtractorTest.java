@@ -1,13 +1,16 @@
 package com.subdual.research_service.extraction.extractor.field;
 
-import com.subdual.research_service.api.dto.response.EvidenceTuple;
-import com.subdual.research_service.extraction.document.ExtractedDocument;
-import com.subdual.research_service.research.model.EntityType;
-import com.subdual.research_service.research.model.ResearchTarget;
+import java.time.Instant;
+
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import java.time.Instant;
+import com.subdual.research_service.api.dto.response.EvidenceTuple;
+import com.subdual.research_service.discovery.cache.ThreadSafeSourceCache;
+import com.subdual.research_service.extraction.document.ExtractedDocument;
+import com.subdual.research_service.integration.web.FetchedContent;
+import com.subdual.research_service.research.model.EntityType;
+import com.subdual.research_service.research.model.ResearchTarget;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -188,11 +191,11 @@ class FieldExtractorTest {
     @Test
     @DisplayName("Should verify thread-safe source caching")
     void shouldVerifyThreadSafeSourceCache() {
-        com.subdual.research_service.discovery.cache.ThreadSafeSourceCache cache = new com.subdual.research_service.discovery.cache.ThreadSafeSourceCache();
+        ThreadSafeSourceCache cache = new ThreadSafeSourceCache();
         assertThat(cache.getFetchedContent("https://example.com/test")).isEmpty();
 
-        com.subdual.research_service.integration.web.FetchedContent content =
-                com.subdual.research_service.integration.web.FetchedContent.success(
+        FetchedContent content =
+                FetchedContent.success(
                         "https://example.com/test", 200, "text/html", "<html><body>Cached</body></html>"
                 );
         cache.putFetchedContent("https://example.com/test", content);

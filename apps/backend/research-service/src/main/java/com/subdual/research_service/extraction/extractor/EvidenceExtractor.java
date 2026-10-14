@@ -1,9 +1,27 @@
 package com.subdual.research_service.extraction.extractor;
 
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+
 import com.subdual.research_service.api.dto.response.EvidenceTuple;
 import com.subdual.research_service.extraction.ai.AiEvidenceEnricher;
 import com.subdual.research_service.extraction.document.ExtractedDocument;
+import com.subdual.research_service.extraction.extractor.field.ActivityFieldExtractor;
+import com.subdual.research_service.extraction.extractor.field.EducationFieldExtractor;
+import com.subdual.research_service.extraction.extractor.field.ExperienceFieldExtractor;
 import com.subdual.research_service.extraction.extractor.field.FieldExtractor;
+import com.subdual.research_service.extraction.extractor.field.LocationFieldExtractor;
+import com.subdual.research_service.extraction.extractor.field.OrganizationFieldExtractor;
+import com.subdual.research_service.extraction.extractor.field.ProjectFieldExtractor;
+import com.subdual.research_service.extraction.extractor.field.RoleFieldExtractor;
+import com.subdual.research_service.extraction.extractor.field.SkillFieldExtractor;
+import com.subdual.research_service.extraction.extractor.field.TechFieldExtractor;
+import com.subdual.research_service.extraction.factory.DefaultEntityEvidenceExtractorFactory;
+import com.subdual.research_service.extraction.factory.EntityEvidenceExtractorFactory;
 import com.subdual.research_service.extraction.support.EntityResolver;
 import com.subdual.research_service.extraction.support.EvidenceMerger;
 import com.subdual.research_service.extraction.support.TargetFieldNormalizer;
@@ -14,13 +32,6 @@ import com.subdual.research_service.research.model.ConfidenceTier;
 import com.subdual.research_service.research.model.EntityType;
 import com.subdual.research_service.research.model.ResearchSource;
 import com.subdual.research_service.research.model.ResearchTarget;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Component;
-
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
 
 /**
  * Cohesive evidence extractor following Single Responsibility and Dependency Inversion Principles.
@@ -38,7 +49,7 @@ public class EvidenceExtractor {
     private final AiEvidenceEnricher aiEvidenceEnricher;
     private final TargetFieldNormalizer targetFieldNormalizer;
     private final List<FieldExtractor> fieldExtractors;
-    private final com.subdual.research_service.extraction.factory.EntityEvidenceExtractorFactory entityEvidenceExtractorFactory;
+    private final EntityEvidenceExtractorFactory entityEvidenceExtractorFactory;
 
     @Autowired
     public EvidenceExtractor(
@@ -61,7 +72,7 @@ public class EvidenceExtractor {
         this.aiEvidenceEnricher = aiEvidenceEnricher;
         this.targetFieldNormalizer = targetFieldNormalizer;
         this.fieldExtractors = fieldExtractors != null ? fieldExtractors : defaultFieldExtractors();
-        this.entityEvidenceExtractorFactory = new com.subdual.research_service.extraction.factory.DefaultEntityEvidenceExtractorFactory(
+        this.entityEvidenceExtractorFactory = new DefaultEntityEvidenceExtractorFactory(
                 personExtractor, organizationExtractor, repositoryExtractor, productExtractor
         );
     }
@@ -89,7 +100,7 @@ public class EvidenceExtractor {
         this.aiEvidenceEnricher = new AiEvidenceEnricher(aiExtractionClient != null ? aiExtractionClient : new NoOpAiExtractionClient(), this.evidenceMerger);
         this.targetFieldNormalizer = new TargetFieldNormalizer();
         this.fieldExtractors = defaultFieldExtractors();
-        this.entityEvidenceExtractorFactory = new com.subdual.research_service.extraction.factory.DefaultEntityEvidenceExtractorFactory(
+        this.entityEvidenceExtractorFactory = new DefaultEntityEvidenceExtractorFactory(
                 personExtractor, organizationExtractor, repositoryExtractor, productExtractor
         );
     }
@@ -100,15 +111,15 @@ public class EvidenceExtractor {
 
     private static List<FieldExtractor> defaultFieldExtractors() {
         return List.of(
-                new com.subdual.research_service.extraction.extractor.field.RoleFieldExtractor(),
-                new com.subdual.research_service.extraction.extractor.field.OrganizationFieldExtractor(),
-                new com.subdual.research_service.extraction.extractor.field.ExperienceFieldExtractor(),
-                new com.subdual.research_service.extraction.extractor.field.EducationFieldExtractor(),
-                new com.subdual.research_service.extraction.extractor.field.SkillFieldExtractor(),
-                new com.subdual.research_service.extraction.extractor.field.TechFieldExtractor(),
-                new com.subdual.research_service.extraction.extractor.field.ActivityFieldExtractor(),
-                new com.subdual.research_service.extraction.extractor.field.ProjectFieldExtractor(),
-                new com.subdual.research_service.extraction.extractor.field.LocationFieldExtractor()
+                new RoleFieldExtractor(),
+                new OrganizationFieldExtractor(),
+                new ExperienceFieldExtractor(),
+                new EducationFieldExtractor(),
+                new SkillFieldExtractor(),
+                new TechFieldExtractor(),
+                new ActivityFieldExtractor(),
+                new ProjectFieldExtractor(),
+                new LocationFieldExtractor()
         );
     }
 

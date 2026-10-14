@@ -1,15 +1,5 @@
 package com.subdual.research_service.config;
 
-import com.subdual.research_service.common.exception.BusinessRuleException;
-import com.subdual.research_service.discovery.provider.MockSearchProvider;
-import com.subdual.research_service.discovery.provider.SearchProvider;
-import com.subdual.research_service.discovery.provider.TavilySearchProvider;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Primary;
-import org.springframework.web.client.RestClient;
-
 import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -18,13 +8,22 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
+import org.springframework.web.client.RestClient;
+
+import com.subdual.research_service.discovery.factory.SearchProviderFactory;
+import com.subdual.research_service.discovery.provider.SearchProvider;
+
 @Configuration
 @Slf4j
 public class ResearchConfiguration {
 
     @Bean
     @Primary
-    public SearchProvider searchProvider(ResearchDiscoveryProperties properties, com.subdual.research_service.discovery.factory.SearchProviderFactory searchProviderFactory) {
+    public SearchProvider searchProvider(ResearchDiscoveryProperties properties, SearchProviderFactory searchProviderFactory) {
         String providerName = resolveProviderName(properties);
         return searchProviderFactory.createSearchProvider(providerName, properties);
     }

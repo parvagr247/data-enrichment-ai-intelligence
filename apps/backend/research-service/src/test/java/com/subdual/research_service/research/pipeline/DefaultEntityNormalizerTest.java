@@ -1,13 +1,16 @@
 package com.subdual.research_service.research.pipeline;
 
-import com.subdual.research_service.api.dto.request.ResearchRequest;
-import com.subdual.research_service.research.model.EntityType;
-import com.subdual.research_service.research.model.ResearchTarget;
+import java.util.List;
+import java.util.Map;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import java.util.Map;
+import com.subdual.research_service.api.dto.request.ResearchRequest;
+import com.subdual.research_service.research.model.EntityType;
+import com.subdual.research_service.research.model.ResearchDepth;
+import com.subdual.research_service.research.model.ResearchTarget;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -85,8 +88,8 @@ class DefaultEntityNormalizerTest {
                 null,
                 "MNIT Jaipur",
                 "Lead",
-                java.util.List.of(),
-                com.subdual.research_service.research.model.ResearchDepth.NORMAL,
+                List.of(),
+                ResearchDepth.NORMAL,
                 Map.of(),
                 null,
                 "Vardhan",
@@ -116,8 +119,8 @@ class DefaultEntityNormalizerTest {
                 "Rahul Sharma",
                 "Google",
                 "Staff SWE",
-                java.util.List.of(),
-                com.subdual.research_service.research.model.ResearchDepth.NORMAL,
+                List.of(),
+                ResearchDepth.NORMAL,
                 Map.of(),
                 null
         );
@@ -128,8 +131,8 @@ class DefaultEntityNormalizerTest {
                 "Rahul Sharma",
                 "Microsoft",
                 "Principal Architect",
-                java.util.List.of(),
-                com.subdual.research_service.research.model.ResearchDepth.NORMAL,
+                List.of(),
+                ResearchDepth.NORMAL,
                 Map.of(),
                 null
         );

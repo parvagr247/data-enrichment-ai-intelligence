@@ -1,6 +1,11 @@
 package com.subdual.research_service.common.exception;
 
+import java.net.URI;
+import java.time.Instant;
+import java.util.concurrent.TimeoutException;
+
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -8,9 +13,9 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
-import java.net.URI;
-import java.util.concurrent.TimeoutException;
+import com.subdual.research_service.common.filter.CorrelationIdFilter;
 
 @RestControllerAdvice
 @Slf4j
@@ -101,8 +106,8 @@ public class GlobalExceptionHandler {
         return rawMessage.replaceAll("(?i)(api[_-]?key|secret|token|password|auth)=[^&\\s]+", "$1=***");
     }
 
-    @ExceptionHandler(org.springframework.web.servlet.resource.NoResourceFoundException.class)
-    public ProblemDetail handleNoResourceFound(org.springframework.web.servlet.resource.NoResourceFoundException ex) {
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ProblemDetail handleNoResourceFound(NoResourceFoundException ex) {
         log.debug("Resource not found on {}: {}", ex.getResourcePath(), ex.getMessage());
         ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(
                 HttpStatus.NOT_FOUND,
@@ -130,8 +135,8 @@ public class GlobalExceptionHandler {
 
     private ProblemDetail enrichProblemDetail(ProblemDetail pd, String code) {
         pd.setProperty("code", code);
-        pd.setProperty("requestId", org.slf4j.MDC.get(com.subdual.research_service.common.filter.CorrelationIdFilter.MDC_KEY));
-        pd.setProperty("timestamp", java.time.Instant.now().toString());
+        pd.setProperty("requestId", MDC.get(CorrelationIdFilter.MDC_KEY));
+        pd.setProperty("timestamp", Instant.now().toString());
         return pd;
     }
 }

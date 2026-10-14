@@ -1,20 +1,28 @@
 package com.subdual.research_service.extraction.support;
 
+import java.net.URI;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.regex.Pattern;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
+
 import com.subdual.research_service.extraction.document.ExtractedDocument;
 import com.subdual.research_service.research.model.ConfidenceTier;
 import com.subdual.research_service.research.model.EntityType;
 import com.subdual.research_service.research.model.ResearchTarget;
-import org.springframework.stereotype.Component;
-
-import java.net.URI;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
+import com.subdual.research_service.util.UrlNormalizer;
 
 @Component
 public class EntityResolver {
 
-    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(EntityResolver.class);
+    private static final Logger log = LoggerFactory.getLogger(EntityResolver.class);
 
     private static final Set<String> MULTI_TENANT_HOSTS = Set.of(
             "linkedin.com", "github.com", "gitlab.com", "twitter.com", "x.com",
@@ -40,10 +48,10 @@ public class EntityResolver {
             boolean matched,
             String reason,
             double score,
-            java.util.List<String> matchedSignals
+            List<String> matchedSignals
     ) {
         public ResolutionResult(ConfidenceTier confidence, MatchStatus status, boolean matched, String reason) {
-            this(confidence, status, matched, reason, confidenceToScore(confidence), java.util.List.of(reason));
+            this(confidence, status, matched, reason, confidenceToScore(confidence), List.of(reason));
         }
 
         public ResolutionResult(ConfidenceTier confidence, MatchStatus status, String reason) {
@@ -74,19 +82,19 @@ public class EntityResolver {
 
     private ResolutionResult executeResolution(ResearchTarget target, ExtractedDocument document) {
         if (!isValidResolutionInput(target, document)) {
-            return new ResolutionResult(ConfidenceTier.UNKNOWN, MatchStatus.NOT_MATCHED, false, "Missing target or document", 0.0, java.util.List.of("NO_INPUT"));
+            return new ResolutionResult(ConfidenceTier.UNKNOWN, MatchStatus.NOT_MATCHED, false, "Missing target or document", 0.0, List.of("NO_INPUT"));
         }
 
         if (isAnchorUrl(document.url(), target)) {
-            return new ResolutionResult(ConfidenceTier.HIGH, MatchStatus.MATCHED, true, "Primary anchor URL match", 0.98, java.util.List.of("ANCHOR_URL_MATCH: " + document.url()));
+            return new ResolutionResult(ConfidenceTier.HIGH, MatchStatus.MATCHED, true, "Primary anchor URL match", 0.98, List.of("ANCHOR_URL_MATCH: " + document.url()));
         }
 
         if (matchesNonMultiTenantHost(target.canonicalUrl(), document.url())) {
-            return new ResolutionResult(ConfidenceTier.HIGH, MatchStatus.MATCHED, true, "Host match with target canonical URL", 0.95, java.util.List.of("HOST_MATCH"));
+            return new ResolutionResult(ConfidenceTier.HIGH, MatchStatus.MATCHED, true, "Host match with target canonical URL", 0.95, List.of("HOST_MATCH"));
         }
 
         if (isConflictingEntity(target, document)) {
-            return new ResolutionResult(ConfidenceTier.LOW, MatchStatus.NOT_MATCHED, false, "Rejected: Conflicting entity identity signals detected", 0.10, java.util.List.of("CONFLICTING_SIGNALS_REJECTED"));
+            return new ResolutionResult(ConfidenceTier.LOW, MatchStatus.NOT_MATCHED, false, "Rejected: Conflicting entity identity signals detected", 0.10, List.of("CONFLICTING_SIGNALS_REJECTED"));
         }
 
         String targetSlug = extractSlug(target.canonicalUrl() != null ? target.canonicalUrl() : target.rawUrl());
@@ -97,10 +105,10 @@ public class EntityResolver {
         }
 
         if (matchesSlugOrUrl(targetSlug, target.canonicalUrl(), document)) {
-            return new ResolutionResult(ConfidenceTier.HIGH, MatchStatus.MATCHED, true, "Identity handle or profile slug corroborated in source", 0.90, java.util.List.of("SLUG_MATCH: " + (targetSlug != null ? targetSlug : "")));
+            return new ResolutionResult(ConfidenceTier.HIGH, MatchStatus.MATCHED, true, "Identity handle or profile slug corroborated in source", 0.90, List.of("SLUG_MATCH: " + (targetSlug != null ? targetSlug : "")));
         }
 
-        java.util.List<String> signals = new java.util.ArrayList<>();
+        List<String> signals = new ArrayList<>();
         if (matchesMetadataSignals(target, document, signals)) {
             signals.add("CORROBORATING_METADATA");
             return new ResolutionResult(ConfidenceTier.HIGH, MatchStatus.MATCHED, true, "Entity name and corroborating identity signals matched", 0.85, signals);
@@ -129,15 +137,15 @@ public class EntityResolver {
 
         if (titleMatched) {
             if (isSingleTokenName(target) && !hasCorroboratingSignals(targetSlug, target, document)) {
-                return new ResolutionResult(ConfidenceTier.LOW, MatchStatus.AMBIGUOUS, false, "Ambiguous: First-name only match without corroborating identity signals", 0.30, java.util.List.of("AMBIGUOUS_FIRST_NAME_ONLY"));
+                return new ResolutionResult(ConfidenceTier.LOW, MatchStatus.AMBIGUOUS, false, "Ambiguous: First-name only match without corroborating identity signals", 0.30, List.of("AMBIGUOUS_FIRST_NAME_ONLY"));
             }
             if (isAnchoredPersonTarget(target) && !hasCorroboratingSignals(targetSlug, target, document)) {
-                return new ResolutionResult(ConfidenceTier.LOW, MatchStatus.AMBIGUOUS, false, "Rejected: Name-only match without corroborating identity signals", 0.35, java.util.List.of("REJECTED_UNNOTICED_SIGNALS"));
+                return new ResolutionResult(ConfidenceTier.LOW, MatchStatus.AMBIGUOUS, false, "Rejected: Name-only match without corroborating identity signals", 0.35, List.of("REJECTED_UNNOTICED_SIGNALS"));
             }
             if (target.entityType() == EntityType.PERSON && !hasCorroboratingSignals(targetSlug, target, document)) {
-                return new ResolutionResult(ConfidenceTier.LOW, MatchStatus.AMBIGUOUS, false, "Ambiguous: Name-only match without corroborating identity signals", 0.35, java.util.List.of("AMBIGUOUS_PERSON_NO_CORROBORATION"));
+                return new ResolutionResult(ConfidenceTier.LOW, MatchStatus.AMBIGUOUS, false, "Ambiguous: Name-only match without corroborating identity signals", 0.35, List.of("AMBIGUOUS_PERSON_NO_CORROBORATION"));
             }
-            return new ResolutionResult(ConfidenceTier.HIGH, MatchStatus.MATCHED, true, "Entity name matched in document title", 0.90, java.util.List.of("TITLE_NAME_MATCH"));
+            return new ResolutionResult(ConfidenceTier.HIGH, MatchStatus.MATCHED, true, "Entity name matched in document title", 0.90, List.of("TITLE_NAME_MATCH"));
         }
         return null;
     }
@@ -173,7 +181,7 @@ public class EntityResolver {
     }
 
     private boolean isSameUrl(String u1, String u2) {
-        return com.subdual.research_service.util.UrlNormalizer.isSameUrl(u1, u2);
+        return UrlNormalizer.isSameUrl(u1, u2);
     }
 
     private boolean matchesNonMultiTenantHost(String canonicalUrl, String docUrl) {
@@ -255,7 +263,7 @@ public class EntityResolver {
     private String extractProfileSlug(String url) {
         if (url == null || url.isBlank()) return null;
         try {
-            String clean = com.subdual.research_service.util.UrlNormalizer.unwrapLink(url);
+            String clean = UrlNormalizer.unwrapLink(url);
             URI uri = URI.create(clean);
             String host = uri.getHost() != null ? uri.getHost().replaceFirst("^www\\.", "").toLowerCase(Locale.ROOT) : "";
             String path = uri.getPath();
@@ -281,11 +289,11 @@ public class EntityResolver {
     private String extractHostFromUrl(String url) {
         if (url == null || url.isBlank()) return "";
         try {
-            URI uri = URI.create(com.subdual.research_service.util.UrlNormalizer.unwrapLink(url));
+            URI uri = URI.create(UrlNormalizer.unwrapLink(url));
             String host = uri.getHost();
             if (host == null) return "";
             host = host.replaceFirst("^www\\.", "").toLowerCase(Locale.ROOT);
-            if (com.subdual.research_service.util.UrlNormalizer.isLinkedInInternational(host)) {
+            if (UrlNormalizer.isLinkedInInternational(host)) {
                 return "linkedin.com";
             }
             return host;
@@ -310,7 +318,7 @@ public class EntityResolver {
 
         boolean textContainsSeed = lowerText.contains(seedOrg);
         if (!textContainsSeed && !normSeedOrg.isBlank() && normSeedOrg.length() >= 2) {
-            textContainsSeed = java.util.regex.Pattern.compile("\\b" + java.util.regex.Pattern.quote(normSeedOrg) + "\\b", java.util.regex.Pattern.CASE_INSENSITIVE).matcher(lowerText).find();
+            textContainsSeed = Pattern.compile("\\b" + Pattern.quote(normSeedOrg) + "\\b", Pattern.CASE_INSENSITIVE).matcher(lowerText).find();
         }
         if (textContainsSeed) {
             return false;
@@ -318,7 +326,7 @@ public class EntityResolver {
 
         if (target.metadata() != null && target.metadata().containsKey("conflictingOrganizations")) {
             Object obj = target.metadata().get("conflictingOrganizations");
-            if (obj instanceof java.util.Collection<?> col) {
+            if (obj instanceof Collection<?> col) {
                 for (Object item : col) {
                     if (item != null) {
                         String conflictOrg = item.toString().toLowerCase(Locale.ROOT).trim();
@@ -340,7 +348,7 @@ public class EntityResolver {
                         String suffix = lowerTitle.substring(idx + sep.length()).trim();
                         boolean suffixContainsSeed = suffix.contains(seedOrg);
                         if (!suffixContainsSeed && !normSeedOrg.isBlank() && normSeedOrg.length() >= 2) {
-                            suffixContainsSeed = java.util.regex.Pattern.compile("\\b" + java.util.regex.Pattern.quote(normSeedOrg) + "\\b", java.util.regex.Pattern.CASE_INSENSITIVE).matcher(suffix).find();
+                            suffixContainsSeed = Pattern.compile("\\b" + Pattern.quote(normSeedOrg) + "\\b", Pattern.CASE_INSENSITIVE).matcher(suffix).find();
                         }
                         if (!suffix.isBlank() && !suffixContainsSeed) {
                             if (suffix.length() >= 3 && !isGenericTitleSuffix(suffix, target)) {
@@ -427,7 +435,7 @@ public class EntityResolver {
         return matchesMetadataSignals(target, document, null);
     }
 
-    private boolean matchesMetadataSignals(ResearchTarget target, ExtractedDocument document, java.util.List<String> signals) {
+    private boolean matchesMetadataSignals(ResearchTarget target, ExtractedDocument document, List<String> signals) {
         if (target == null || document == null) {
             return false;
         }
@@ -489,9 +497,9 @@ public class EntityResolver {
 
     private ResolutionResult resolveWithoutDisplayName(String canonicalUrl, String docUrl) {
         if (matchesDomainAlignment(canonicalUrl, docUrl)) {
-            return new ResolutionResult(ConfidenceTier.MEDIUM, MatchStatus.MATCHED, true, "Domain-aligned discovery match", 0.70, java.util.List.of("DOMAIN_ALIGNMENT_MATCH"));
+            return new ResolutionResult(ConfidenceTier.MEDIUM, MatchStatus.MATCHED, true, "Domain-aligned discovery match", 0.70, List.of("DOMAIN_ALIGNMENT_MATCH"));
         }
-        return new ResolutionResult(ConfidenceTier.LOW, MatchStatus.NOT_MATCHED, false, "No host or entity name correlation found", 0.10, java.util.List.of("NO_CORRELATION"));
+        return new ResolutionResult(ConfidenceTier.LOW, MatchStatus.NOT_MATCHED, false, "No host or entity name correlation found", 0.10, List.of("NO_CORRELATION"));
     }
 
     private boolean matchesDomainAlignment(String canonicalUrl, String docUrl) {
@@ -527,29 +535,29 @@ public class EntityResolver {
         }
 
         if (!titleContains && !textContains && !fuzzyTitle) {
-            return new ResolutionResult(ConfidenceTier.LOW, MatchStatus.NOT_MATCHED, false, "Entity name not found in document content", 0.10, java.util.List.of("NAME_NOT_FOUND"));
+            return new ResolutionResult(ConfidenceTier.LOW, MatchStatus.NOT_MATCHED, false, "Entity name not found in document content", 0.10, List.of("NAME_NOT_FOUND"));
         }
 
         boolean isPerson = target.entityType() == EntityType.PERSON;
         boolean hasContext = matchesMetadataSignals(target, document);
 
         if (isSingleTokenName(target) && !hasContext) {
-            return new ResolutionResult(ConfidenceTier.LOW, MatchStatus.AMBIGUOUS, false, "Ambiguous: First-name only match without corroborating identity signals", 0.30, java.util.List.of("AMBIGUOUS_FIRST_NAME_ONLY"));
+            return new ResolutionResult(ConfidenceTier.LOW, MatchStatus.AMBIGUOUS, false, "Ambiguous: First-name only match without corroborating identity signals", 0.30, List.of("AMBIGUOUS_FIRST_NAME_ONLY"));
         }
 
         if (isPerson && !hasContext && hasAnchorOrMetadata(target)) {
-            return new ResolutionResult(ConfidenceTier.LOW, MatchStatus.AMBIGUOUS, false, "Ambiguous: Name-only match without corroborating identity signals", 0.35, java.util.List.of("AMBIGUOUS_NAME_ONLY"));
+            return new ResolutionResult(ConfidenceTier.LOW, MatchStatus.AMBIGUOUS, false, "Ambiguous: Name-only match without corroborating identity signals", 0.35, List.of("AMBIGUOUS_NAME_ONLY"));
         }
 
         if (titleContains || fuzzyTitle) {
-            return new ResolutionResult(ConfidenceTier.HIGH, MatchStatus.MATCHED, true, "Entity name matched in document title", 0.90, java.util.List.of(titleContains ? "TITLE_NAME_MATCH" : "TITLE_FUZZY_NAME_MATCH"));
+            return new ResolutionResult(ConfidenceTier.HIGH, MatchStatus.MATCHED, true, "Entity name matched in document title", 0.90, List.of(titleContains ? "TITLE_NAME_MATCH" : "TITLE_FUZZY_NAME_MATCH"));
         }
-        return new ResolutionResult(ConfidenceTier.MEDIUM, MatchStatus.MATCHED, true, "Entity name mentioned in document body", 0.70, java.util.List.of("BODY_NAME_MATCH"));
+        return new ResolutionResult(ConfidenceTier.MEDIUM, MatchStatus.MATCHED, true, "Entity name mentioned in document body", 0.70, List.of("BODY_NAME_MATCH"));
     }
 
     public ResolutionResult resolveByEntityName(String displayName, ExtractedDocument document) {
         if (displayName == null || displayName.isBlank()) {
-            return new ResolutionResult(ConfidenceTier.LOW, MatchStatus.NOT_MATCHED, false, "Empty display name", 0.0, java.util.List.of("EMPTY_NAME"));
+            return new ResolutionResult(ConfidenceTier.LOW, MatchStatus.NOT_MATCHED, false, "Empty display name", 0.0, List.of("EMPTY_NAME"));
         }
         String lowerName = displayName.toLowerCase(Locale.ROOT);
         String normName = NameNormalizer.normalize(displayName).toLowerCase(Locale.ROOT);
@@ -557,15 +565,15 @@ public class EntityResolver {
         String docText = document.cleanText() != null ? document.cleanText().toLowerCase(Locale.ROOT) : "";
 
         if (docTitle.contains(lowerName) || (!normName.isBlank() && docTitle.contains(normName))) {
-            return new ResolutionResult(ConfidenceTier.HIGH, MatchStatus.MATCHED, true, "Entity name matched in document title", 0.90, java.util.List.of("TITLE_NAME_MATCH"));
+            return new ResolutionResult(ConfidenceTier.HIGH, MatchStatus.MATCHED, true, "Entity name matched in document title", 0.90, List.of("TITLE_NAME_MATCH"));
         }
         if (docText.contains(lowerName) || (!normName.isBlank() && docText.contains(normName))) {
-            return new ResolutionResult(ConfidenceTier.MEDIUM, MatchStatus.MATCHED, true, "Entity name mentioned in document body", 0.70, java.util.List.of("BODY_NAME_MATCH"));
+            return new ResolutionResult(ConfidenceTier.MEDIUM, MatchStatus.MATCHED, true, "Entity name mentioned in document body", 0.70, List.of("BODY_NAME_MATCH"));
         }
         if (!normName.isBlank() && !docTitle.isBlank() && FuzzyMatcher.isFuzzyMatch(normName, docTitle, 0.85)) {
-            return new ResolutionResult(ConfidenceTier.HIGH, MatchStatus.MATCHED, true, "Entity name matched in document title", 0.85, java.util.List.of("TITLE_FUZZY_NAME_MATCH"));
+            return new ResolutionResult(ConfidenceTier.HIGH, MatchStatus.MATCHED, true, "Entity name matched in document title", 0.85, List.of("TITLE_FUZZY_NAME_MATCH"));
         }
-        return new ResolutionResult(ConfidenceTier.LOW, MatchStatus.NOT_MATCHED, false, "Entity name not found in document content", 0.10, java.util.List.of("NAME_NOT_FOUND"));
+        return new ResolutionResult(ConfidenceTier.LOW, MatchStatus.NOT_MATCHED, false, "Entity name not found in document content", 0.10, List.of("NAME_NOT_FOUND"));
     }
 
     private String extractHost(URI uri) {

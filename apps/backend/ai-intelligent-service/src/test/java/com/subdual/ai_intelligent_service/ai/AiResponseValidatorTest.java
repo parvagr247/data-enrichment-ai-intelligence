@@ -1,7 +1,6 @@
 package com.subdual.ai_intelligent_service.ai;
 
-import com.subdual.ai_intelligent_service.ai.helper.AiResponseValidator;
-import com.subdual.ai_intelligent_service.extraction.model.ExtractedFact;
+import com.subdual.ai_intelligent_service.capability.extraction.model.ExtractedFact;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 

@@ -1,14 +1,16 @@
 package com.subdual.research_service.extraction.support;
 
-import com.subdual.research_service.extraction.document.ExtractedDocument;
-import com.subdual.research_service.research.model.ConfidenceTier;
-import com.subdual.research_service.research.model.EntityType;
-import com.subdual.research_service.research.model.ResearchTarget;
+import java.time.Instant;
+import java.util.Map;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import java.time.Instant;
+import com.subdual.research_service.extraction.document.ExtractedDocument;
+import com.subdual.research_service.research.model.ConfidenceTier;
+import com.subdual.research_service.research.model.EntityType;
+import com.subdual.research_service.research.model.ResearchTarget;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -240,7 +242,7 @@ class EntityResolverTest {
                 "id-vardhan-org",
                 EntityType.PERSON,
                 "Vardhan Bhati",
-                java.util.Map.of("organization", "Company A")
+                Map.of("organization", "Company A")
         );
         ExtractedDocument doc = new ExtractedDocument(
                 "https://techcorp.com/team/vardhan",

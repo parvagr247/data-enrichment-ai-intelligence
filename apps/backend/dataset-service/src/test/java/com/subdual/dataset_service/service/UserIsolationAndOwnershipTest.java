@@ -1,5 +1,19 @@
 package com.subdual.dataset_service.service;
 
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.Executors;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Sort;
+
 import com.subdual.dataset_service.config.EnrichmentProperties;
 import com.subdual.dataset_service.enrichment.api.dto.request.EnrichmentJobRequest;
 import com.subdual.dataset_service.enrichment.api.dto.response.EnrichmentJobResponse;
@@ -13,21 +27,10 @@ import com.subdual.dataset_service.entity.api.dto.response.EntitySummaryResponse
 import com.subdual.dataset_service.entity.model.EnrichedEntity;
 import com.subdual.dataset_service.entity.repository.EnrichedEntityRepository;
 import com.subdual.dataset_service.entity.service.impl.DefaultEntityPersistenceService;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-
-import java.time.Instant;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.concurrent.Executors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -144,9 +147,9 @@ class UserIsolationAndOwnershipTest {
                 .updatedAt(Instant.now())
                 .build();
 
-        when(entityRepository.findByUserId(org.mockito.ArgumentMatchers.eq("user-alice"), any(org.springframework.data.domain.Sort.class)))
+        when(entityRepository.findByUserId(eq("user-alice"), any(Sort.class)))
                 .thenReturn(List.of(aliceEntity));
-        when(entityRepository.findByUserId(org.mockito.ArgumentMatchers.eq("user-bob"), any(org.springframework.data.domain.Sort.class)))
+        when(entityRepository.findByUserId(eq("user-bob"), any(Sort.class)))
                 .thenReturn(List.of());
 
         // Alice lists her catalog -> only Alice entity

@@ -1,5 +1,18 @@
 package com.subdual.dataset_service.enrichment.service.impl;
 
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+
 import com.subdual.dataset_service.enrichment.api.dto.request.EnrichmentJobRequest;
 import com.subdual.dataset_service.enrichment.api.dto.request.SingleEnrichmentRequest;
 import com.subdual.dataset_service.enrichment.api.dto.response.EnrichmentJobResponse;
@@ -8,25 +21,13 @@ import com.subdual.dataset_service.enrichment.facade.DefaultEnrichmentEngineFaca
 import com.subdual.dataset_service.enrichment.facade.EnrichmentEngineFacade;
 import com.subdual.dataset_service.enrichment.integration.AiServiceClient;
 import com.subdual.dataset_service.enrichment.integration.ResearchServiceClient;
-import com.subdual.dataset_service.entity.service.EntityPersistenceService;
 import com.subdual.dataset_service.enrichment.model.JobState;
 import com.subdual.dataset_service.enrichment.service.DatasetEnrichmentService;
 import com.subdual.dataset_service.enrichment.service.helper.EnrichmentJobManager;
 import com.subdual.dataset_service.enrichment.service.helper.EnrichmentTaskExecutor;
 import com.subdual.dataset_service.enrichment.service.helper.RowEnrichmentProcessor;
 import com.subdual.dataset_service.enrichment.service.helper.RowIdentityResolver;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
-import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
-
-import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
+import com.subdual.dataset_service.entity.service.EntityPersistenceService;
 
 /**
  * Clean, minimalistic implementation of DatasetEnrichmentService following SOLID principles.
@@ -43,7 +44,7 @@ public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService
     private final RowIdentityResolver rowIdentityResolver;
     private final RowEnrichmentProcessor rowEnrichmentProcessor;
 
-    @org.springframework.beans.factory.annotation.Autowired
+    @Autowired
     public DefaultDatasetEnrichmentService(
             EnrichmentEngineFacade enrichmentEngineFacade,
             ExecutorService enrichmentJobExecutor,

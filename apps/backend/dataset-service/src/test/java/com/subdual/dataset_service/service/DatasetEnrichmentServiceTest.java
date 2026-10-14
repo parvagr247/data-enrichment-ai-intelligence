@@ -1,5 +1,20 @@
 package com.subdual.dataset_service.service;
 
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+
+import com.subdual.dataset_service.config.EnrichmentProperties;
 import com.subdual.dataset_service.enrichment.api.dto.request.EnrichmentJobRequest;
 import com.subdual.dataset_service.enrichment.api.dto.request.ProfileAssessmentRequest;
 import com.subdual.dataset_service.enrichment.api.dto.request.SingleEnrichmentRequest;
@@ -15,16 +30,6 @@ import com.subdual.dataset_service.enrichment.model.ResearchProfile;
 import com.subdual.dataset_service.enrichment.service.helper.EnrichmentTaskExecutor;
 import com.subdual.dataset_service.enrichment.service.impl.DefaultDatasetEnrichmentService;
 import com.subdual.dataset_service.entity.service.EntityPersistenceService;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.Executors;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -50,11 +55,11 @@ class DatasetEnrichmentServiceTest {
     @BeforeEach
     void setUp() {
         taskExecutor = new EnrichmentTaskExecutor(
-                new com.subdual.dataset_service.config.EnrichmentProperties(
-                        new com.subdual.dataset_service.config.EnrichmentProperties.Execution(3, 100),
-                        new com.subdual.dataset_service.config.EnrichmentProperties.Research(5),
-                        new com.subdual.dataset_service.config.EnrichmentProperties.Timeout(60, 30),
-                        new com.subdual.dataset_service.config.EnrichmentProperties.Ai(true)
+                new EnrichmentProperties(
+                        new EnrichmentProperties.Execution(3, 100),
+                        new EnrichmentProperties.Research(5),
+                        new EnrichmentProperties.Timeout(60, 30),
+                        new EnrichmentProperties.Ai(true)
                 )
         );
         enrichmentService = new DefaultDatasetEnrichmentService(
@@ -219,8 +224,8 @@ class DatasetEnrichmentServiceTest {
         when(aiServiceClient.interpretRequirement(any(), any(), any()))
                 .thenReturn(new AiServiceClient.RequirementCallResponse(List.of("currentRole"), "Role scope", true));
 
-        java.util.concurrent.atomic.AtomicInteger concurrentCalls = new java.util.concurrent.atomic.AtomicInteger(0);
-        java.util.concurrent.atomic.AtomicInteger maxConcurrentSeen = new java.util.concurrent.atomic.AtomicInteger(0);
+        AtomicInteger concurrentCalls = new AtomicInteger(0);
+        AtomicInteger maxConcurrentSeen = new AtomicInteger(0);
 
         when(researchServiceClient.executeResearch(any())).thenAnswer(invocation -> {
             int current = concurrentCalls.incrementAndGet();
@@ -303,7 +308,7 @@ class DatasetEnrichmentServiceTest {
         assertNotNull(submitted);
         assertEquals(3, submitted.concurrency());
 
-        org.springframework.web.servlet.mvc.method.annotation.SseEmitter emitter =
+        SseEmitter emitter =
                 enrichmentService.subscribeJobEvents(submitted.jobId());
         assertNotNull(emitter);
     }
@@ -589,8 +594,8 @@ class DatasetEnrichmentServiceTest {
                         false
                 ));
 
-        org.mockito.ArgumentCaptor<ResearchServiceClient.ResearchCallRequest> captor =
-                org.mockito.ArgumentCaptor.forClass(ResearchServiceClient.ResearchCallRequest.class);
+        ArgumentCaptor<ResearchServiceClient.ResearchCallRequest> captor =
+                ArgumentCaptor.forClass(ResearchServiceClient.ResearchCallRequest.class);
 
         when(researchServiceClient.executeResearch(captor.capture()))
                 .thenReturn(new ResearchServiceClient.ResearchCallResponse(

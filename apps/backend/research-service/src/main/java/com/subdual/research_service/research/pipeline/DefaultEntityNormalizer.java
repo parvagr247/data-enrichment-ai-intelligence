@@ -1,17 +1,20 @@
 package com.subdual.research_service.research.pipeline;
 
-import com.subdual.research_service.api.dto.request.ResearchRequest;
-import com.subdual.research_service.research.model.EntityType;
-import com.subdual.research_service.research.model.ResearchTarget;
-import org.springframework.stereotype.Component;
-
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
+import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
+
+import org.springframework.stereotype.Component;
+
+import com.subdual.research_service.api.dto.request.ResearchRequest;
+import com.subdual.research_service.research.model.EntityType;
+import com.subdual.research_service.research.model.ResearchTarget;
+import com.subdual.research_service.util.UrlNormalizer;
 
 @Component
 public class DefaultEntityNormalizer implements EntityNormalizer {
@@ -91,7 +94,7 @@ public class DefaultEntityNormalizer implements EntityNormalizer {
     }
 
     private Map<String, Object> buildTargetMetadata(ResearchRequest request, String displayName) {
-        java.util.Map<String, Object> metadata = new java.util.LinkedHashMap<>();
+        Map<String, Object> metadata = new LinkedHashMap<>();
         if (request.metadata() != null) {
             metadata.putAll(request.metadata());
         }
@@ -146,7 +149,7 @@ public class DefaultEntityNormalizer implements EntityNormalizer {
 
     public String canonicalizeUrl(String rawUrl) {
         if (rawUrl == null || rawUrl.isBlank()) return "";
-        String unwrapped = com.subdual.research_service.util.UrlNormalizer.unwrapLink(rawUrl);
+        String unwrapped = UrlNormalizer.unwrapLink(rawUrl);
         if (unwrapped.isBlank()) return "";
         try {
             int hashIdx = unwrapped.indexOf('#');
@@ -160,12 +163,12 @@ public class DefaultEntityNormalizer implements EntityNormalizer {
             URI uri = URI.create(unwrapped);
             String scheme = uri.getScheme() != null ? uri.getScheme().toLowerCase(Locale.ROOT) : "https";
             String host = uri.getHost() != null ? uri.getHost().toLowerCase(Locale.ROOT) : "";
-            if (com.subdual.research_service.util.UrlNormalizer.isLinkedInInternational(host)) {
+            if (UrlNormalizer.isLinkedInInternational(host)) {
                 host = "linkedin.com";
             }
             String portPart = (uri.getPort() == -1 || ("http".equals(scheme) && uri.getPort() == 80) || ("https".equals(scheme) && uri.getPort() == 443)) ? "" : ":" + uri.getPort();
-            String path = com.subdual.research_service.util.UrlNormalizer.normalizePath(uri.getRawPath());
-            String query = com.subdual.research_service.util.UrlNormalizer.cleanQueryParameters(uri.getRawQuery());
+            String path = UrlNormalizer.normalizePath(uri.getRawPath());
+            String query = UrlNormalizer.cleanQueryParameters(uri.getRawQuery());
 
             return scheme + "://" + host + portPart + path + query;
         } catch (Exception e) {

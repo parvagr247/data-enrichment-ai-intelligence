@@ -1,21 +1,25 @@
 package com.subdual.research_service.integration.ai.client;
 
-import com.subdual.research_service.integration.ai.dto.AiExtractedFact;
-import com.subdual.research_service.integration.ai.dto.AiExtractionRequest;
-import com.subdual.research_service.integration.ai.dto.AiExtractionResponse;
-
-import com.subdual.research_service.config.ServiceMeshProperties;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.MediaType;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
-import org.springframework.stereotype.Component;
-import org.springframework.web.client.RestClient;
-
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatusCode;
+import org.springframework.http.MediaType;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.http.converter.AbstractHttpMessageConverter;
+import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
+
+import com.subdual.research_service.config.ServiceMeshProperties;
+import com.subdual.research_service.integration.ai.dto.AiExtractedFact;
+import com.subdual.research_service.integration.ai.dto.AiExtractionRequest;
+import com.subdual.research_service.integration.ai.dto.AiExtractionResponse;
 
 @Component
 @Slf4j
@@ -64,22 +68,22 @@ public class RestAiExtractionClient implements AiExtractionClient {
                     .accept(MediaType.APPLICATION_JSON, MediaType.valueOf("application/problem+json"))
                     .body(request)
                     .retrieve()
-                    .onStatus(org.springframework.http.HttpStatusCode::isError, (req, resp) -> {
+                    .onStatus(HttpStatusCode::isError, (req, resp) -> {
                         String errorBody = "";
                         try {
-                            errorBody = new String(resp.getBody().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+                            errorBody = new String(resp.getBody().readAllBytes(), StandardCharsets.UTF_8);
                         } catch (Exception ignored) {}
                         MediaType ct = resp.getHeaders().getContentType();
                         String safeError = sanitizeErrorBody(errorBody);
                         log.warn("[AI_EXTRACTION_HTTP_ERROR] upstream='{}' status={} contentType='{}' body='{}'",
                                 serviceUrl, resp.getStatusCode(), ct, safeError);
-                        throw new org.springframework.web.client.RestClientResponseException(
+                        throw new RestClientResponseException(
                                 "AI service error: " + resp.getStatusCode() + " - " + safeError,
                                 resp.getStatusCode().value(),
                                 resp.getStatusText(),
                                 resp.getHeaders(),
-                                errorBody.getBytes(java.nio.charset.StandardCharsets.UTF_8),
-                                java.nio.charset.StandardCharsets.UTF_8
+                                errorBody.getBytes(StandardCharsets.UTF_8),
+                                StandardCharsets.UTF_8
                         );
                     })
                     .body(AiExtractionResponse.class);
@@ -117,7 +121,7 @@ public class RestAiExtractionClient implements AiExtractionClient {
                 .requestFactory(requestFactory)
                 .configureMessageConverters(convertersBuilder -> convertersBuilder.configureMessageConvertersList(converters -> {
                     for (var converter : converters) {
-                        if (converter instanceof org.springframework.http.converter.AbstractHttpMessageConverter<?> ac) {
+                        if (converter instanceof AbstractHttpMessageConverter<?> ac) {
                             List<MediaType> types = new ArrayList<>(ac.getSupportedMediaTypes());
                             if (types.contains(MediaType.APPLICATION_JSON)) {
                                 if (!types.contains(MediaType.valueOf("application/problem+json"))) {

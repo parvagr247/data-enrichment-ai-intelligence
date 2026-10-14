@@ -1,6 +1,18 @@
 package com.subdual.dataset_service.enrichment.service.helper;
 
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.UUID;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+
 import com.subdual.dataset_service.common.dto.EntityAttributeDto;
 import com.subdual.dataset_service.common.dto.EntitySourceDto;
 import com.subdual.dataset_service.enrichment.api.dto.request.FactEvidenceDto;
@@ -17,12 +29,6 @@ import com.subdual.dataset_service.enrichment.model.ResearchFinding;
 import com.subdual.dataset_service.enrichment.model.ResearchObjective;
 import com.subdual.dataset_service.enrichment.model.ResearchProfile;
 import com.subdual.dataset_service.entity.api.dto.request.PersistEntityRequest;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Component;
-
-import java.time.Instant;
-import java.util.*;
 
 /**
  * Clean processor for single row research, evidence synthesis, profile assessment, and persistence.
@@ -37,7 +43,7 @@ public class RowEnrichmentProcessor {
     private final RowIdentityResolver rowIdentityResolver;
     private final EnrichmentJobManager jobManager;
 
-    @org.springframework.beans.factory.annotation.Autowired
+    @Autowired
     public RowEnrichmentProcessor(
             EnrichmentEngineFacade engineFacade,
             ObjectMapper objectMapper,

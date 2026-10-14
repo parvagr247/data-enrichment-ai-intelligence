@@ -1,12 +1,14 @@
 package com.subdual.research_service.research.pipeline;
 
+import java.net.URI;
+import java.util.Locale;
+
+import org.springframework.stereotype.Component;
+
 import com.subdual.research_service.research.model.DiscoveredSource;
 import com.subdual.research_service.research.model.EntityType;
 import com.subdual.research_service.research.model.ResearchTarget;
-import org.springframework.stereotype.Component;
-
-import java.net.URI;
-import java.util.Locale;
+import com.subdual.research_service.util.UrlNormalizer;
 
 @Component
 public class DeterministicRelevanceEvaluator implements RelevanceEvaluator {
@@ -95,7 +97,7 @@ public class DeterministicRelevanceEvaluator implements RelevanceEvaluator {
     }
 
     private boolean isSameUrl(String u1, String u2) {
-        return com.subdual.research_service.util.UrlNormalizer.isSameUrl(u1, u2);
+        return UrlNormalizer.isSameUrl(u1, u2);
     }
 
     private String extractSlug(String path) {

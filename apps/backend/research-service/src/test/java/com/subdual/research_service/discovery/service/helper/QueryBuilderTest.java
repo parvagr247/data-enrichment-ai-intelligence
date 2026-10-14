@@ -1,16 +1,17 @@
 package com.subdual.research_service.discovery.service.helper;
 
+import java.util.List;
+import java.util.Map;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+
 import com.subdual.research_service.discovery.model.QueryIntent;
 import com.subdual.research_service.discovery.model.QueryStrategy;
 import com.subdual.research_service.discovery.model.ResearchQuery;
 import com.subdual.research_service.research.model.EntityType;
 import com.subdual.research_service.research.model.ResearchTarget;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
-
-import java.util.List;
-import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -32,7 +33,7 @@ class QueryBuilderTest {
                 "id-10",
                 EntityType.PERSON,
                 "John Doe",
-                java.util.Map.of(
+                Map.of(
                         "organization", "Acme Corp",
                         "role", "Staff Engineer",
                         "targetFields", List.of("role", "education", "skills")
@@ -59,7 +60,7 @@ class QueryBuilderTest {
                 "id-11",
                 EntityType.PERSON,
                 "Jane Doe",
-                java.util.Map.of("organization", "Google")
+                Map.of("organization", "Google")
         );
 
         List<ResearchQuery> adaptive = queryBuilder.buildAdaptiveResearchQueries(target, List.of("education", "role"));
@@ -89,7 +90,7 @@ class QueryBuilderTest {
                 "id-krati",
                 EntityType.PERSON,
                 "Krati",
-                java.util.Map.of(
+                Map.of(
                         "organization", "Google",
                         "targetFields", List.of("role", "education")
                 )
@@ -119,7 +120,7 @@ class QueryBuilderTest {
                 "id-krati-slug",
                 EntityType.PERSON,
                 "Krati",
-                java.util.Map.of(
+                Map.of(
                         "targetFields", List.of("role", "skills")
                 )
         );
@@ -148,7 +149,7 @@ class QueryBuilderTest {
                 "id-vardhan",
                 EntityType.PERSON,
                 "Vardhan Bhati",
-                java.util.Map.of(
+                Map.of(
                         "organization", "Entrepreneurship Development Cell MNIT Jaipur",
                         "role", "Lead",
                         "location", "Jaipur, India",

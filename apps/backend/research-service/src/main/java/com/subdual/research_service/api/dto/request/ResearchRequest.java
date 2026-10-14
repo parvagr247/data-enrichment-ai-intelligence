@@ -1,11 +1,14 @@
 package com.subdual.research_service.api.dto.request;
 
-import com.subdual.research_service.research.model.EntityType;
-import com.subdual.research_service.research.model.ResearchDepth;
-import jakarta.validation.constraints.AssertTrue;
-
+import java.net.URI;
 import java.util.List;
 import java.util.Map;
+
+import jakarta.validation.constraints.AssertTrue;
+
+import com.subdual.research_service.research.model.EntityType;
+import com.subdual.research_service.research.model.ResearchDepth;
+import com.subdual.research_service.util.UrlNormalizer;
 
 public record ResearchRequest(
         String url,
@@ -62,7 +65,7 @@ public record ResearchRequest(
 
     public ResearchRequest {
         if (url != null && !url.isBlank()) {
-            url = com.subdual.research_service.util.UrlNormalizer.unwrapLink(url);
+            url = UrlNormalizer.unwrapLink(url);
         }
         if (entityType == null) {
             entityType = EntityType.OTHER;
@@ -91,12 +94,12 @@ public record ResearchRequest(
         if (url == null) {
             return true;
         }
-        String cleanUrl = com.subdual.research_service.util.UrlNormalizer.unwrapLink(url);
+        String cleanUrl = UrlNormalizer.unwrapLink(url);
         if (cleanUrl.isBlank()) {
             return false;
         }
         try {
-            java.net.URI uri = java.net.URI.create(cleanUrl.trim());
+            URI uri = URI.create(cleanUrl.trim());
             String scheme = uri.getScheme();
             if (scheme == null || (!"http".equalsIgnoreCase(scheme) && !"https".equalsIgnoreCase(scheme))) {
                 return false;

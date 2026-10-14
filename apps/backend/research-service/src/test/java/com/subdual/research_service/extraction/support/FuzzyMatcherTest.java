@@ -1,5 +1,6 @@
 package com.subdual.research_service.extraction.support;
 
+import org.assertj.core.data.Offset;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -15,7 +16,7 @@ class FuzzyMatcherTest {
 
         double partial = FuzzyMatcher.jaccardTokenSimilarity("John Robert Doe", "John Doe");
         // tokens: {john, robert, doe} and {john, doe}. intersection: 2, union: 3 => 2/3 ~ 0.666
-        assertThat(partial).isCloseTo(0.666, org.assertj.core.data.Offset.offset(0.01));
+        assertThat(partial).isCloseTo(0.666, Offset.offset(0.01));
 
         double disjoint = FuzzyMatcher.jaccardTokenSimilarity("Jane Smith", "John Doe");
         assertThat(disjoint).isEqualTo(0.0);

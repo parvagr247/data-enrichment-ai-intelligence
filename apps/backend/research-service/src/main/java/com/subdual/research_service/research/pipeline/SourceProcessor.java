@@ -1,13 +1,5 @@
 package com.subdual.research_service.research.pipeline;
 
-import com.subdual.research_service.research.model.DiscoveredSource;
-import com.subdual.research_service.research.model.ResearchSource;
-import com.subdual.research_service.research.model.ResearchTarget;
-import com.subdual.research_service.util.UrlNormalizer;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Component;
-
 import java.net.URI;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -16,6 +8,16 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Component;
+
+import com.subdual.research_service.research.model.DiscoveredSource;
+import com.subdual.research_service.research.model.EntityType;
+import com.subdual.research_service.research.model.ResearchSource;
+import com.subdual.research_service.research.model.ResearchTarget;
+import com.subdual.research_service.util.UrlNormalizer;
 
 /**
  * Clean source processor that validates, normalizes, deduplicates, and ranks candidate sources
@@ -82,7 +84,7 @@ public class SourceProcessor {
     private boolean shouldCheckCandidateConflicts(DiscoveredSource ds, String normalizedUrl, ResearchTarget target) {
         if (target == null || ds == null) return false;
         if (isPrimaryAnchor(normalizedUrl, target)) return false;
-        return target.entityType() == com.subdual.research_service.research.model.EntityType.PERSON;
+        return target.entityType() == EntityType.PERSON;
     }
 
     private String extractCandidateText(DiscoveredSource ds) {

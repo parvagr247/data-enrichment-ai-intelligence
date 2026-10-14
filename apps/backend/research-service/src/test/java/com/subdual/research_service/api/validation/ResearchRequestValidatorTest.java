@@ -1,14 +1,16 @@
 package com.subdual.research_service.api.validation;
 
-import com.subdual.research_service.api.dto.request.ResearchRequest;
-import com.subdual.research_service.common.exception.BusinessRuleException;
-import com.subdual.research_service.research.model.EntityType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import com.subdual.research_service.api.dto.request.ResearchRequest;
+import com.subdual.research_service.common.exception.BusinessRuleException;
+import com.subdual.research_service.research.model.EntityType;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -93,7 +95,7 @@ class ResearchRequestValidatorTest {
                 "Krati Mittal"
         );
         assertThatCode(() -> validator.validate(request)).doesNotThrowAnyException();
-        org.assertj.core.api.Assertions.assertThat(request.url())
+        assertThat(request.url())
                 .isEqualTo("https://www.linkedin.com/in/krati-mittal");
     }
 }

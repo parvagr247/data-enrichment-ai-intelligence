@@ -4,6 +4,7 @@ import java.net.URI;
 import java.util.Arrays;
 import java.util.Locale;
 import java.util.Set;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -45,7 +46,7 @@ public final class UrlNormalizer {
         String input = raw.trim();
 
         // 1. Markdown link pattern: [label](targetUrl) or [targetUrl](targetUrl)
-        java.util.regex.Matcher m = MARKDOWN_LINK_PATTERN.matcher(input);
+        Matcher m = MARKDOWN_LINK_PATTERN.matcher(input);
         if (m.matches()) {
             input = m.group(1).trim();
         }

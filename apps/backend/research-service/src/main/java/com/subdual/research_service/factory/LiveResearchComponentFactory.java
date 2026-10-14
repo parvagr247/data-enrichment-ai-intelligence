@@ -1,8 +1,11 @@
 package com.subdual.research_service.factory;
 
+import org.springframework.web.client.RestClient;
+
 import com.subdual.research_service.config.ResearchDiscoveryProperties;
 import com.subdual.research_service.config.ServiceMeshProperties;
 import com.subdual.research_service.config.WebFetchProperties;
+import com.subdual.research_service.discovery.cache.ThreadSafeSourceCache;
 import com.subdual.research_service.discovery.provider.MockSearchProvider;
 import com.subdual.research_service.discovery.provider.ResilientSearchProviderDecorator;
 import com.subdual.research_service.discovery.provider.SearchProvider;
@@ -14,7 +17,6 @@ import com.subdual.research_service.integration.persistence.client.RestDatasetPe
 import com.subdual.research_service.integration.web.CachingWebContentFetcher;
 import com.subdual.research_service.integration.web.DefaultWebContentFetcher;
 import com.subdual.research_service.integration.web.WebContentFetcher;
-import org.springframework.web.client.RestClient;
 
 /**
  * Concrete factory manufacturing live cloud and service-mesh integrated research components.
@@ -59,7 +61,7 @@ public class LiveResearchComponentFactory implements ResearchComponentFactory {
     public WebContentFetcher createWebContentFetcher() {
         return new CachingWebContentFetcher(
                 new DefaultWebContentFetcher(webFetchProperties, discoveryProperties),
-                com.subdual.research_service.discovery.cache.ThreadSafeSourceCache.getInstance()
+                ThreadSafeSourceCache.getInstance()
         );
     }
 }
