@@ -1,36 +1,32 @@
 package com.subdual.research_service.extraction.extractor;
 
+import com.subdual.research_service.api.dto.response.EvidenceTuple;
 import com.subdual.research_service.extraction.ai.AiEvidenceEnricher;
 import com.subdual.research_service.extraction.document.ExtractedDocument;
-import com.subdual.research_service.extraction.extractor.field.ActivityFieldExtractor;
-import com.subdual.research_service.extraction.extractor.field.EducationFieldExtractor;
-import com.subdual.research_service.extraction.extractor.field.ExperienceFieldExtractor;
 import com.subdual.research_service.extraction.extractor.field.FieldExtractor;
-import com.subdual.research_service.extraction.extractor.field.LocationFieldExtractor;
-import com.subdual.research_service.extraction.extractor.field.OrganizationFieldExtractor;
-import com.subdual.research_service.extraction.extractor.field.ProjectFieldExtractor;
-import com.subdual.research_service.extraction.extractor.field.RoleFieldExtractor;
-import com.subdual.research_service.extraction.extractor.field.SkillFieldExtractor;
-import com.subdual.research_service.extraction.extractor.field.TechFieldExtractor;
 import com.subdual.research_service.extraction.support.EntityResolver;
 import com.subdual.research_service.extraction.support.EvidenceMerger;
 import com.subdual.research_service.extraction.support.TargetFieldNormalizer;
-import com.subdual.research_service.api.dto.response.EvidenceTuple;
-import com.subdual.research_service.integration.ai.client.AiExtractionClient;
-import com.subdual.research_service.integration.ai.client.NoOpAiExtractionClient;
 import com.subdual.research_service.integration.ai.dto.AiExtractedFact;
 import com.subdual.research_service.research.model.ConfidenceTier;
 import com.subdual.research_service.research.model.EntityType;
 import com.subdual.research_service.research.model.ResearchSource;
 import com.subdual.research_service.research.model.ResearchTarget;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Cohesive evidence extractor following Single Responsibility and Dependency Inversion Principles.
+ * Coordinates document-level, entity-specific, and field-specific evidence extraction.
+ */
 @Component
+@RequiredArgsConstructor
 public class EvidenceExtractor {
 
     private final EvidenceMerger evidenceMerger;
@@ -41,73 +37,9 @@ public class EvidenceExtractor {
     private final ProductEvidenceExtractor productExtractor;
     private final AiEvidenceEnricher aiEvidenceEnricher;
     private final TargetFieldNormalizer targetFieldNormalizer;
-    private final List<FieldExtractor> fieldExtractors;
 
-    @Autowired
-    public EvidenceExtractor(
-            EvidenceMerger evidenceMerger,
-            CommonEvidenceExtractor commonExtractor,
-            PersonEvidenceExtractor personExtractor,
-            OrganizationEvidenceExtractor organizationExtractor,
-            RepositoryEvidenceExtractor repositoryExtractor,
-            ProductEvidenceExtractor productExtractor,
-            AiEvidenceEnricher aiEvidenceEnricher,
-            TargetFieldNormalizer targetFieldNormalizer,
-            @Autowired(required = false) List<FieldExtractor> fieldExtractors
-    ) {
-        this.evidenceMerger = evidenceMerger;
-        this.commonExtractor = commonExtractor;
-        this.personExtractor = personExtractor;
-        this.organizationExtractor = organizationExtractor;
-        this.repositoryExtractor = repositoryExtractor;
-        this.productExtractor = productExtractor;
-        this.aiEvidenceEnricher = aiEvidenceEnricher;
-        this.targetFieldNormalizer = targetFieldNormalizer;
-        this.fieldExtractors = fieldExtractors != null ? fieldExtractors : defaultFieldExtractors();
-    }
-
-    public EvidenceExtractor(
-            EvidenceMerger evidenceMerger,
-            CommonEvidenceExtractor commonExtractor,
-            PersonEvidenceExtractor personExtractor,
-            OrganizationEvidenceExtractor organizationExtractor,
-            RepositoryEvidenceExtractor repositoryExtractor,
-            ProductEvidenceExtractor productExtractor,
-            AiEvidenceEnricher aiEvidenceEnricher,
-            TargetFieldNormalizer targetFieldNormalizer
-    ) {
-        this(evidenceMerger, commonExtractor, personExtractor, organizationExtractor, repositoryExtractor, productExtractor, aiEvidenceEnricher, targetFieldNormalizer, null);
-    }
-
-    public EvidenceExtractor(AiExtractionClient aiExtractionClient) {
-        this.evidenceMerger = new EvidenceMerger();
-        this.commonExtractor = new CommonEvidenceExtractor();
-        this.personExtractor = new PersonEvidenceExtractor(this.evidenceMerger);
-        this.organizationExtractor = new OrganizationEvidenceExtractor(this.evidenceMerger);
-        this.repositoryExtractor = new RepositoryEvidenceExtractor(this.evidenceMerger);
-        this.productExtractor = new ProductEvidenceExtractor(this.evidenceMerger);
-        this.aiEvidenceEnricher = new AiEvidenceEnricher(aiExtractionClient != null ? aiExtractionClient : new NoOpAiExtractionClient(), this.evidenceMerger);
-        this.targetFieldNormalizer = new TargetFieldNormalizer();
-        this.fieldExtractors = defaultFieldExtractors();
-    }
-
-    public EvidenceExtractor() {
-        this((AiExtractionClient) null);
-    }
-
-    private static List<FieldExtractor> defaultFieldExtractors() {
-        return List.of(
-                new RoleFieldExtractor(),
-                new OrganizationFieldExtractor(),
-                new ExperienceFieldExtractor(),
-                new EducationFieldExtractor(),
-                new SkillFieldExtractor(),
-                new TechFieldExtractor(),
-                new ActivityFieldExtractor(),
-                new ProjectFieldExtractor(),
-                new LocationFieldExtractor()
-        );
-    }
+    @Autowired(required = false)
+    private List<FieldExtractor> fieldExtractors = Collections.emptyList();
 
     public Map<String, EvidenceTuple> extractEvidence(
             ResearchTarget target,

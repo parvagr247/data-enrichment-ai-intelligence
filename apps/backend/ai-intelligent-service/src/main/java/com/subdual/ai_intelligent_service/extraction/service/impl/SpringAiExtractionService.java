@@ -2,28 +2,26 @@ package com.subdual.ai_intelligent_service.extraction.service.impl;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.subdual.ai_intelligent_service.configuration.AiProperties;
-import com.subdual.ai_intelligent_service.exception.AiErrorClassifier;
-import com.subdual.ai_intelligent_service.exception.AiErrorClassifier.AiClassification;
+import com.subdual.ai_intelligent_service.ai.helper.AiPromptExecutor;
 import com.subdual.ai_intelligent_service.extraction.api.dto.request.ExtractionRequest;
 import com.subdual.ai_intelligent_service.extraction.api.dto.response.ExtractionResponse;
 import com.subdual.ai_intelligent_service.extraction.model.ExtractedFact;
 import com.subdual.ai_intelligent_service.extraction.service.ExtractionService;
 import com.subdual.ai_intelligent_service.extraction.service.helper.DeterministicExtractionHelper;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.ai.chat.model.ChatModel;
-import org.springframework.ai.chat.prompt.Prompt;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
 
+/**
+ * Clean, minimalistic implementation of ExtractionService using AiPromptExecutor and zero-hallucination guard.
+ */
 @Service
+@RequiredArgsConstructor
 @Slf4j
 public class SpringAiExtractionService implements ExtractionService {
 
@@ -31,138 +29,39 @@ public class SpringAiExtractionService implements ExtractionService {
     private static final int MAX_PROMPT_TEXT_LENGTH = 6000;
     private static final double DEFAULT_CONFIDENCE_SCORE = 0.85;
 
-    private final ChatModel chatModel;
-    private final AiProperties properties;
+    private final AiPromptExecutor promptExecutor;
     private final DeterministicExtractionHelper deterministicHelper;
-    private final String geminiApiKey;
 
-    @org.springframework.beans.factory.annotation.Autowired
-    public SpringAiExtractionService(
-            Optional<ChatModel> chatModel,
-            AiProperties properties,
-            DeterministicExtractionHelper deterministicHelper,
-            @Value("${spring.ai.google.genai.api-key:mock-key}") String geminiApiKey
-    ) {
-        this.chatModel = chatModel != null ? chatModel.orElse(null) : null;
-        this.properties = properties;
-        this.deterministicHelper = deterministicHelper;
-        this.geminiApiKey = geminiApiKey;
-    }
-
-    public SpringAiExtractionService(
-            Optional<ChatModel> chatModel,
-            AiProperties properties,
-            @Value("${spring.ai.google.genai.api-key:mock-key}") String geminiApiKey
-    ) {
-        this(chatModel, properties, new DeterministicExtractionHelper(), geminiApiKey);
-    }
-
-    @Override // Extracts grounded structured facts from text content.
+    @Override
     public ExtractionResponse extractFacts(ExtractionRequest request) {
         long startTime = System.currentTimeMillis();
-        ExtractionExecution execution = executeExtraction(request);
-        long executionTimeMs = System.currentTimeMillis() - startTime;
 
-        return new ExtractionResponse(
-                request.entityName(),
-                request.sourceUrl(),
-                execution.facts(),
-                execution.modelUsed(),
-                executionTimeMs
-        );
-    }
+        if (request != null) {
+            String promptText = buildPromptText(request);
+            Optional<String> aiResponse = promptExecutor.executePrompt("FACT_EXTRACTION", promptText, request.entityName());
 
-    private ExtractionExecution executeExtraction(ExtractionRequest request) {
-        long startTime = System.currentTimeMillis();
-        if (!isMockMode() && chatModel != null) {
-            return executeAiWithRetry(request, startTime);
+            if (aiResponse.isPresent()) {
+                Map<String, ExtractedFact> facts = parseSpringAiResponse(aiResponse.get(), request);
+                long executionTimeMs = System.currentTimeMillis() - startTime;
+                return new ExtractionResponse(
+                        request.entityName(),
+                        request.sourceUrl(),
+                        facts,
+                        promptExecutor.getModelName(),
+                        executionTimeMs
+                );
+            }
         }
 
         Map<String, ExtractedFact> facts = deterministicHelper.extractDeterministically(request);
-        long durationMs = System.currentTimeMillis() - startTime;
-        log.info("[AI_EXTRACTION] entity='{}' source='{}' model='deterministic-rule-engine' provider='local' status='SUCCESS' factsExtracted={} durationMs={}",
-                request.entityName(), request.sourceUrl(), facts.size(), durationMs);
-        return new ExtractionExecution(facts, "deterministic-rule-engine");
-    }
-
-    private ExtractionExecution executeAiWithRetry(ExtractionRequest request, long startTime) {
-        int maxRetries = 2;
-        int attempt = 0;
-        while (attempt <= maxRetries) {
-            attempt++;
-            try {
-                Map<String, ExtractedFact> facts = extractViaSpringAi(request);
-                long durationMs = System.currentTimeMillis() - startTime;
-                log.info("[AI_EXTRACTION] entity='{}' source='{}' model='{}' provider='google-genai' status='SUCCESS' factsExtracted={} durationMs={}",
-                        request.entityName(), request.sourceUrl(), properties.model(), facts.size(), durationMs);
-                return new ExtractionExecution(facts, properties.model());
-            } catch (Exception ex) {
-                AiClassification classification = AiErrorClassifier.classify(ex);
-                if (shouldRetry(classification, attempt, maxRetries)) {
-                    pauseForRetry(request, attempt, maxRetries, classification);
-                } else {
-                    return handleAiFallback(request, classification, startTime);
-                }
-            }
-        }
-        return new ExtractionExecution(deterministicHelper.extractDeterministically(request), "deterministic-fallback");
-    }
-
-    private boolean shouldRetry(AiClassification classification, int attempt, int maxRetries) {
-        boolean isDailyQuotaExhausted = classification.sanitizedMessage().toLowerCase(Locale.ROOT).contains("free_tier_requests")
-                || classification.sanitizedMessage().toLowerCase(Locale.ROOT).contains("generaterequestsperday");
-        return classification.isRetryable() && !isDailyQuotaExhausted && attempt <= maxRetries;
-    }
-
-    private void pauseForRetry(ExtractionRequest request, int attempt, int maxRetries, AiClassification classification) {
-        long backoffMs = attempt * 500L;
-        log.warn("[AI_EXTRACTION] entity='{}' source='{}' model='{}' attempt={}/{} errorCategory='{}' retryable=true retrying in {}ms (reason: {})",
-                request.entityName(), request.sourceUrl(), properties.model(), attempt, maxRetries + 1,
-                classification.category(), backoffMs, classification.sanitizedMessage());
-        try {
-            Thread.sleep(backoffMs);
-        } catch (InterruptedException ie) {
-            Thread.currentThread().interrupt();
-        }
-    }
-
-    private ExtractionExecution handleAiFallback(ExtractionRequest request, AiClassification classification, long startTime) {
-        long durationMs = System.currentTimeMillis() - startTime;
-        log.warn("[AI_EXTRACTION] entity='{}' source='{}' model='{}' provider='google-genai' status='FALLBACK' category='{}' httpStatus={} reason='{}' fallback='DETERMINISTIC' durationMs={}",
-                request.entityName(), request.sourceUrl(), properties.model(),
-                classification.category(), classification.httpStatusCode(), classification.sanitizedMessage(), durationMs);
-        return new ExtractionExecution(deterministicHelper.extractDeterministically(request), "deterministic-fallback");
-    }
-
-    private boolean isMockMode() {
-        return properties.mockMode()
-                || geminiApiKey == null
-                || geminiApiKey.isBlank()
-                || "mock-key".equalsIgnoreCase(geminiApiKey)
-                || geminiApiKey.contains("your-");
-    }
-
-    private Map<String, ExtractedFact> extractViaSpringAi(ExtractionRequest request) {
-        String promptText = buildPromptText(request);
-        String rawResponse;
-        try {
-            CompletableFuture<String> future = CompletableFuture.supplyAsync(() ->
-                    chatModel.call(new Prompt(promptText)).getResult().getOutput().getText()
-            );
-            rawResponse = future.get(15, TimeUnit.SECONDS);
-        } catch (java.util.concurrent.ExecutionException ee) {
-            Throwable cause = ee.getCause() != null ? ee.getCause() : ee;
-            if (cause instanceof RuntimeException re) {
-                throw re;
-            }
-            throw new RuntimeException(cause);
-        } catch (java.util.concurrent.TimeoutException te) {
-            throw new java.util.concurrent.CompletionException(new java.net.SocketTimeoutException("Gemini AI extraction timed out after 15 seconds"));
-        } catch (InterruptedException ie) {
-            Thread.currentThread().interrupt();
-            throw new RuntimeException("Gemini AI extraction interrupted", ie);
-        }
-        return parseSpringAiResponse(rawResponse, request);
+        long executionTimeMs = System.currentTimeMillis() - startTime;
+        return new ExtractionResponse(
+                request != null ? request.entityName() : null,
+                request != null ? request.sourceUrl() : null,
+                facts,
+                "deterministic-fallback",
+                executionTimeMs
+        );
     }
 
     private String buildPromptText(ExtractionRequest request) {
@@ -199,9 +98,7 @@ public class SpringAiExtractionService implements ExtractionService {
     }
 
     private String truncateText(String text, int maxLength) {
-        if (text == null) {
-            return "";
-        }
+        if (text == null) return "";
         return text.length() > maxLength ? text.substring(0, maxLength) : text;
     }
 
@@ -209,9 +106,8 @@ public class SpringAiExtractionService implements ExtractionService {
         Map<String, ExtractedFact> facts = new LinkedHashMap<>();
 
         try {
-            String cleaned = rawResponse.replaceAll("^```json\\s*", "").replaceAll("```\\s*$", "").trim();
-            JsonNode root = MAPPER.readTree(cleaned);
-            String lowerContent = request.textContent().toLowerCase(Locale.ROOT);
+            JsonNode root = MAPPER.readTree(rawResponse);
+            String lowerContent = request.textContent() != null ? request.textContent().toLowerCase(Locale.ROOT) : "";
 
             root.fields().forEachRemaining(entry -> parseFactEntry(entry, lowerContent, facts));
         } catch (Exception ex) {
@@ -237,6 +133,4 @@ public class SpringAiExtractionService implements ExtractionService {
             }
         }
     }
-
-    private record ExtractionExecution(Map<String, ExtractedFact> facts, String modelUsed) {}
 }

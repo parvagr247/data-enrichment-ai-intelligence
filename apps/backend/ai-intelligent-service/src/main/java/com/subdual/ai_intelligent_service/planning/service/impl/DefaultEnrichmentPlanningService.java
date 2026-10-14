@@ -1,5 +1,6 @@
 package com.subdual.ai_intelligent_service.planning.service.impl;
 
+import com.subdual.ai_intelligent_service.ai.helper.AiPromptExecutor;
 import com.subdual.ai_intelligent_service.planning.model.EnrichmentPlan;
 import com.subdual.ai_intelligent_service.planning.model.EnrichmentRequirement;
 import com.subdual.ai_intelligent_service.planning.model.FieldSourceStrategy;
@@ -10,8 +11,6 @@ import com.subdual.ai_intelligent_service.planning.service.helper.RequirementNor
 import com.subdual.ai_intelligent_service.planning.service.helper.RequirementValidator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.ai.chat.model.ChatModel;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -19,10 +18,11 @@ import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.Set;
 
 /**
- * Production implementation of requirement understanding and enrichment planning.
+ * Clean production implementation of requirement understanding and enrichment planning.
  * Decoupled from research execution: AI determines WHAT is needed, research determines HOW to find it.
  */
 @Service
@@ -33,11 +33,9 @@ public class DefaultEnrichmentPlanningService implements EnrichmentPlanningServi
     private final DefaultPlanGenerator defaultPlanGenerator;
     private final RequirementNormalizer requirementNormalizer;
     private final RequirementValidator requirementValidator;
+    private final AiPromptExecutor promptExecutor;
 
-    @Autowired(required = false)
-    private ChatModel chatModel;
-
-    @Override // Constructs a structured enrichment plan based on user requirements and input schema.
+    @Override
     public EnrichmentPlan planEnrichment(EnrichmentRequirement requirement) {
         String entityType = resolveEntityType(requirement);
 
@@ -75,7 +73,7 @@ public class DefaultEnrichmentPlanningService implements EnrichmentPlanningServi
         Set<String> extractedFromText = requirementNormalizer.extractNormalizedFieldsFromText(requirement.userObjective());
         candidateFields.addAll(extractedFromText);
 
-        if (candidateFields.isEmpty() && chatModel != null) {
+        if (candidateFields.isEmpty()) {
             trySpringAiFieldExtraction(requirement.userObjective(), validationNotes, candidateFields);
         }
 
@@ -87,19 +85,19 @@ public class DefaultEnrichmentPlanningService implements EnrichmentPlanningServi
             String aiPrompt = "You are a data enrichment planner. Given this user requirement: \""
                     + objective
                     + "\", list the 1 to 5 target fields needed as comma-separated snake_case identifiers (e.g. role, organization, education). Output ONLY the comma-separated list.";
-            String aiResponse = chatModel.call(aiPrompt);
-            if (aiResponse != null && !aiResponse.isBlank()) {
-                String[] tokens = aiResponse.split("[,;\\n]");
+            Optional<String> aiResponse = promptExecutor.executePrompt("REQUIREMENT_PLANNING", aiPrompt, "planning");
+            if (aiResponse.isPresent() && !aiResponse.get().isBlank()) {
+                String[] tokens = aiResponse.get().split("[,;\\n]");
                 for (String t : tokens) {
                     String clean = requirementNormalizer.normalizeFieldKey(t);
                     if (!clean.equalsIgnoreCase("UNKNOWN")) {
                         candidateFields.add(clean);
                     }
                 }
-                validationNotes.add("Parsed complex user requirement via Spring AI");
+                validationNotes.add("Parsed complex user requirement via AI");
             }
         } catch (Exception ex) {
-            log.warn("Spring AI requirement interpretation fallback triggered: {}", ex.getMessage());
+            log.warn("AI requirement interpretation fallback triggered: {}", ex.getMessage());
             validationNotes.add("AI parsing failed (" + ex.getMessage() + "); using heuristic extraction");
         }
     }

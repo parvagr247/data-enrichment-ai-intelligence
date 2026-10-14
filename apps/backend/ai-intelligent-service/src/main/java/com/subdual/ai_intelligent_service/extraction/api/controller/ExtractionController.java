@@ -2,7 +2,7 @@ package com.subdual.ai_intelligent_service.extraction.api.controller;
 
 import com.subdual.ai_intelligent_service.extraction.api.dto.request.ExtractionRequest;
 import com.subdual.ai_intelligent_service.extraction.api.dto.response.ExtractionResponse;
-import com.subdual.ai_intelligent_service.extraction.service.ExtractionService;
+import com.subdual.ai_intelligent_service.facade.AiServiceFacade;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
@@ -12,16 +12,19 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * Controller delegating extraction operations to the unified AiServiceFacade.
+ */
 @RestController
 @RequestMapping("/api/v1/ai")
 @RequiredArgsConstructor
 public class ExtractionController {
 
-    private final ExtractionService extractionService;
+    private final AiServiceFacade aiFacade;
 
     @PostMapping(value = "/extract", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<ExtractionResponse> extract(@Valid @RequestBody ExtractionRequest request) {
-        ExtractionResponse response = extractionService.extractFacts(request);
+        ExtractionResponse response = aiFacade.extractFacts(request);
         return ResponseEntity.ok(response);
     }
 }

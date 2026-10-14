@@ -3,9 +3,7 @@ package com.subdual.ai_intelligent_service.profile.service.impl;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.subdual.ai_intelligent_service.ai.dto.AiExecutionMetrics;
-import com.subdual.ai_intelligent_service.configuration.AiProperties;
-import com.subdual.ai_intelligent_service.exception.AiErrorClassifier;
-import com.subdual.ai_intelligent_service.exception.AiErrorClassifier.AiClassification;
+import com.subdual.ai_intelligent_service.ai.helper.AiPromptExecutor;
 import com.subdual.ai_intelligent_service.profile.api.dto.request.ProfileAssessmentRequest;
 import com.subdual.ai_intelligent_service.profile.api.dto.response.ProfileAssessmentResponse;
 import com.subdual.ai_intelligent_service.profile.model.ObjectiveAssessment;
@@ -23,10 +21,8 @@ import com.subdual.ai_intelligent_service.profile.model.ResearchProfile.ProjectI
 import com.subdual.ai_intelligent_service.profile.service.ProfileAssessmentEngine;
 import com.subdual.ai_intelligent_service.profile.service.helper.ProfileExtractionHelper;
 import com.subdual.ai_intelligent_service.prompt.PromptTemplateService;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.ai.chat.model.ChatModel;
-import org.springframework.ai.chat.prompt.Prompt;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Component;
 
@@ -38,97 +34,42 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 
+/**
+ * Clean, minimalistic implementation of ProfileAssessmentEngine delegating prompt execution
+ * to AiPromptExecutor and fallback to DeterministicProfileAssessmentEngine.
+ */
 @Component
 @Primary
+@RequiredArgsConstructor
 @Slf4j
 public class SpringAiProfileAssessmentEngine implements ProfileAssessmentEngine {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
-    private static final int MAX_RETRIES = 2;
 
-    private final ChatModel chatModel;
-    private final AiProperties properties;
+    private final AiPromptExecutor promptExecutor;
     private final PromptTemplateService promptTemplateService;
     private final DeterministicProfileAssessmentEngine deterministicFallback;
     private final ProfileExtractionHelper extractionHelper;
-    private final String geminiApiKey;
 
-    public SpringAiProfileAssessmentEngine(
-            Optional<ChatModel> chatModel,
-            AiProperties properties,
-            PromptTemplateService promptTemplateService,
-            DeterministicProfileAssessmentEngine deterministicFallback,
-            ProfileExtractionHelper extractionHelper,
-            @Value("${spring.ai.google.genai.api-key:mock-key}") String geminiApiKey
-    ) {
-        this.chatModel = chatModel != null ? chatModel.orElse(null) : null;
-        this.properties = properties;
-        this.promptTemplateService = promptTemplateService;
-        this.deterministicFallback = deterministicFallback;
-        this.extractionHelper = extractionHelper;
-        this.geminiApiKey = geminiApiKey;
-    }
-
-    @Override // Assesses candidate profile against target objectives using Spring AI with heuristic fallback.
+    @Override
     public ProfileAssessmentResponse assessProfile(ProfileAssessmentRequest request) {
-        if (isMockMode() || chatModel == null) {
+        if (request == null) {
             return deterministicFallback.assessProfile(request);
         }
 
-        ProfileAssessmentResponse response = executeAiAssessmentWithRetry(request);
-        if (response != null) {
-            return response;
-        }
-
-        log.warn("[AI_MODEL_DEGRADED] model='{}' provider='google-genai' stage='PROFILE_ASSESSMENT' entity='{}' falling back to deterministic assessment",
-                properties.model(), request.displayName());
-        return deterministicFallback.assessProfile(request);
-    }
-
-    private ProfileAssessmentResponse executeAiAssessmentWithRetry(ProfileAssessmentRequest request) {
         long startMs = System.currentTimeMillis();
-        int retries = 0;
+        String promptText = buildPromptText(request);
+        Optional<String> aiResponse = promptExecutor.executePrompt("PROFILE_ASSESSMENT", promptText, request.displayName());
 
-        while (retries <= MAX_RETRIES) {
-            try {
-                String promptText = buildPromptText(request);
-                log.info("[AI_MODEL_CALL] model='{}' provider='google-genai' stage='PROFILE_ASSESSMENT' entity='{}' attempt={}/{}",
-                        properties.model(), request.displayName(), retries + 1, MAX_RETRIES + 1);
-                String responseText = chatModel.call(new Prompt(promptText)).getResult().getOutput().getText();
-
-                ProfileAssessmentResponse parsed = parseProfileResponse(responseText, request, startMs);
-                if (parsed != null) {
-                    log.info("[AI_MODEL_SUCCESS] model='{}' provider='google-genai' stage='PROFILE_ASSESSMENT' entity='{}' durationMs={}",
-                            properties.model(), request.displayName(), System.currentTimeMillis() - startMs);
-                    return parsed;
-                }
-            } catch (Exception ex) {
-                if (!handleRetryException(ex, request.displayName(), retries)) {
-                    break;
-                }
+        if (aiResponse.isPresent()) {
+            ProfileAssessmentResponse response = parseProfileResponse(aiResponse.get(), request, startMs);
+            if (response != null) {
+                return response;
             }
-            retries++;
         }
-        return null;
-    }
 
-    private boolean handleRetryException(Exception ex, String displayName, int retries) {
-        AiClassification classification = AiErrorClassifier.classify(ex);
-        if (classification.isRetryable() && retries < MAX_RETRIES) {
-            log.warn("[AI_MODEL_RETRY] model='{}' provider='google-genai' stage='PROFILE_ASSESSMENT' entity='{}' attempt={}/{} category='{}' retryable=true error='{}'",
-                    properties.model(), displayName, retries + 1, MAX_RETRIES + 1, classification.category(), classification.sanitizedMessage());
-            try {
-                Thread.sleep((retries + 1) * 500L);
-                return true;
-            } catch (InterruptedException ie) {
-                Thread.currentThread().interrupt();
-                return false;
-            }
-        } else {
-            log.warn("[AI_MODEL_ABORT] model='{}' provider='google-genai' stage='PROFILE_ASSESSMENT' entity='{}' category='{}' httpStatus={} non-retryable error: {}",
-                    properties.model(), displayName, classification.category(), classification.httpStatusCode(), classification.sanitizedMessage());
-            return false;
-        }
+        log.warn("[AI_PROFILE_FALLBACK] Falling back to deterministic assessment for entity: '{}'", request.displayName());
+        return deterministicFallback.assessProfile(request);
     }
 
     private String buildPromptText(ProfileAssessmentRequest request) {
@@ -145,14 +86,6 @@ public class SpringAiProfileAssessmentEngine implements ProfileAssessmentEngine 
         return promptTemplateService.render("research-profile-assessment", vars);
     }
 
-    private boolean isMockMode() {
-        return properties.mockMode()
-                || geminiApiKey == null
-                || geminiApiKey.isBlank()
-                || "mock-key".equalsIgnoreCase(geminiApiKey)
-                || geminiApiKey.contains("your-");
-    }
-
     private String toJsonSafe(Object obj) {
         try {
             return MAPPER.writeValueAsString(obj);
@@ -163,8 +96,7 @@ public class SpringAiProfileAssessmentEngine implements ProfileAssessmentEngine 
 
     private ProfileAssessmentResponse parseProfileResponse(String responseText, ProfileAssessmentRequest request, long startMs) {
         try {
-            String cleaned = extractionHelper.cleanJsonBlocks(responseText);
-            JsonNode root = MAPPER.readTree(cleaned);
+            JsonNode root = MAPPER.readTree(responseText);
 
             ResearchProfile profile = parseProfile(root.get("profile"));
             ObjectiveAssessment assessment = parseAssessment(root.get("assessment"));
@@ -172,7 +104,7 @@ public class SpringAiProfileAssessmentEngine implements ProfileAssessmentEngine 
             List<ResearchFinding> findings = parseFindings(root);
 
             long elapsed = System.currentTimeMillis() - startMs;
-            AiExecutionMetrics metrics = new AiExecutionMetrics(properties.model(), 0, 0, 0, elapsed, 1, 0, "SUCCESS");
+            AiExecutionMetrics metrics = new AiExecutionMetrics(promptExecutor.getModelName(), 0, 0, 0, elapsed, 1, 0, "SUCCESS");
 
             return new ProfileAssessmentResponse(
                     request.displayName(), request.canonicalUrl(), request.entityType(),

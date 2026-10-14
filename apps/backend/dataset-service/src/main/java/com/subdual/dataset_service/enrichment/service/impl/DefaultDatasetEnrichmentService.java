@@ -1,23 +1,19 @@
 package com.subdual.dataset_service.enrichment.service.impl;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.subdual.dataset_service.enrichment.api.dto.request.EnrichmentJobRequest;
 import com.subdual.dataset_service.enrichment.api.dto.request.SingleEnrichmentRequest;
 import com.subdual.dataset_service.enrichment.api.dto.response.EnrichmentJobResponse;
 import com.subdual.dataset_service.enrichment.api.dto.response.RowEnrichmentResult;
+import com.subdual.dataset_service.enrichment.facade.EnrichmentEngineFacade;
 import com.subdual.dataset_service.enrichment.integration.AiServiceClient;
-import com.subdual.dataset_service.enrichment.integration.ResearchServiceClient;
 import com.subdual.dataset_service.enrichment.model.JobState;
 import com.subdual.dataset_service.enrichment.service.DatasetEnrichmentService;
 import com.subdual.dataset_service.enrichment.service.helper.EnrichmentJobManager;
 import com.subdual.dataset_service.enrichment.service.helper.EnrichmentTaskExecutor;
 import com.subdual.dataset_service.enrichment.service.helper.RowEnrichmentProcessor;
 import com.subdual.dataset_service.enrichment.service.helper.RowIdentityResolver;
-import com.subdual.dataset_service.entity.service.EntityPersistenceService;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.Nullable;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -29,75 +25,28 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 
+/**
+ * Clean, minimalistic implementation of DatasetEnrichmentService following SOLID principles.
+ * Orchestrates batch enrichment workflows, manages thread pools, and broadcasts SSE updates.
+ */
 @Service
+@RequiredArgsConstructor
 @Slf4j
 public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService {
 
-    private final AiServiceClient aiServiceClient;
+    private final EnrichmentEngineFacade enrichmentEngineFacade;
     private final ExecutorService enrichmentJobExecutor;
     private final EnrichmentTaskExecutor enrichmentTaskExecutor;
     private final EnrichmentJobManager jobManager;
     private final RowIdentityResolver rowIdentityResolver;
     private final RowEnrichmentProcessor rowEnrichmentProcessor;
 
-    @Autowired
-    public DefaultDatasetEnrichmentService(
-            AiServiceClient aiServiceClient,
-            ExecutorService enrichmentJobExecutor,
-            EnrichmentTaskExecutor enrichmentTaskExecutor,
-            EnrichmentJobManager jobManager,
-            RowIdentityResolver rowIdentityResolver,
-            RowEnrichmentProcessor rowEnrichmentProcessor
-    ) {
-        this.aiServiceClient = aiServiceClient;
-        this.enrichmentJobExecutor = enrichmentJobExecutor;
-        this.enrichmentTaskExecutor = enrichmentTaskExecutor;
-        this.jobManager = jobManager;
-        this.rowIdentityResolver = rowIdentityResolver;
-        this.rowEnrichmentProcessor = rowEnrichmentProcessor;
-    }
-
-    public DefaultDatasetEnrichmentService(
-            ResearchServiceClient researchServiceClient,
-            AiServiceClient aiServiceClient,
-            EntityPersistenceService persistenceService,
-            ExecutorService enrichmentJobExecutor,
-            EnrichmentTaskExecutor enrichmentTaskExecutor
-    ) {
-        this(researchServiceClient, aiServiceClient, persistenceService, enrichmentJobExecutor, enrichmentTaskExecutor,
-                new ObjectMapper().registerModule(new JavaTimeModule()));
-    }
-
-    public DefaultDatasetEnrichmentService(
-            ResearchServiceClient researchServiceClient,
-            AiServiceClient aiServiceClient,
-            EntityPersistenceService persistenceService,
-            ExecutorService enrichmentJobExecutor,
-            EnrichmentTaskExecutor enrichmentTaskExecutor,
-            @Nullable ObjectMapper objectMapper
-    ) {
-        ObjectMapper mapper = objectMapper != null ? objectMapper : new ObjectMapper().registerModule(new JavaTimeModule());
-        RowIdentityResolver resolver = new RowIdentityResolver();
-        EnrichmentJobManager manager = new EnrichmentJobManager();
-        RowEnrichmentProcessor processor = new RowEnrichmentProcessor(researchServiceClient, aiServiceClient, persistenceService, mapper, resolver, manager);
-        this.aiServiceClient = aiServiceClient;
-        this.enrichmentJobExecutor = enrichmentJobExecutor;
-        this.enrichmentTaskExecutor = enrichmentTaskExecutor;
-        this.jobManager = manager;
-        this.rowIdentityResolver = resolver;
-        this.rowEnrichmentProcessor = processor;
-    }
-
-    public static String buildCompositeName(String firstName, String lastName, String fullName, String legacyName) {
-        return RowIdentityResolver.buildCompositeName(firstName, lastName, fullName, legacyName);
-    }
-
     @Override
     public EnrichmentJobResponse createAndSubmitJob(EnrichmentJobRequest request) {
         return createAndSubmitJob(request, null);
     }
 
-    @Override // Submits an asynchronous batch dataset enrichment job.
+    @Override
     public EnrichmentJobResponse createAndSubmitJob(EnrichmentJobRequest request, String userId) {
         JobState state = jobManager.createJobState(request, userId, rowIdentityResolver);
         enrichmentJobExecutor.submit(() -> executeJobAsync(state, request));
@@ -109,7 +58,7 @@ public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService
         return getJob(jobId, null);
     }
 
-    @Override // Retrieves enrichment job state with user ownership enforcement.
+    @Override
     public Optional<EnrichmentJobResponse> getJob(String jobId, String userId) {
         return jobManager.getJob(jobId, userId, enrichmentTaskExecutor.getConcurrency());
     }
@@ -119,7 +68,7 @@ public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService
         return listJobs(null);
     }
 
-    @Override // Lists active and historical enrichment jobs for user.
+    @Override
     public List<EnrichmentJobResponse> listJobs(String userId) {
         return jobManager.listJobs(userId, enrichmentTaskExecutor.getConcurrency());
     }
@@ -129,14 +78,14 @@ public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService
         return enrichSingle(request, null);
     }
 
-    @Override // Executes immediate synchronous enrichment for an individual row.
+    @Override
     public RowEnrichmentResult enrichSingle(SingleEnrichmentRequest request, String userId) {
         Map<String, String> row = request.row();
         Map<String, String> mapping = request.columnMapping();
         String entityType = request.entityType();
         String requirement = request.userRequirement();
 
-        AiServiceClient.RequirementCallResponse reqResponse = aiServiceClient.interpretRequirement(requirement, entityType, row);
+        AiServiceClient.RequirementCallResponse reqResponse = enrichmentEngineFacade.interpretRequirement(requirement, entityType, row);
         List<String> targetFields = reqResponse != null ? reqResponse.requestedFields() : List.of();
 
         return rowEnrichmentProcessor.processSingleRow(
@@ -150,7 +99,7 @@ public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService
         return cancelJob(jobId, null);
     }
 
-    @Override // Cancels an in-flight dataset enrichment job.
+    @Override
     public boolean cancelJob(String jobId, String userId) {
         return jobManager.cancelJob(jobId, userId);
     }
@@ -160,7 +109,7 @@ public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService
         return subscribeJobEvents(jobId, null);
     }
 
-    @Override // Subscribes to live SSE stream for job execution events.
+    @Override
     public SseEmitter subscribeJobEvents(String jobId, String userId) {
         return jobManager.subscribeJobEvents(jobId, userId, enrichmentTaskExecutor.getConcurrency());
     }
@@ -168,8 +117,8 @@ public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService
     private void executeJobAsync(JobState state, EnrichmentJobRequest request) {
         long startMs = System.currentTimeMillis();
         try {
-            log.info("Starting enrichment job '{}' ({} rows, concurrency={}), requirement='{}'",
-                    state.jobId, state.totalRows, enrichmentTaskExecutor.getConcurrency(), state.userRequirement);
+            log.info("Starting enrichment job '{}' ({} rows, concurrency={})",
+                    state.jobId, state.totalRows, enrichmentTaskExecutor.getConcurrency());
 
             List<String> targetFields = interpretTargetFields(request);
             List<Map<String, String>> rows = request.rows() != null ? request.rows() : List.of();
@@ -188,7 +137,7 @@ public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService
     }
 
     private List<String> interpretTargetFields(EnrichmentJobRequest request) {
-        AiServiceClient.RequirementCallResponse reqResponse = aiServiceClient.interpretRequirement(
+        AiServiceClient.RequirementCallResponse reqResponse = enrichmentEngineFacade.interpretRequirement(
                 request.userRequirement(),
                 request.defaultEntityType(),
                 request.rows() != null && !request.rows().isEmpty() ? request.rows().get(0) : Map.of()
@@ -197,17 +146,12 @@ public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService
     }
 
     private CompletableFuture<Void> submitRowTask(
-            JobState state,
-            EnrichmentJobRequest request,
-            int rowIndex,
-            Map<String, String> row,
-            List<String> targetFields
+            JobState state, EnrichmentJobRequest request, int rowIndex,
+            Map<String, String> row, List<String> targetFields
     ) {
         final String rowId = state.jobId + "-row-" + rowIndex;
         return enrichmentTaskExecutor.submitTask(() -> {
-            if (state.cancelled) {
-                return null;
-            }
+            if (state.cancelled) return null;
             state.processingRows.incrementAndGet();
 
             String workerId = resolveWorkerId(rowIndex);
@@ -283,12 +227,10 @@ public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService
             jobManager.emitExecutionEvent(
                     state.jobId, rowId, rowIndex, result.displayName(), result.status(), result.status(), workerId,
                     result.message() != null ? result.message() : "Enrichment completed",
-                    Map.of(
-                            "attributesCount", result.attributes() != null ? result.attributes().size() : 0,
-                            "sourcesCount", result.sources() != null ? result.sources().size() : 0,
-                            "confidence", result.confidence(),
-                            "result", result
-                    )
+                    Map.of("attributesCount", result.attributes() != null ? result.attributes().size() : 0,
+                           "sourcesCount", result.sources() != null ? result.sources().size() : 0,
+                           "confidence", result.confidence(),
+                           "result", result)
             );
         }
     }
@@ -331,8 +273,8 @@ public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService
             state.status = (failed == state.totalRows && state.totalRows > 0) ? "FAILED" : "COMPLETED";
         }
 
-        log.info("Completed enrichment job '{}' in {} ms (completed={}, partial={}, failed={})",
-                state.jobId, state.durationMs, state.completedRows.get(), state.partialRows.get(), state.failedRows.get());
+        log.info("Completed enrichment job '{}' in {} ms (completed={}, failed={})",
+                state.jobId, state.durationMs, state.completedRows.get(), state.failedRows.get());
 
         jobManager.emitJobCompleted(state.jobId, state.status, state.completedRows.get(), state.failedRows.get(), state.durationMs);
     }

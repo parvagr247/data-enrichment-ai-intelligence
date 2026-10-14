@@ -6,7 +6,7 @@ import com.subdual.ai_intelligent_service.enrichment.api.dto.request.Requirement
 import com.subdual.ai_intelligent_service.enrichment.api.dto.response.AIEnrichmentResult;
 import com.subdual.ai_intelligent_service.enrichment.api.dto.response.InputCleansingResponse;
 import com.subdual.ai_intelligent_service.enrichment.api.dto.response.RequirementInterpretationResponse;
-import com.subdual.ai_intelligent_service.enrichment.service.EnrichmentAIService;
+import com.subdual.ai_intelligent_service.facade.AiServiceFacade;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,21 +17,23 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * Controller delegating enrichment operations to the unified AiServiceFacade.
+ */
 @RestController
 @RequestMapping("/api/v1/ai")
 @RequiredArgsConstructor
 @Slf4j
 public class EnrichmentAiController {
 
-    private final EnrichmentAIService enrichmentAIService;
+    private final AiServiceFacade aiFacade;
 
     @PostMapping(value = "/requirement", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<RequirementInterpretationResponse> interpretRequirement(
             @Valid @RequestBody RequirementInterpretationRequest request
     ) {
         log.info("Interpreting user requirement for entityType: '{}'", request != null ? request.entityType() : "null");
-        RequirementInterpretationResponse response = enrichmentAIService.interpretRequirement(request);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(aiFacade.interpretRequirement(request));
     }
 
     @PostMapping(value = "/clean", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
@@ -39,8 +41,7 @@ public class EnrichmentAiController {
             @Valid @RequestBody InputCleansingRequest request
     ) {
         log.info("Cleaning raw entity input");
-        InputCleansingResponse response = enrichmentAIService.cleanInput(request);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(aiFacade.cleanInput(request));
     }
 
     @PostMapping(value = "/enrich", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
@@ -48,7 +49,6 @@ public class EnrichmentAiController {
             @Valid @RequestBody EnrichmentSynthesisRequest request
     ) {
         log.info("Synthesizing structured enrichment for entity: '{}'", request != null ? request.displayName() : "null");
-        AIEnrichmentResult response = enrichmentAIService.synthesizeEnrichment(request);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(aiFacade.synthesizeEnrichment(request));
     }
 }

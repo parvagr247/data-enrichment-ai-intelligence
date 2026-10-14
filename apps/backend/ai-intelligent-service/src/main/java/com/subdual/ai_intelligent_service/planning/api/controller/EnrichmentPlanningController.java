@@ -1,8 +1,8 @@
 package com.subdual.ai_intelligent_service.planning.api.controller;
 
+import com.subdual.ai_intelligent_service.facade.AiServiceFacade;
 import com.subdual.ai_intelligent_service.planning.model.EnrichmentPlan;
 import com.subdual.ai_intelligent_service.planning.model.EnrichmentRequirement;
-import com.subdual.ai_intelligent_service.planning.service.EnrichmentPlanningService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
@@ -13,8 +13,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * V2 Controller for requirement understanding and enrichment planning.
- * Delegates planning logic to {@link EnrichmentPlanningService}.
+ * Controller delegating enrichment planning to the unified AiServiceFacade.
  */
 @RestController
 @RequestMapping("/api/v2/ai/requirements")
@@ -22,7 +21,7 @@ import org.springframework.web.bind.annotation.RestController;
 @Slf4j
 public class EnrichmentPlanningController {
 
-    private final EnrichmentPlanningService planningService;
+    private final AiServiceFacade aiFacade;
 
     @PostMapping(value = "/plan", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<EnrichmentPlan> createEnrichmentPlan(
@@ -35,7 +34,6 @@ public class EnrichmentPlanningController {
         log.info("Generating V2 enrichment plan for objective: '{}' (entityType: '{}')",
                 requirement.userObjective(), requirement.entityType());
 
-        EnrichmentPlan plan = planningService.planEnrichment(requirement);
-        return ResponseEntity.ok(plan);
+        return ResponseEntity.ok(aiFacade.planEnrichment(requirement));
     }
 }

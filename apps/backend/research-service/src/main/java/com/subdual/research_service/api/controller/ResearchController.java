@@ -3,8 +3,7 @@ package com.subdual.research_service.api.controller;
 import com.subdual.research_service.api.dto.request.ResearchRequest;
 import com.subdual.research_service.api.dto.response.ResearchJobResponse;
 import com.subdual.research_service.api.dto.response.ResearchResponse;
-import com.subdual.research_service.research.job.ResearchJobService;
-import com.subdual.research_service.research.service.ResearchService;
+import com.subdual.research_service.facade.ResearchPipelineFacade;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,19 +21,21 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Optional;
 
+/**
+ * REST controller for research operations, cleanly delegating to the unified ResearchPipelineFacade.
+ */
 @RestController
 @RequestMapping("/api/v1/research")
 @RequiredArgsConstructor
 @Slf4j
 public class ResearchController {
 
-    private final ResearchService researchService;
-    private final ResearchJobService researchJobService;
+    private final ResearchPipelineFacade researchFacade;
 
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<ResearchResponse> executeResearch(@Valid @RequestBody ResearchRequest request) {
         log.info("Received synchronous research request for URL='{}'", request != null ? request.url() : null);
-        ResearchResponse response = researchService.executeResearch(request);
+        ResearchResponse response = researchFacade.executeResearch(request);
         return ResponseEntity.ok(response);
     }
 
@@ -45,9 +46,7 @@ public class ResearchController {
             @RequestHeader(value = "X-User-Id", required = false) String userId
     ) {
         log.info("Received asynchronous research job request for URL='{}' from user='{}'", request != null ? request.url() : null, userId);
-        ResearchJobResponse response = (userId != null && !userId.isBlank())
-                ? researchJobService.submitJob(request, userId)
-                : researchJobService.submitJob(request);
+        ResearchJobResponse response = researchFacade.submitJob(request, userId);
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(response);
     }
 
@@ -56,9 +55,7 @@ public class ResearchController {
             @PathVariable String jobId,
             @RequestHeader(value = "X-User-Id", required = false) String userId
     ) {
-        Optional<ResearchJobResponse> opt = (userId != null && !userId.isBlank())
-                ? researchJobService.getJob(jobId, userId)
-                : researchJobService.getJob(jobId);
+        Optional<ResearchJobResponse> opt = researchFacade.getJob(jobId, userId);
         return opt.map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }

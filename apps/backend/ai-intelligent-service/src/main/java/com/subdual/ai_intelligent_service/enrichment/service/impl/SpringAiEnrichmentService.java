@@ -2,7 +2,7 @@ package com.subdual.ai_intelligent_service.enrichment.service.impl;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.subdual.ai_intelligent_service.configuration.AiProperties;
+import com.subdual.ai_intelligent_service.ai.helper.AiPromptExecutor;
 import com.subdual.ai_intelligent_service.enrichment.api.dto.request.EnrichmentSynthesisRequest;
 import com.subdual.ai_intelligent_service.enrichment.api.dto.request.InputCleansingRequest;
 import com.subdual.ai_intelligent_service.enrichment.api.dto.request.RequirementInterpretationRequest;
@@ -12,13 +12,10 @@ import com.subdual.ai_intelligent_service.enrichment.api.dto.response.InputClean
 import com.subdual.ai_intelligent_service.enrichment.api.dto.response.RequirementInterpretationResponse;
 import com.subdual.ai_intelligent_service.enrichment.service.EnrichmentAIService;
 import com.subdual.ai_intelligent_service.enrichment.service.helper.DeterministicEnrichmentHelper;
-import com.subdual.ai_intelligent_service.exception.AiErrorClassifier;
 import com.subdual.ai_intelligent_service.normalization.AiOutputNormalizer;
 import com.subdual.ai_intelligent_service.prompt.PromptTemplates;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.ai.chat.model.ChatModel;
-import org.springframework.ai.chat.prompt.Prompt;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -28,30 +25,21 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 
+/**
+ * Clean, minimalistic implementation of EnrichmentAIService delegating prompt execution
+ * to AiPromptExecutor and fallback to DeterministicEnrichmentHelper.
+ */
 @Service
+@RequiredArgsConstructor
 @Slf4j
 public class SpringAiEnrichmentService implements EnrichmentAIService {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    private final ChatModel chatModel;
-    private final AiProperties properties;
-    private final String geminiApiKey;
+    private final AiPromptExecutor promptExecutor;
     private final DeterministicEnrichmentHelper helper;
 
-    public SpringAiEnrichmentService(
-            Optional<ChatModel> chatModel,
-            AiProperties properties,
-            @Value("${spring.ai.google.genai.api-key:mock-key}") String geminiApiKey,
-            DeterministicEnrichmentHelper helper
-    ) {
-        this.chatModel = chatModel != null ? chatModel.orElse(null) : null;
-        this.properties = properties;
-        this.geminiApiKey = geminiApiKey;
-        this.helper = helper;
-    }
-
-    @Override // Interprets requirement text into target enrichment fields.
+    @Override
     public RequirementInterpretationResponse interpretRequirement(RequirementInterpretationRequest request) {
         String requirement = request != null ? request.requirement() : null;
         String entityType = request != null && request.entityType() != null ? request.entityType().toUpperCase(Locale.ROOT) : "PERSON";
@@ -60,67 +48,41 @@ public class SpringAiEnrichmentService implements EnrichmentAIService {
             return helper.buildDefaultScope(entityType);
         }
 
-        if (!isMockMode() && chatModel != null) {
-            try {
-                RequirementInterpretationResponse response = executeAiInterpretation(requirement, entityType);
-                if (response != null) {
-                    return response;
-                }
-            } catch (Exception ex) {
-                logAiError("requirement interpretation", ex);
+        String promptText = String.format(PromptTemplates.REQUIREMENT_INTERPRETATION_PROMPT, entityType, requirement.trim());
+        Optional<String> aiResponse = promptExecutor.executePrompt("REQUIREMENT_INTERPRETATION", promptText, entityType);
+
+        if (aiResponse.isPresent()) {
+            RequirementInterpretationResponse parsed = parseRequirementResponse(aiResponse.get());
+            if (parsed != null) {
+                return parsed;
             }
         }
 
         return helper.interpretDeterministically(requirement, entityType);
     }
 
-    @Override // Cleans and normalizes raw input attributes for downstream enrichment.
+    @Override
     public InputCleansingResponse cleanInput(InputCleansingRequest request) {
         return helper.cleanInput(request);
     }
 
-    @Override // Synthesizes research evidence and input data into enriched attributes.
+    @Override
     public AIEnrichmentResult synthesizeEnrichment(EnrichmentSynthesisRequest request) {
         long startTime = System.currentTimeMillis();
 
-        if (!isMockMode() && chatModel != null) {
-            try {
-                AIEnrichmentResult result = executeAiSynthesis(request, startTime);
+        if (request != null) {
+            String promptText = buildSynthesisPromptText(request);
+            Optional<String> aiResponse = promptExecutor.executePrompt("ENRICHMENT_SYNTHESIS", promptText, request.displayName());
+
+            if (aiResponse.isPresent()) {
+                AIEnrichmentResult result = parseSynthesisResponse(aiResponse.get(), request, startTime);
                 if (result != null) {
                     return result;
                 }
-            } catch (Exception ex) {
-                logAiError("enrichment synthesis", ex);
             }
         }
 
         return helper.synthesizeDeterministically(request, startTime);
-    }
-
-    private RequirementInterpretationResponse executeAiInterpretation(String requirement, String entityType) {
-        String promptText = String.format(PromptTemplates.REQUIREMENT_INTERPRETATION_PROMPT, entityType, requirement.trim());
-        String responseText = chatModel.call(new Prompt(promptText)).getResult().getOutput().getText();
-        return parseRequirementResponse(responseText);
-    }
-
-    private AIEnrichmentResult executeAiSynthesis(EnrichmentSynthesisRequest request, long startTime) {
-        String promptText = buildSynthesisPromptText(request);
-        String responseText = chatModel.call(new Prompt(promptText)).getResult().getOutput().getText();
-        return parseSynthesisResponse(responseText, request, startTime);
-    }
-
-    private boolean isMockMode() {
-        return properties.mockMode()
-                || geminiApiKey == null
-                || geminiApiKey.isBlank()
-                || "mock-key".equalsIgnoreCase(geminiApiKey)
-                || geminiApiKey.contains("your-");
-    }
-
-    private void logAiError(String operation, Exception ex) {
-        var c = AiErrorClassifier.classify(ex);
-        log.warn("Spring AI {} failed [category='{}', status={}, reason='{}'], falling back to deterministic extraction",
-                operation, c.category(), c.httpStatusCode(), c.sanitizedMessage());
     }
 
     private String buildSynthesisPromptText(EnrichmentSynthesisRequest request) {
@@ -152,8 +114,7 @@ public class SpringAiEnrichmentService implements EnrichmentAIService {
 
     private RequirementInterpretationResponse parseRequirementResponse(String responseText) {
         try {
-            String cleaned = helper.cleanJsonBlocks(responseText);
-            JsonNode root = MAPPER.readTree(cleaned);
+            JsonNode root = MAPPER.readTree(responseText);
             List<String> fields = parseStringList(root, "requestedFields");
             String scope = root.has("scopeDescription") ? root.get("scopeDescription").asText() : "Interpreted scope";
             return new RequirementInterpretationResponse(fields, scope, false);
@@ -165,8 +126,7 @@ public class SpringAiEnrichmentService implements EnrichmentAIService {
 
     private AIEnrichmentResult parseSynthesisResponse(String responseText, EnrichmentSynthesisRequest request, long startTime) {
         try {
-            String cleaned = helper.cleanJsonBlocks(responseText);
-            JsonNode root = MAPPER.readTree(cleaned);
+            JsonNode root = MAPPER.readTree(responseText);
 
             String displayName = root.has("displayName") ? root.get("displayName").asText() : request.displayName();
             String entityType = root.has("entityType") ? root.get("entityType").asText() : request.entityType();
@@ -178,7 +138,7 @@ public class SpringAiEnrichmentService implements EnrichmentAIService {
             List<String> conflicts = parseStringList(root, "conflicts");
 
             long elapsed = System.currentTimeMillis() - startTime;
-            return new AIEnrichmentResult(displayName, entityType, canonicalUrl, attributes, unresolved, conflicts, confidence, properties.model(), elapsed);
+            return new AIEnrichmentResult(displayName, entityType, canonicalUrl, attributes, unresolved, conflicts, confidence, promptExecutor.getModelName(), elapsed);
         } catch (Exception e) {
             log.warn("Failed to parse AI synthesis response: {}", e.getMessage());
             return null;
