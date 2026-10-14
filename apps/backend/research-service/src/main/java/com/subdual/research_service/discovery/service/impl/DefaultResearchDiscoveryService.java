@@ -32,7 +32,6 @@ public class DefaultResearchDiscoveryService implements ResearchDiscoveryService
 
     @Override // Discovers candidate web sources for an entity research target.
     public List<DiscoveredSource> discoverSources(ResearchTarget target) {
-        long startTime = System.currentTimeMillis();
         List<ResearchQuery> queries = queryBuilder.buildRequirementQueries(target);
         if (queries.isEmpty()) {
             String primary = queryBuilder.buildDiscoveryQuery(target);
@@ -79,20 +78,12 @@ public class DefaultResearchDiscoveryService implements ResearchDiscoveryService
             ranked = ranked.subList(0, maxBudget);
         }
 
-        long duration = System.currentTimeMillis() - startTime;
-        log.info("[Pipeline: DISCOVERY_METRICS] Provider: '{}', Queries: {}, RawResults: {}, DedupRemoved: {}, Selected: {}, Duration: {}ms",
-                searchProvider.providerName(), executedQueries, allRaw.size(), dedupResult.duplicatesRemovedCount(), ranked.size(), duration);
-
         return ranked;
     }
 
     @Override // Discovers targeted sources to fill identified attribute gaps.
     public List<DiscoveredSource> discoverAdaptiveSources(ResearchTarget target, List<String> missingFields, int maxResults) {
-        long startTime = System.currentTimeMillis();
         String query = queryBuilder.buildAdaptiveQuery(target, missingFields);
-        log.info("[Pipeline: ADAPTIVE_DISCOVERY] Searching provider '{}' for missing fields {} with query: '{}'",
-                searchProvider.providerName(), missingFields, query);
-
         List<DiscoveredSource> raw = searchWithProvider(query, Math.max(1, maxResults));
         var dedupResult = SourceDeduplicator.deduplicate(raw);
         List<DiscoveredSource> ranked = SourceRanker.rankSources(
@@ -101,25 +92,15 @@ public class DefaultResearchDiscoveryService implements ResearchDiscoveryService
                 )
         );
 
-        long duration = System.currentTimeMillis() - startTime;
-        log.info("[Pipeline: ADAPTIVE_METRICS] Provider: '{}', MissingFields: {}, Results: {}, DedupRemoved: {}, Selected: {}, Duration: {}ms",
-                searchProvider.providerName(), missingFields, raw.size(), dedupResult.duplicatesRemovedCount(), ranked.size(), duration);
-
         return ranked;
     }
 
     private List<DiscoveredSource> searchWithProvider(String query, int maxResults) {
-        log.info("[Pipeline: DISCOVERY] Searching provider '{}' with query: '{}'",
-                discoveryProperties.provider(), query);
         try {
             return searchProvider.search(query, maxResults);
-        } catch (BusinessRuleException ex) {
-            throw ex;
-        } catch (ExternalServiceException ex) {
-            log.error("[Pipeline: FAILED] Search provider failure for query '{}': {}", query, ex.getMessage());
+        } catch (BusinessRuleException | ExternalServiceException ex) {
             throw ex;
         } catch (Exception ex) {
-            log.error("[Pipeline: FAILED] Unexpected error during search discovery for query '{}': {}", query, ex.getMessage(), ex);
             throw new ExternalServiceException("Failed to retrieve research sources from provider", ex);
         }
     }

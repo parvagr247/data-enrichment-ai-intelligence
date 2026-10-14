@@ -18,7 +18,6 @@ import com.subdual.ai_intelligent_service.profile.api.dto.response.ProfileAssess
 import com.subdual.ai_intelligent_service.profile.model.ResearchObjective;
 import com.subdual.ai_intelligent_service.profile.service.ProfileAssessmentEngine;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 /**
@@ -26,7 +25,6 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @RequiredArgsConstructor
-@Slf4j
 public class DefaultAiServiceFacade implements AiServiceFacade {
 
     private final EnrichmentAIService enrichmentAIService;

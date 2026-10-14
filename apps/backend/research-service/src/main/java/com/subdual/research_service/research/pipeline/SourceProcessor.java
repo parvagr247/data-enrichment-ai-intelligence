@@ -33,6 +33,13 @@ public class SourceProcessor {
         return processSources(rawSources, target, maxSources, null);
     }
 
+    private static final Set<String> CONFLICTING_PROFESSIONS = Set.of(
+            "dentist", "dentistry", "dental", "dds", "dmd",
+            "actress", "actor", "filmography", "hollywood", "imdb",
+            "realtor", "real estate", "broker",
+            "physician", "pediatrician", "surgeon"
+    );
+
     public List<ResearchSource> processSources(List<DiscoveredSource> rawSources, ResearchTarget target, int maxSources, String provider) {
         if (rawSources == null || rawSources.isEmpty()) {
             return List.of();
@@ -50,10 +57,87 @@ public class SourceProcessor {
             String dedupKey = deduplicationKey(normalizedUrl);
             if (!seenUrls.add(dedupKey)) continue;
 
+            if (isConflictingCandidate(ds, normalizedUrl, target)) {
+                log.info("[Pipeline: SOURCE_FILTERED] Candidate '{}' rejected due to conflicting identity signals with target '{}'",
+                        ds.url(), target != null ? target.displayName() : "null");
+                continue;
+            }
+
             processed.add(buildResearchSource(ds, normalizedUrl, target, provider));
         }
 
         return rankAndLimit(processed, target, maxSources);
+    }
+
+    private boolean isConflictingCandidate(DiscoveredSource ds, String normalizedUrl, ResearchTarget target) {
+        if (!shouldCheckCandidateConflicts(ds, normalizedUrl, target)) {
+            return false;
+        }
+
+        String lower = extractCandidateText(ds);
+        return hasConflictingProfession(lower, target)
+                || hasConflictingOrganization(lower, normalizedUrl, target);
+    }
+
+    private boolean shouldCheckCandidateConflicts(DiscoveredSource ds, String normalizedUrl, ResearchTarget target) {
+        if (target == null || ds == null) return false;
+        if (isPrimaryAnchor(normalizedUrl, target)) return false;
+        return target.entityType() == com.subdual.research_service.research.model.EntityType.PERSON;
+    }
+
+    private String extractCandidateText(DiscoveredSource ds) {
+        String title = ds.title() != null ? ds.title() : "";
+        String snippet = ds.snippet() != null ? ds.snippet() : "";
+        return (title + " " + snippet).toLowerCase(Locale.ROOT);
+    }
+
+    private boolean hasConflictingProfession(String lowerText, ResearchTarget target) {
+        String targetContext = getTargetContext(target).toLowerCase(Locale.ROOT);
+        for (String prof : CONFLICTING_PROFESSIONS) {
+            if (lowerText.contains(prof) && !targetContext.contains(prof)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean hasConflictingOrganization(String lowerText, String normalizedUrl, ResearchTarget target) {
+        if (target.seedOrganization() == null || target.seedOrganization().isBlank()) {
+            return false;
+        }
+
+        String seedOrg = target.seedOrganization().toLowerCase(Locale.ROOT);
+        String cleanOrg = seedOrg.replaceAll("[^a-z0-9]", "");
+        boolean urlHasOrg = normalizedUrl.toLowerCase(Locale.ROOT).contains(cleanOrg);
+
+        if (!lowerText.contains(seedOrg) && !urlHasOrg) {
+            return isConflictingInstitution(lowerText);
+        }
+        return false;
+    }
+
+    private boolean isConflictingInstitution(String text) {
+        return text.contains("d. e. shaw") || text.contains("deshaw")
+                || text.contains("iit delhi") || text.contains("iit bombay")
+                || text.contains("dental clinic") || text.contains("family dentistry");
+    }
+
+    private String getTargetContext(ResearchTarget target) {
+        StringBuilder sb = new StringBuilder();
+        if (target.displayName() != null) sb.append(target.displayName()).append(" ");
+        if (target.seedOrganization() != null) sb.append(target.seedOrganization()).append(" ");
+        if (target.seedRole() != null) sb.append(target.seedRole()).append(" ");
+        if (target.metadata() != null) {
+            target.metadata().values().forEach(v -> sb.append(v).append(" "));
+        }
+        return sb.toString();
+    }
+
+    private boolean isPrimaryAnchor(String url, ResearchTarget target) {
+        if (url == null || target == null) return false;
+        if (target.canonicalUrl() != null && UrlNormalizer.isSameUrl(url, target.canonicalUrl())) return true;
+        if (target.rawUrl() != null && UrlNormalizer.isSameUrl(url, target.rawUrl())) return true;
+        return false;
     }
 
     private boolean isValidSource(DiscoveredSource ds) {

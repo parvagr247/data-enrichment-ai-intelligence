@@ -58,21 +58,13 @@ public class AiPromptExecutor {
             return Optional.empty();
         }
 
-        long startMs = System.currentTimeMillis();
         int attempt = 0;
 
         while (attempt <= MAX_RETRIES) {
             attempt++;
             try {
-                log.info("[AI_CALL] operation='{}' entity='{}' model='{}' attempt={}/{}",
-                        operationName, entityName, properties.model(), attempt, MAX_RETRIES + 1);
-
                 String responseText = chatModel.call(new Prompt(promptText)).getResult().getOutput().getText();
                 String cleaned = cleanJson(responseText);
-
-                log.info("[AI_SUCCESS] operation='{}' entity='{}' durationMs={}",
-                        operationName, entityName, System.currentTimeMillis() - startMs);
-
                 return Optional.of(cleaned);
             } catch (Exception ex) {
                 AiClassification classification = AiErrorClassifier.classify(ex);

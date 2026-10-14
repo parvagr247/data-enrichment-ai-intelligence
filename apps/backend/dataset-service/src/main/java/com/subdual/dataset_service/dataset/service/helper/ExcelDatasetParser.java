@@ -1,6 +1,7 @@
 package com.subdual.dataset_service.dataset.service.helper;
 
 import com.subdual.dataset_service.dataset.model.RawDataset;
+import com.subdual.dataset_service.dataset.service.factory.DatasetParser;
 import org.springframework.stereotype.Component;
 
 import javax.xml.parsers.DocumentBuilder;
@@ -22,8 +23,16 @@ import java.util.zip.ZipInputStream;
  * Reads xl/sharedStrings.xml and xl/worksheets/sheet1.xml without external dependency risks.
  */
 @Component
-public class ExcelDatasetParser {
+public class ExcelDatasetParser implements DatasetParser {
 
+    @Override
+    public boolean supports(String fileName) {
+        if (fileName == null) return false;
+        String lower = fileName.toLowerCase(Locale.ROOT);
+        return lower.endsWith(".xlsx") || lower.endsWith(".xls");
+    }
+
+    @Override
     public RawDataset parse(InputStream inputStream, String fileName) throws IOException {
         byte[] bytes = inputStream.readAllBytes();
 

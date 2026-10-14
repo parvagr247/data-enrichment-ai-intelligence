@@ -7,7 +7,6 @@ import com.subdual.dataset_service.enrichment.api.dto.response.RowEnrichmentResu
 import com.subdual.dataset_service.enrichment.service.DatasetEnrichmentService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -26,7 +25,6 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/enrichment")
 @RequiredArgsConstructor
-@Slf4j
 public class EnrichmentJobController {
 
     private final DatasetEnrichmentService datasetEnrichmentService;
@@ -37,10 +35,6 @@ public class EnrichmentJobController {
             @Valid @RequestBody EnrichmentJobRequest request,
             @RequestHeader(value = "X-User-Id", required = false) String userId
     ) {
-        log.info("Received dataset enrichment job submission for '{}' ({} rows) from user '{}'",
-                request != null ? request.datasetName() : "unknown",
-                request != null && request.rows() != null ? request.rows().size() : 0,
-                userId);
         EnrichmentJobResponse response = datasetEnrichmentService.createAndSubmitJob(request, userId);
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(response);
     }
@@ -60,7 +54,6 @@ public class EnrichmentJobController {
             @PathVariable String jobId,
             @RequestHeader(value = "X-User-Id", required = false) String userId
     ) {
-        log.info("Client subscribed to SSE events for enrichment job '{}' (user '{}')", jobId, userId);
         return datasetEnrichmentService.subscribeJobEvents(jobId, userId);
     }
 
@@ -85,7 +78,6 @@ public class EnrichmentJobController {
             @Valid @RequestBody SingleEnrichmentRequest request,
             @RequestHeader(value = "X-User-Id", required = false) String userId
     ) {
-        log.info("Executing synchronous single row enrichment for user '{}'", userId);
         RowEnrichmentResult response = (userId != null && !userId.isBlank())
                 ? datasetEnrichmentService.enrichSingle(request, userId)
                 : datasetEnrichmentService.enrichSingle(request);

@@ -24,27 +24,15 @@ public class ResearchConfiguration {
 
     @Bean
     @Primary
-    public SearchProvider searchProvider(ResearchDiscoveryProperties properties) {
+    public SearchProvider searchProvider(ResearchDiscoveryProperties properties, com.subdual.research_service.discovery.factory.SearchProviderFactory searchProviderFactory) {
         String providerName = resolveProviderName(properties);
-        log.info("Initializing active SearchProvider: '{}'", providerName);
-        return createSearchProvider(providerName, properties);
+        return searchProviderFactory.createSearchProvider(providerName, properties);
     }
 
     private String resolveProviderName(ResearchDiscoveryProperties properties) {
         return (properties != null && properties.provider() != null)
                 ? properties.provider().trim().toLowerCase(Locale.ROOT)
                 : "mock";
-    }
-
-    private SearchProvider createSearchProvider(String providerName, ResearchDiscoveryProperties properties) {
-        if ("tavily".equals(providerName)) {
-            return new TavilySearchProvider(properties);
-        }
-        if ("mock".equals(providerName)) {
-            return new MockSearchProvider();
-        }
-        throw new BusinessRuleException("Unsupported search provider configured: '" + properties.provider()
-                + "'. Supported providers are 'mock' and 'tavily'.");
     }
 
     @Bean

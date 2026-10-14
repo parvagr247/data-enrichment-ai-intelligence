@@ -80,24 +80,28 @@ public class DeterministicExtractionHelper {
     }
 
     private void tryExtractRole(String sentence, String lowerSentence, String lowerName, Map<String, ExtractedFact> facts) {
-        if (facts.containsKey("currentRole") || !lowerSentence.contains(lowerName)) {
+        if ((facts.containsKey("currentRole") && facts.containsKey("role")) || !lowerSentence.contains(lowerName)) {
             return;
         }
         Matcher m = ROLE_PATTERN.matcher(sentence);
         if (m.find()) {
             String role = m.group(1).trim();
-            facts.put("currentRole", new ExtractedFact(role, sentence, 0.90));
+            ExtractedFact fact = new ExtractedFact(role, sentence, 0.90);
+            facts.put("currentRole", fact);
+            facts.put("role", fact);
         }
     }
 
     private void tryExtractOrganization(String sentence, String lowerSentence, String lowerName, Map<String, ExtractedFact> facts) {
-        if (facts.containsKey("organization") || !lowerSentence.contains(lowerName)) {
+        if ((facts.containsKey("organization") && facts.containsKey("currentOrganization")) || !lowerSentence.contains(lowerName)) {
             return;
         }
         Matcher m = ORG_PATTERN.matcher(sentence);
         if (m.find()) {
             String org = m.group(1).trim();
-            facts.put("organization", new ExtractedFact(org, sentence, 0.85));
+            ExtractedFact fact = new ExtractedFact(org, sentence, 0.85);
+            facts.put("organization", fact);
+            facts.put("currentOrganization", fact);
         }
     }
 

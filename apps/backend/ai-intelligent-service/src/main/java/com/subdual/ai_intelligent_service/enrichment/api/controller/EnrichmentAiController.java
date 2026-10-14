@@ -9,7 +9,6 @@ import com.subdual.ai_intelligent_service.enrichment.api.dto.response.Requiremen
 import com.subdual.ai_intelligent_service.facade.AiServiceFacade;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -23,7 +22,6 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/ai")
 @RequiredArgsConstructor
-@Slf4j
 public class EnrichmentAiController {
 
     private final AiServiceFacade aiFacade;
@@ -32,7 +30,6 @@ public class EnrichmentAiController {
     public ResponseEntity<RequirementInterpretationResponse> interpretRequirement(
             @Valid @RequestBody RequirementInterpretationRequest request
     ) {
-        log.info("Interpreting user requirement for entityType: '{}'", request != null ? request.entityType() : "null");
         return ResponseEntity.ok(aiFacade.interpretRequirement(request));
     }
 
@@ -40,7 +37,6 @@ public class EnrichmentAiController {
     public ResponseEntity<InputCleansingResponse> cleanInput(
             @Valid @RequestBody InputCleansingRequest request
     ) {
-        log.info("Cleaning raw entity input");
         return ResponseEntity.ok(aiFacade.cleanInput(request));
     }
 
@@ -48,7 +44,6 @@ public class EnrichmentAiController {
     public ResponseEntity<AIEnrichmentResult> synthesizeEnrichment(
             @Valid @RequestBody EnrichmentSynthesisRequest request
     ) {
-        log.info("Synthesizing structured enrichment for entity: '{}'", request != null ? request.displayName() : "null");
         return ResponseEntity.ok(aiFacade.synthesizeEnrichment(request));
     }
 }

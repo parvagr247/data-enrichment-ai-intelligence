@@ -20,7 +20,6 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @Primary
-@RequiredArgsConstructor
 @Slf4j
 public class SpringAiIntelligence implements AiIntelligence {
 
@@ -28,6 +27,32 @@ public class SpringAiIntelligence implements AiIntelligence {
     private final ExtractionService extractionService;
 
     private volatile AiExecutionMetrics latestMetrics = AiExecutionMetrics.deterministic(0L);
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public SpringAiIntelligence(EnrichmentAIService enrichmentAIService, ExtractionService extractionService) {
+        this.enrichmentAIService = enrichmentAIService;
+        this.extractionService = extractionService;
+    }
+
+    public SpringAiIntelligence(
+            java.util.Optional<org.springframework.ai.chat.model.ChatModel> chatModel,
+            com.subdual.ai_intelligent_service.configuration.AiProperties properties,
+            com.subdual.ai_intelligent_service.prompt.PromptTemplateService promptService,
+            com.subdual.ai_intelligent_service.ai.helper.AiResponseValidator validator,
+            com.subdual.ai_intelligent_service.ai.impl.DeterministicAiIntelligence deterministicFallback,
+            String apiKey
+    ) {
+        this(
+                new com.subdual.ai_intelligent_service.enrichment.service.impl.SpringAiEnrichmentService(
+                        new com.subdual.ai_intelligent_service.ai.helper.AiPromptExecutor(chatModel, properties, apiKey),
+                        new com.subdual.ai_intelligent_service.enrichment.service.helper.DeterministicEnrichmentHelper()
+                ),
+                new com.subdual.ai_intelligent_service.extraction.service.impl.SpringAiExtractionService(
+                        new com.subdual.ai_intelligent_service.ai.helper.AiPromptExecutor(chatModel, properties, apiKey),
+                        new com.subdual.ai_intelligent_service.extraction.service.helper.DeterministicExtractionHelper()
+                )
+        );
+    }
 
     @Override
     public RequirementInterpretationResponse interpretRequirement(RequirementInterpretationRequest request) {

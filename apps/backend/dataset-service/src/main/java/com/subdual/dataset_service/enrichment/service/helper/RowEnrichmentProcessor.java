@@ -29,7 +29,6 @@ import java.util.*;
  * Uses EnrichmentEngineFacade to interact with downstream research, AI, and database persistence subsystems.
  */
 @Component
-@RequiredArgsConstructor
 @Slf4j
 public class RowEnrichmentProcessor {
 
@@ -37,6 +36,23 @@ public class RowEnrichmentProcessor {
     private final ObjectMapper objectMapper;
     private final RowIdentityResolver rowIdentityResolver;
     private final EnrichmentJobManager jobManager;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public RowEnrichmentProcessor(
+            EnrichmentEngineFacade engineFacade,
+            ObjectMapper objectMapper,
+            RowIdentityResolver rowIdentityResolver,
+            EnrichmentJobManager jobManager
+    ) {
+        this.engineFacade = engineFacade;
+        this.objectMapper = objectMapper;
+        this.rowIdentityResolver = rowIdentityResolver;
+        this.jobManager = jobManager;
+    }
+
+    public RowEnrichmentProcessor(EnrichmentEngineFacade engineFacade) {
+        this(engineFacade, new ObjectMapper(), new RowIdentityResolver(), new EnrichmentJobManager());
+    }
 
     public RowEnrichmentResult processSingleRow(
             String rowId,
@@ -136,23 +152,18 @@ public class RowEnrichmentProcessor {
     private ResearchServiceClient.ResearchCallResponse callResearch(
             RowIdentity id, Map<String, String> rawRow, List<String> targetFields, String req, int rowIndex
     ) {
-        try {
-            Map<String, Object> meta = new LinkedHashMap<>();
-            if (rawRow != null) meta.putAll(rawRow);
-            if (id.firstName() != null) meta.put("firstName", id.firstName());
-            if (id.lastName() != null) meta.put("lastName", id.lastName());
-            if (id.email() != null) meta.put("email", id.email());
-            if (id.location() != null) meta.put("location", id.location());
+        Map<String, Object> meta = new LinkedHashMap<>();
+        if (rawRow != null) meta.putAll(rawRow);
+        if (id.firstName() != null) meta.put("firstName", id.firstName());
+        if (id.lastName() != null) meta.put("lastName", id.lastName());
+        if (id.email() != null) meta.put("email", id.email());
+        if (id.location() != null) meta.put("location", id.location());
 
-            return engineFacade.executeResearch(new ResearchServiceClient.ResearchCallRequest(
-                    id.canonicalUrl(), id.entityType(), id.displayName(), id.org(), id.role(),
-                    targetFields, req, meta, id.firstName(), id.lastName(),
-                    id.fullName() != null ? id.fullName() : id.displayName(), id.email(), id.location()
-            ));
-        } catch (Exception ex) {
-            log.warn("Research call failed for row {}: {}", rowIndex, ex.getMessage());
-            return null;
-        }
+        return engineFacade.executeResearch(new ResearchServiceClient.ResearchCallRequest(
+                id.canonicalUrl(), id.entityType(), id.displayName(), id.org(), id.role(),
+                targetFields, req, meta, id.firstName(), id.lastName(),
+                id.fullName() != null ? id.fullName() : id.displayName(), id.email(), id.location()
+        ));
     }
 
     private record EvidenceBundle(Map<String, AiServiceClient.FactEvidenceCallDto> evidenceMap,

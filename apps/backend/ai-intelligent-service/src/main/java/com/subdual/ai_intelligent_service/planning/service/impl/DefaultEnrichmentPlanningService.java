@@ -26,7 +26,6 @@ import java.util.Set;
  * Decoupled from research execution: AI determines WHAT is needed, research determines HOW to find it.
  */
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class DefaultEnrichmentPlanningService implements EnrichmentPlanningService {
 
@@ -34,6 +33,28 @@ public class DefaultEnrichmentPlanningService implements EnrichmentPlanningServi
     private final RequirementNormalizer requirementNormalizer;
     private final RequirementValidator requirementValidator;
     private final AiPromptExecutor promptExecutor;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public DefaultEnrichmentPlanningService(
+            DefaultPlanGenerator defaultPlanGenerator,
+            RequirementNormalizer requirementNormalizer,
+            RequirementValidator requirementValidator,
+            AiPromptExecutor promptExecutor
+    ) {
+        this.defaultPlanGenerator = defaultPlanGenerator;
+        this.requirementNormalizer = requirementNormalizer;
+        this.requirementValidator = requirementValidator;
+        this.promptExecutor = promptExecutor;
+    }
+
+    public DefaultEnrichmentPlanningService(
+            DefaultPlanGenerator defaultPlanGenerator,
+            RequirementNormalizer requirementNormalizer,
+            RequirementValidator requirementValidator
+    ) {
+        this(defaultPlanGenerator, requirementNormalizer, requirementValidator,
+                new AiPromptExecutor(java.util.Optional.empty(), new com.subdual.ai_intelligent_service.configuration.AiProperties("mock", 0.0, true), "mock-key"));
+    }
 
     @Override
     public EnrichmentPlan planEnrichment(EnrichmentRequirement requirement) {

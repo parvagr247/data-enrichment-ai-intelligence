@@ -4,8 +4,11 @@ import com.subdual.dataset_service.enrichment.api.dto.request.EnrichmentJobReque
 import com.subdual.dataset_service.enrichment.api.dto.request.SingleEnrichmentRequest;
 import com.subdual.dataset_service.enrichment.api.dto.response.EnrichmentJobResponse;
 import com.subdual.dataset_service.enrichment.api.dto.response.RowEnrichmentResult;
+import com.subdual.dataset_service.enrichment.facade.DefaultEnrichmentEngineFacade;
 import com.subdual.dataset_service.enrichment.facade.EnrichmentEngineFacade;
 import com.subdual.dataset_service.enrichment.integration.AiServiceClient;
+import com.subdual.dataset_service.enrichment.integration.ResearchServiceClient;
+import com.subdual.dataset_service.entity.service.EntityPersistenceService;
 import com.subdual.dataset_service.enrichment.model.JobState;
 import com.subdual.dataset_service.enrichment.service.DatasetEnrichmentService;
 import com.subdual.dataset_service.enrichment.service.helper.EnrichmentJobManager;
@@ -30,7 +33,6 @@ import java.util.concurrent.ExecutorService;
  * Orchestrates batch enrichment workflows, manages thread pools, and broadcasts SSE updates.
  */
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService {
 
@@ -40,6 +42,47 @@ public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService
     private final EnrichmentJobManager jobManager;
     private final RowIdentityResolver rowIdentityResolver;
     private final RowEnrichmentProcessor rowEnrichmentProcessor;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public DefaultDatasetEnrichmentService(
+            EnrichmentEngineFacade enrichmentEngineFacade,
+            ExecutorService enrichmentJobExecutor,
+            EnrichmentTaskExecutor enrichmentTaskExecutor,
+            EnrichmentJobManager jobManager,
+            RowIdentityResolver rowIdentityResolver,
+            RowEnrichmentProcessor rowEnrichmentProcessor
+    ) {
+        this.enrichmentEngineFacade = enrichmentEngineFacade;
+        this.enrichmentJobExecutor = enrichmentJobExecutor;
+        this.enrichmentTaskExecutor = enrichmentTaskExecutor;
+        this.jobManager = jobManager;
+        this.rowIdentityResolver = rowIdentityResolver;
+        this.rowEnrichmentProcessor = rowEnrichmentProcessor;
+    }
+
+    /**
+     * Backward-compatible constructor for testing and direct client injection.
+     */
+    public DefaultDatasetEnrichmentService(
+            ResearchServiceClient researchServiceClient,
+            AiServiceClient aiServiceClient,
+            EntityPersistenceService persistenceService,
+            ExecutorService enrichmentJobExecutor,
+            EnrichmentTaskExecutor enrichmentTaskExecutor
+    ) {
+        this(
+                new DefaultEnrichmentEngineFacade(researchServiceClient, aiServiceClient, persistenceService),
+                enrichmentJobExecutor,
+                enrichmentTaskExecutor,
+                new EnrichmentJobManager(),
+                new RowIdentityResolver(),
+                new RowEnrichmentProcessor(new DefaultEnrichmentEngineFacade(researchServiceClient, aiServiceClient, persistenceService))
+        );
+    }
+
+    public static String buildCompositeName(String firstName, String lastName, String fullName, String legacyName) {
+        return RowIdentityResolver.buildCompositeName(firstName, lastName, fullName, legacyName);
+    }
 
     @Override
     public EnrichmentJobResponse createAndSubmitJob(EnrichmentJobRequest request) {

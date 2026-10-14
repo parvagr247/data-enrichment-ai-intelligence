@@ -2,6 +2,7 @@ package com.subdual.dataset_service.dataset.service.helper;
 
 import com.subdual.dataset_service.dataset.model.MalformedRow;
 import com.subdual.dataset_service.dataset.model.RawDataset;
+import com.subdual.dataset_service.dataset.service.factory.DatasetParser;
 import org.springframework.stereotype.Component;
 
 import java.io.BufferedReader;
@@ -17,8 +18,16 @@ import java.util.*;
  * escaped quotes (""), and gracefully isolates malformed rows.
  */
 @Component
-public class CsvDatasetParser {
+public class CsvDatasetParser implements DatasetParser {
 
+    @Override
+    public boolean supports(String fileName) {
+        if (fileName == null) return false;
+        String lower = fileName.toLowerCase(Locale.ROOT);
+        return lower.endsWith(".csv") || lower.endsWith(".tsv") || lower.endsWith(".txt") || !lower.contains(".");
+    }
+
+    @Override
     public RawDataset parse(InputStream inputStream, String fileName) throws IOException {
         List<String> rawLines = readAllLogicalLines(inputStream);
         if (rawLines.isEmpty()) {

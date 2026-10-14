@@ -4,7 +4,6 @@ import com.subdual.ai_intelligent_service.facade.AiServiceFacade;
 import com.subdual.ai_intelligent_service.planning.model.EnrichmentPlan;
 import com.subdual.ai_intelligent_service.planning.model.EnrichmentRequirement;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -18,7 +17,6 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v2/ai/requirements")
 @RequiredArgsConstructor
-@Slf4j
 public class EnrichmentPlanningController {
 
     private final AiServiceFacade aiFacade;
@@ -30,9 +28,6 @@ public class EnrichmentPlanningController {
         if (requirement == null) {
             requirement = new EnrichmentRequirement(null, "PERSON");
         }
-
-        log.info("Generating V2 enrichment plan for objective: '{}' (entityType: '{}')",
-                requirement.userObjective(), requirement.entityType());
 
         return ResponseEntity.ok(aiFacade.planEnrichment(requirement));
     }

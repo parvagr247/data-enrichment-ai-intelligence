@@ -41,10 +41,6 @@ class DatasetServiceApplicationTests {
                 .retrieve()
                 .toEntity(String.class);
 
-        System.out.println("=== Direct Dataset-Service Upload Result ===");
-        System.out.println("Status: " + response.getStatusCode());
-        System.out.println("Body: " + response.getBody());
-
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
         assertTrue(response.getBody().contains("test.csv"));

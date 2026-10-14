@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
 import org.springframework.beans.factory.DisposableBean;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -21,13 +22,27 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.UnaryOperator;
 
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class InMemoryResearchJobService implements ResearchJobService, DisposableBean {
+
+    private static volatile InMemoryResearchJobService instance;
 
     private final ResearchService researchService;
     private final ExecutorService executor;
     private final Map<String, ResearchJob> jobs = new ConcurrentHashMap<>();
+
+    @Autowired
+    public InMemoryResearchJobService(ResearchService researchService, ExecutorService executor) {
+        this.researchService = researchService;
+        this.executor = executor;
+        synchronized (InMemoryResearchJobService.class) {
+            instance = this;
+        }
+    }
+
+    public static InMemoryResearchJobService getInstance() {
+        return instance;
+    }
 
     @Override // Submits a research request asynchronously with default user context.
     public ResearchJobResponse submitJob(ResearchRequest request) {

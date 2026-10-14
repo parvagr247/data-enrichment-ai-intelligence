@@ -21,7 +21,6 @@ import java.util.Optional;
  * Clean, minimalistic implementation of ExtractionService using AiPromptExecutor and zero-hallucination guard.
  */
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class SpringAiExtractionService implements ExtractionService {
 
@@ -31,6 +30,23 @@ public class SpringAiExtractionService implements ExtractionService {
 
     private final AiPromptExecutor promptExecutor;
     private final DeterministicExtractionHelper deterministicHelper;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public SpringAiExtractionService(AiPromptExecutor promptExecutor, DeterministicExtractionHelper deterministicHelper) {
+        this.promptExecutor = promptExecutor;
+        this.deterministicHelper = deterministicHelper;
+    }
+
+    public SpringAiExtractionService(
+            java.util.Optional<org.springframework.ai.chat.model.ChatModel> chatModel,
+            com.subdual.ai_intelligent_service.configuration.AiProperties properties,
+            String apiKey,
+            DeterministicExtractionHelper deterministicHelper,
+            com.subdual.ai_intelligent_service.prompt.PromptTemplateService promptService,
+            com.subdual.ai_intelligent_service.ai.helper.AiResponseValidator validator
+    ) {
+        this(new AiPromptExecutor(chatModel, properties, apiKey), deterministicHelper);
+    }
 
     @Override
     public ExtractionResponse extractFacts(ExtractionRequest request) {

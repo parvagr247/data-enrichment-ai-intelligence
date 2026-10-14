@@ -20,7 +20,9 @@ public final class AiOutputNormalizer {
             "null", "-", "--", "nil"
     );
 
-    private AiOutputNormalizer() {}
+    private AiOutputNormalizer() {
+        // Private constructor for utility class
+    }
 
     /**
      * Normalizes a raw string attribute value:

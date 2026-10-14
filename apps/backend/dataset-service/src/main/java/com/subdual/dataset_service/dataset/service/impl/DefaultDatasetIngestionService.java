@@ -3,40 +3,62 @@ package com.subdual.dataset_service.dataset.service.impl;
 import com.subdual.dataset_service.dataset.api.dto.response.DatasetProfileReport;
 import com.subdual.dataset_service.dataset.model.RawDataset;
 import com.subdual.dataset_service.dataset.service.DatasetIngestionService;
+import com.subdual.dataset_service.dataset.service.factory.DatasetParser;
+import com.subdual.dataset_service.dataset.service.factory.DatasetParserFactory;
 import com.subdual.dataset_service.dataset.service.helper.CsvDatasetParser;
 import com.subdual.dataset_service.dataset.service.helper.DatasetProfiler;
 import com.subdual.dataset_service.dataset.service.helper.DatasetValidator;
 import com.subdual.dataset_service.dataset.service.helper.ExcelDatasetParser;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class DefaultDatasetIngestionService implements DatasetIngestionService {
 
-    private final CsvDatasetParser csvParser;
-    private final ExcelDatasetParser excelParser;
+    private final DatasetParserFactory parserFactory;
     private final DatasetValidator datasetValidator;
     private final DatasetProfiler datasetProfiler;
 
-    @Override // Parses, validates, and returns the uploaded dataset.
+    @Autowired
+    public DefaultDatasetIngestionService(
+            DatasetParserFactory parserFactory,
+            DatasetValidator datasetValidator,
+            DatasetProfiler datasetProfiler
+    ) {
+        this.parserFactory = parserFactory;
+        this.datasetValidator = datasetValidator;
+        this.datasetProfiler = datasetProfiler;
+    }
+
+    /**
+     * Backward-compatible constructor for testing and direct instantiation.
+     */
+    public DefaultDatasetIngestionService(
+            CsvDatasetParser csvParser,
+            ExcelDatasetParser excelParser,
+            DatasetValidator datasetValidator,
+            DatasetProfiler datasetProfiler
+    ) {
+        this(new DatasetParserFactory(List.of(csvParser, excelParser)), datasetValidator, datasetProfiler);
+    }
+
+    @Override // Parses, validates, and returns the uploaded dataset using Factory Pattern.
     public RawDataset parseFile(InputStream inputStream, String fileName) {
         datasetValidator.validateFileName(fileName);
-        String lower = fileName.toLowerCase(Locale.ROOT);
 
         try {
-            RawDataset dataset;
-            if (lower.endsWith(".xlsx")) {
-                dataset = excelParser.parse(inputStream, fileName);
-            } else {
-                dataset = csvParser.parse(inputStream, fileName);
-            }
+            DatasetParser parser = parserFactory.getParser(fileName);
+            RawDataset dataset = parser.parse(inputStream, fileName);
 
             datasetValidator.validateParsedDataset(dataset);
             log.info("Parsed dataset '{}': {} valid rows, {} malformed, {} duplicates",

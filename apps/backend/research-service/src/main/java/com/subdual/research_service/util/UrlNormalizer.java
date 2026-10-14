@@ -23,7 +23,17 @@ public final class UrlNormalizer {
     private static final Pattern MARKDOWN_LINK_PATTERN =
             Pattern.compile("^\\[.*?\\]\\((https?://[^\\s\\)]+|[^\\s\\)]+)\\)$", Pattern.CASE_INSENSITIVE);
 
+    private static final UrlNormalizer INSTANCE = new UrlNormalizer();
+
     private UrlNormalizer() {}
+
+    public static UrlNormalizer getInstance() {
+        return INSTANCE;
+    }
+
+    public String normalizeUrl(String rawUrl) {
+        return normalize(rawUrl);
+    }
 
     /**
      * Unwraps Markdown links [label](url), angle brackets <url>, square brackets [url], or quotes.

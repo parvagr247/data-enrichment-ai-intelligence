@@ -44,6 +44,19 @@ public class DefaultWebContentFetcher implements WebContentFetcher {
                 .build();
     }
 
+    public DefaultWebContentFetcher(boolean mockMode) {
+        this.properties = null;
+        this.mockMode = mockMode;
+        this.httpClient = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofMillis(3000))
+                .followRedirects(HttpClient.Redirect.NORMAL)
+                .build();
+    }
+
+    public DefaultWebContentFetcher() {
+        this(null, null);
+    }
+
     @Override
     public FetchedContent fetch(String url) {
         if (url == null || url.isBlank()) {

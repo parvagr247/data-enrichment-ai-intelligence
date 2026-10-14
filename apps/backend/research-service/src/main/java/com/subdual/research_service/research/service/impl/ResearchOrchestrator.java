@@ -105,11 +105,7 @@ public class ResearchOrchestrator implements ResearchService {
             return false;
         }
         int maxAdaptive = target.depth() != null ? target.depth().maxAdaptiveQueries() : 1;
-        if (maxAdaptive <= 0) {
-            log.info("[Pipeline: ADAPTIVE_STOP] Depth '{}' allows 0 adaptive queries. Skipping follow-up search.", target.depth());
-            return false;
-        }
-        return true;
+        return maxAdaptive > 0;
     }
 
     private boolean runAdaptiveIteration(
@@ -120,26 +116,22 @@ public class ResearchOrchestrator implements ResearchService {
     ) {
         List<String> missingFields = identifyMissingTargetFields(target, attributes);
         if (missingFields.isEmpty()) {
-            log.info("[Pipeline: ADAPTIVE_STOP] All requested target fields covered. Stopping early.");
             return false;
         }
 
         int maxTotal = target.depth() != null ? target.depth().maxSources() : 5;
         int remainingAllowed = maxTotal - currentSources.size();
         if (remainingAllowed <= 0) {
-            log.info("[Pipeline: ADAPTIVE_STOP] Source limit reached ({}). Stopping.", currentSources.size());
             return false;
         }
 
         List<DiscoveredSource> newDiscovered = discoveryService.discoverAdaptiveSources(target, missingFields, Math.min(3, remainingAllowed));
         if (newDiscovered == null || newDiscovered.isEmpty()) {
-            log.info("[Pipeline: ADAPTIVE_STOP] No new sources discovered for missing fields {}. Stopping.", missingFields);
             return false;
         }
 
         List<ResearchSource> newRanked = filterUnseenSources(newDiscovered, currentSources, target);
         if (newRanked.isEmpty()) {
-            log.info("[Pipeline: ADAPTIVE_STOP] Discovered candidates already seen or filtered. Stopping.");
             return false;
         }
 
@@ -209,10 +201,7 @@ public class ResearchOrchestrator implements ResearchService {
     }
 
     public ResearchTarget normalize(ResearchRequest request) {
-        ResearchTarget target = entityNormalizer.normalize(request);
-        log.info("[Pipeline: NORMALIZED] EntityId='{}', CanonicalUrl='{}', DisplayName='{}', Type='{}'",
-                target.entityId(), target.canonicalUrl(), target.displayName(), target.entityType());
-        return target;
+        return entityNormalizer.normalize(request);
     }
 
     public List<DiscoveredSource> discover(ResearchTarget target) {

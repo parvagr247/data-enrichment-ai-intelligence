@@ -30,7 +30,6 @@ import java.util.Optional;
  * to AiPromptExecutor and fallback to DeterministicEnrichmentHelper.
  */
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class SpringAiEnrichmentService implements EnrichmentAIService {
 
@@ -38,6 +37,21 @@ public class SpringAiEnrichmentService implements EnrichmentAIService {
 
     private final AiPromptExecutor promptExecutor;
     private final DeterministicEnrichmentHelper helper;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public SpringAiEnrichmentService(AiPromptExecutor promptExecutor, DeterministicEnrichmentHelper helper) {
+        this.promptExecutor = promptExecutor;
+        this.helper = helper;
+    }
+
+    public SpringAiEnrichmentService(
+            java.util.Optional<org.springframework.ai.chat.model.ChatModel> chatModel,
+            com.subdual.ai_intelligent_service.configuration.AiProperties properties,
+            String apiKey,
+            DeterministicEnrichmentHelper helper
+    ) {
+        this(new AiPromptExecutor(chatModel, properties, apiKey), helper);
+    }
 
     @Override
     public RequirementInterpretationResponse interpretRequirement(RequirementInterpretationRequest request) {

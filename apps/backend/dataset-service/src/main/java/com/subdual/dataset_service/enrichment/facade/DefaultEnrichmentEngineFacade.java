@@ -8,7 +8,6 @@ import com.subdual.dataset_service.entity.api.dto.request.PersistEntityRequest;
 import com.subdual.dataset_service.entity.api.dto.response.EntityDetailResponse;
 import com.subdual.dataset_service.entity.service.EntityPersistenceService;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
@@ -19,7 +18,6 @@ import java.util.Map;
  */
 @Component
 @RequiredArgsConstructor
-@Slf4j
 public class DefaultEnrichmentEngineFacade implements EnrichmentEngineFacade {
 
     private final ResearchServiceClient researchServiceClient;

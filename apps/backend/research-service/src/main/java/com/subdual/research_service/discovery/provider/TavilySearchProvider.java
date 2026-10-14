@@ -56,8 +56,6 @@ public class TavilySearchProvider implements SearchProvider {
     }
 
     private TavilyResponse executeSearch(String query, int maxResults) {
-        log.info("Executing real Tavily search query: '{}' (maxResults: {})", query, maxResults);
-
         try {
             Map<String, Object> requestBody = buildRequestBody(query, maxResults);
             return restClient.post()

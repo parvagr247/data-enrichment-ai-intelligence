@@ -30,6 +30,7 @@ public class EnrichmentTaskExecutor {
         int queueCapacity = properties.execution().queueCapacity();
 
         AtomicInteger workerNumber = new AtomicInteger(1);
+
         ThreadFactory threadFactory = runnable -> {
             Thread thread = new Thread(runnable, "dataset-enrichment-worker-" + workerNumber.getAndIncrement());
             thread.setDaemon(true);
@@ -47,8 +48,7 @@ public class EnrichmentTaskExecutor {
         );
         this.executor.allowCoreThreadTimeOut(false);
 
-        log.info("Initialized EnrichmentTaskExecutor with concurrency={}, queueCapacity={}",
-                concurrency, queueCapacity);
+        log.info("Initialized EnrichmentTaskExecutor with concurrency={}, queueCapacity={}", concurrency, queueCapacity);
     }
 
     public <T> CompletableFuture<T> submitTask(Supplier<T> task) {

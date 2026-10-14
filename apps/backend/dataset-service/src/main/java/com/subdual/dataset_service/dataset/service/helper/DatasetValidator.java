@@ -7,9 +7,18 @@ import java.util.Locale;
 
 /**
  * Dataset validation rules.
+ * Implements Singleton Pattern via static inner class holder with thread safety.
  */
 @Component
 public class DatasetValidator {
+
+    private static class InstanceHolder {
+        private static final DatasetValidator INSTANCE = new DatasetValidator();
+    }
+
+    public static DatasetValidator getInstance() {
+        return InstanceHolder.INSTANCE;
+    }
 
     public void validateFileName(String fileName) {
         if (fileName == null || fileName.isBlank()) {

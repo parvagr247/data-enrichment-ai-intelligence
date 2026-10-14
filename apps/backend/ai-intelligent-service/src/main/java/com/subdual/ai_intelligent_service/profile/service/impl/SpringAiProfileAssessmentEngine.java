@@ -68,7 +68,6 @@ public class SpringAiProfileAssessmentEngine implements ProfileAssessmentEngine 
             }
         }
 
-        log.warn("[AI_PROFILE_FALLBACK] Falling back to deterministic assessment for entity: '{}'", request.displayName());
         return deterministicFallback.assessProfile(request);
     }
 

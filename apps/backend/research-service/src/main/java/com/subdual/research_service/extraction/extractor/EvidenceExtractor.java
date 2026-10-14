@@ -7,12 +7,13 @@ import com.subdual.research_service.extraction.extractor.field.FieldExtractor;
 import com.subdual.research_service.extraction.support.EntityResolver;
 import com.subdual.research_service.extraction.support.EvidenceMerger;
 import com.subdual.research_service.extraction.support.TargetFieldNormalizer;
+import com.subdual.research_service.integration.ai.client.AiExtractionClient;
+import com.subdual.research_service.integration.ai.client.NoOpAiExtractionClient;
 import com.subdual.research_service.integration.ai.dto.AiExtractedFact;
 import com.subdual.research_service.research.model.ConfidenceTier;
 import com.subdual.research_service.research.model.EntityType;
 import com.subdual.research_service.research.model.ResearchSource;
 import com.subdual.research_service.research.model.ResearchTarget;
-import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -26,7 +27,6 @@ import java.util.Map;
  * Coordinates document-level, entity-specific, and field-specific evidence extraction.
  */
 @Component
-@RequiredArgsConstructor
 public class EvidenceExtractor {
 
     private final EvidenceMerger evidenceMerger;
@@ -37,9 +37,80 @@ public class EvidenceExtractor {
     private final ProductEvidenceExtractor productExtractor;
     private final AiEvidenceEnricher aiEvidenceEnricher;
     private final TargetFieldNormalizer targetFieldNormalizer;
+    private final List<FieldExtractor> fieldExtractors;
+    private final com.subdual.research_service.extraction.factory.EntityEvidenceExtractorFactory entityEvidenceExtractorFactory;
 
-    @Autowired(required = false)
-    private List<FieldExtractor> fieldExtractors = Collections.emptyList();
+    @Autowired
+    public EvidenceExtractor(
+            EvidenceMerger evidenceMerger,
+            CommonEvidenceExtractor commonExtractor,
+            PersonEvidenceExtractor personExtractor,
+            OrganizationEvidenceExtractor organizationExtractor,
+            RepositoryEvidenceExtractor repositoryExtractor,
+            ProductEvidenceExtractor productExtractor,
+            AiEvidenceEnricher aiEvidenceEnricher,
+            TargetFieldNormalizer targetFieldNormalizer,
+            @Autowired(required = false) List<FieldExtractor> fieldExtractors
+    ) {
+        this.evidenceMerger = evidenceMerger;
+        this.commonExtractor = commonExtractor;
+        this.personExtractor = personExtractor;
+        this.organizationExtractor = organizationExtractor;
+        this.repositoryExtractor = repositoryExtractor;
+        this.productExtractor = productExtractor;
+        this.aiEvidenceEnricher = aiEvidenceEnricher;
+        this.targetFieldNormalizer = targetFieldNormalizer;
+        this.fieldExtractors = fieldExtractors != null ? fieldExtractors : defaultFieldExtractors();
+        this.entityEvidenceExtractorFactory = new com.subdual.research_service.extraction.factory.DefaultEntityEvidenceExtractorFactory(
+                personExtractor, organizationExtractor, repositoryExtractor, productExtractor
+        );
+    }
+
+    public EvidenceExtractor(
+            EvidenceMerger evidenceMerger,
+            CommonEvidenceExtractor commonExtractor,
+            PersonEvidenceExtractor personExtractor,
+            OrganizationEvidenceExtractor organizationExtractor,
+            RepositoryEvidenceExtractor repositoryExtractor,
+            ProductEvidenceExtractor productExtractor,
+            AiEvidenceEnricher aiEvidenceEnricher,
+            TargetFieldNormalizer targetFieldNormalizer
+    ) {
+        this(evidenceMerger, commonExtractor, personExtractor, organizationExtractor, repositoryExtractor, productExtractor, aiEvidenceEnricher, targetFieldNormalizer, null);
+    }
+
+    public EvidenceExtractor(AiExtractionClient aiExtractionClient) {
+        this.evidenceMerger = new EvidenceMerger();
+        this.commonExtractor = new CommonEvidenceExtractor();
+        this.personExtractor = new PersonEvidenceExtractor(this.evidenceMerger);
+        this.organizationExtractor = new OrganizationEvidenceExtractor(this.evidenceMerger);
+        this.repositoryExtractor = new RepositoryEvidenceExtractor(this.evidenceMerger);
+        this.productExtractor = new ProductEvidenceExtractor(this.evidenceMerger);
+        this.aiEvidenceEnricher = new AiEvidenceEnricher(aiExtractionClient != null ? aiExtractionClient : new NoOpAiExtractionClient(), this.evidenceMerger);
+        this.targetFieldNormalizer = new TargetFieldNormalizer();
+        this.fieldExtractors = defaultFieldExtractors();
+        this.entityEvidenceExtractorFactory = new com.subdual.research_service.extraction.factory.DefaultEntityEvidenceExtractorFactory(
+                personExtractor, organizationExtractor, repositoryExtractor, productExtractor
+        );
+    }
+
+    public EvidenceExtractor() {
+        this((AiExtractionClient) null);
+    }
+
+    private static List<FieldExtractor> defaultFieldExtractors() {
+        return List.of(
+                new com.subdual.research_service.extraction.extractor.field.RoleFieldExtractor(),
+                new com.subdual.research_service.extraction.extractor.field.OrganizationFieldExtractor(),
+                new com.subdual.research_service.extraction.extractor.field.ExperienceFieldExtractor(),
+                new com.subdual.research_service.extraction.extractor.field.EducationFieldExtractor(),
+                new com.subdual.research_service.extraction.extractor.field.SkillFieldExtractor(),
+                new com.subdual.research_service.extraction.extractor.field.TechFieldExtractor(),
+                new com.subdual.research_service.extraction.extractor.field.ActivityFieldExtractor(),
+                new com.subdual.research_service.extraction.extractor.field.ProjectFieldExtractor(),
+                new com.subdual.research_service.extraction.extractor.field.LocationFieldExtractor()
+        );
+    }
 
     public Map<String, EvidenceTuple> extractEvidence(
             ResearchTarget target,
@@ -125,17 +196,8 @@ public class EvidenceExtractor {
             return;
         }
 
-        switch (type) {
-            case PERSON -> personExtractor.extractAttributes(target, documents, attributes, resolutions);
-            case ORGANIZATION -> organizationExtractor.extractAttributes(target, documents, attributes, resolutions);
-            case REPOSITORY -> {
-                putIfPresent(attributes, "repository", repositoryExtractor.extractRepositoryInfo(target, documents));
-                repositoryExtractor.extractAttributes(target, documents, attributes, resolutions);
-            }
-            case PRODUCT -> productExtractor.extractAttributes(target, documents, attributes, resolutions);
-            case WEBSITE -> productExtractor.extractWebsiteAttributes(target, documents, attributes, resolutions);
-            default -> {}
-        }
+        entityEvidenceExtractorFactory.getExtractor(type)
+                .ifPresent(extractor -> extractor.extract(target, documents, attributes, resolutions));
     }
 
     private void enrichWithAiIfAvailable(

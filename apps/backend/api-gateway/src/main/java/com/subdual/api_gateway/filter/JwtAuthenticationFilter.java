@@ -41,7 +41,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             keyBytes = Arrays.copyOf(keyBytes, 32);
         }
         this.signingKey = Keys.hmacShaKeyFor(keyBytes);
-        log.info("Gateway JWT Authentication Filter initialized");
     }
 
     @Override
