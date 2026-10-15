@@ -1,5 +1,11 @@
 package com.subdual.research_service.research.pipeline;
 
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.springframework.stereotype.Component;
+
 import com.subdual.research_service.api.dto.response.EvidenceTuple;
 import com.subdual.research_service.api.dto.response.ResearchResponse;
 import com.subdual.research_service.api.dto.response.ResearchResult;
@@ -7,11 +13,6 @@ import com.subdual.research_service.api.dto.response.SourceItem;
 import com.subdual.research_service.research.model.ResearchSource;
 import com.subdual.research_service.research.model.ResearchStatus;
 import com.subdual.research_service.research.model.ResearchTarget;
-import org.springframework.stereotype.Component;
-
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
 
 @Component
 public class ResearchResponseFactory {

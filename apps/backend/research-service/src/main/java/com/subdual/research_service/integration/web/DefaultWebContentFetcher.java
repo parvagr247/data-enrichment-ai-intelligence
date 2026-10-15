@@ -1,10 +1,5 @@
 package com.subdual.research_service.integration.web;
 
-import com.subdual.research_service.config.ResearchDiscoveryProperties;
-import com.subdual.research_service.config.WebFetchProperties;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Component;
-
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.net.InetAddress;
@@ -16,6 +11,12 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Locale;
 import java.util.Set;
+
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Component;
+
+import com.subdual.research_service.configuration.ResearchDiscoveryProperties;
+import com.subdual.research_service.configuration.WebFetchProperties;
 
 /**
  * Robust HTTP client implementation of WebContentFetcher with SSRF guards,

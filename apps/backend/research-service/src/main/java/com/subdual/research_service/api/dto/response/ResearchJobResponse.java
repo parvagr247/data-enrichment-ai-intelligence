@@ -1,10 +1,10 @@
 package com.subdual.research_service.api.dto.response;
 
-import com.subdual.research_service.research.job.ResearchJobStatus;
-
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+
+import com.subdual.research_service.research.job.ResearchJobStatus;
 
 public record ResearchJobResponse(
         String jobId,

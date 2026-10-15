@@ -1,9 +1,9 @@
 package com.subdual.research_service.research.job;
 
-import com.subdual.research_service.api.dto.response.ResearchJobResponse;
-import com.subdual.research_service.api.dto.request.ResearchRequest;
-
 import java.util.Optional;
+
+import com.subdual.research_service.api.dto.ResearchRequest;
+import com.subdual.research_service.api.dto.response.ResearchJobResponse;
 
 public interface ResearchJobService {
 

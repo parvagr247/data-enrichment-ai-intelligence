@@ -1,12 +1,10 @@
 package com.subdual.research_service.research.job;
 
-import com.subdual.research_service.api.dto.response.ResearchJobResponse;
-import com.subdual.research_service.api.dto.request.ResearchRequest;
-import com.subdual.research_service.api.dto.response.ResearchResponse;
-import com.subdual.research_service.api.dto.response.ResearchResult;
-import com.subdual.research_service.research.model.EntityType;
-import com.subdual.research_service.research.model.ResearchStatus;
-import com.subdual.research_service.research.service.ResearchService;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.Executors;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -14,10 +12,13 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.concurrent.Executors;
+import com.subdual.research_service.api.dto.ResearchRequest;
+import com.subdual.research_service.api.dto.response.ResearchJobResponse;
+import com.subdual.research_service.api.dto.response.ResearchResponse;
+import com.subdual.research_service.api.dto.response.ResearchResult;
+import com.subdual.research_service.research.ResearchService;
+import com.subdual.research_service.research.model.EntityType;
+import com.subdual.research_service.research.model.ResearchStatus;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;

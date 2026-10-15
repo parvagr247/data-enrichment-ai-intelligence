@@ -1,6 +1,6 @@
 package com.subdual.dataset_service.enrichment.model;
 
-import com.subdual.dataset_service.enrichment.api.dto.response.RowEnrichmentResult;
+import com.subdual.dataset_service.enrichment.dto.RowEnrichmentResult;
 
 import java.time.Instant;
 import java.util.Map;

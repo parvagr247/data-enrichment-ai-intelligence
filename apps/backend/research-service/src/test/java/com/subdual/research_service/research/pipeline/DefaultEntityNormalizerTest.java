@@ -7,7 +7,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import com.subdual.research_service.api.dto.request.ResearchRequest;
+import com.subdual.research_service.api.dto.ResearchRequest;
 import com.subdual.research_service.research.model.EntityType;
 import com.subdual.research_service.research.model.ResearchDepth;
 import com.subdual.research_service.research.model.ResearchTarget;

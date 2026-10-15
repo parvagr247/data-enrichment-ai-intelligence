@@ -1,7 +1,8 @@
 package com.subdual.research_service.api.dto.response;
 
-import com.subdual.research_service.research.model.EntityType;
 import java.util.Map;
+
+import com.subdual.research_service.research.model.EntityType;
 
 public record ResearchResult(
         String displayName,

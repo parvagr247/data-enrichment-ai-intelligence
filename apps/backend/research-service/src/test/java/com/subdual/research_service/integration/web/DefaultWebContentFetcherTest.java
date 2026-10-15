@@ -1,10 +1,11 @@
 package com.subdual.research_service.integration.web;
 
-import com.subdual.research_service.config.ResearchDiscoveryProperties;
-import com.subdual.research_service.config.WebFetchProperties;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+
+import com.subdual.research_service.configuration.ResearchDiscoveryProperties;
+import com.subdual.research_service.configuration.WebFetchProperties;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

@@ -1,28 +1,35 @@
 package com.subdual.research_service.research;
 
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+
+import com.subdual.research_service.api.ResearchRequestValidator;
+import com.subdual.research_service.api.dto.ResearchRequest;
 import com.subdual.research_service.api.dto.response.EvidenceTuple;
-import com.subdual.research_service.api.dto.request.ResearchRequest;
 import com.subdual.research_service.api.dto.response.ResearchResponse;
 import com.subdual.research_service.api.dto.response.SourceItem;
-import com.subdual.research_service.api.validation.ResearchRequestValidator;
-import com.subdual.research_service.config.ResearchDiscoveryProperties;
-import com.subdual.research_service.config.ResearchPipelineProperties;
-import com.subdual.research_service.config.WebFetchProperties;
-import com.subdual.research_service.discovery.service.helper.QueryBuilder;
-import com.subdual.research_service.discovery.provider.MockSearchProvider;
-import com.subdual.research_service.discovery.service.impl.DefaultResearchDiscoveryService;
-import com.subdual.research_service.discovery.service.ResearchDiscoveryService;
-import com.subdual.research_service.extraction.service.impl.DefaultSourceEvidenceService;
-import com.subdual.research_service.extraction.extractor.EvidenceExtractor;
-import com.subdual.research_service.research.service.impl.ResearchOrchestrator;
-import com.subdual.research_service.extraction.service.SourceEvidenceService;
-import com.subdual.research_service.extraction.document.ContentExtractor;
-import com.subdual.research_service.extraction.document.ExtractedDocument;
-import com.subdual.research_service.extraction.support.EntityResolver;
-import com.subdual.research_service.integration.ai.client.NoOpAiExtractionClient;
+import com.subdual.research_service.configuration.ResearchDiscoveryProperties;
+import com.subdual.research_service.configuration.ResearchPipelineProperties;
+import com.subdual.research_service.configuration.WebFetchProperties;
+import com.subdual.research_service.integration.ai.NoOpAiExtractionClient;
+import com.subdual.research_service.integration.dataset.NoOpDatasetPersistenceClient;
 import com.subdual.research_service.integration.persistence.DefaultResearchSnapshotPersister;
-import com.subdual.research_service.integration.persistence.client.NoOpDatasetPersistenceClient;
 import com.subdual.research_service.integration.web.DefaultWebContentFetcher;
+import com.subdual.research_service.research.discovery.DefaultResearchDiscoveryService;
+import com.subdual.research_service.research.discovery.QueryBuilder;
+import com.subdual.research_service.research.discovery.ResearchDiscoveryService;
+import com.subdual.research_service.research.discovery.provider.MockSearchProvider;
+import com.subdual.research_service.research.evidence.DefaultSourceEvidenceService;
+import com.subdual.research_service.research.evidence.SourceEvidenceService;
+import com.subdual.research_service.research.evidence.document.ContentExtractor;
+import com.subdual.research_service.research.evidence.document.ExtractedDocument;
+import com.subdual.research_service.research.evidence.extractor.EvidenceExtractor;
+import com.subdual.research_service.research.evidence.support.EntityResolver;
 import com.subdual.research_service.research.model.ConfidenceTier;
 import com.subdual.research_service.research.model.EntityType;
 import com.subdual.research_service.research.model.ResearchSource;
@@ -33,13 +40,6 @@ import com.subdual.research_service.research.pipeline.DeterministicRelevanceEval
 import com.subdual.research_service.research.pipeline.DeterministicSourceClassifier;
 import com.subdual.research_service.research.pipeline.ResearchResponseFactory;
 import com.subdual.research_service.research.pipeline.SourceProcessor;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
-
-import java.time.Instant;
-import java.util.List;
-import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

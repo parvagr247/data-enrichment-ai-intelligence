@@ -1,18 +1,18 @@
 package com.subdual.research_service.integration.persistence;
 
-import com.subdual.research_service.integration.persistence.client.DatasetPersistenceClient;
+import java.util.List;
+import java.util.Map;
 
-import com.subdual.research_service.research.pipeline.ResearchDiagnostics;
-import com.subdual.research_service.research.model.EntityType;
-import com.subdual.research_service.research.model.ResearchTarget;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.util.List;
-import java.util.Map;
+import com.subdual.research_service.integration.dataset.DatasetPersistenceClient;
+import com.subdual.research_service.research.model.EntityType;
+import com.subdual.research_service.research.model.ResearchTarget;
+import com.subdual.research_service.research.pipeline.ResearchDiagnostics;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;

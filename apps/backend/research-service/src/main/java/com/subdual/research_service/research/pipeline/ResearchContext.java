@@ -1,14 +1,14 @@
 package com.subdual.research_service.research.pipeline;
 
-import com.subdual.research_service.api.dto.response.EvidenceTuple;
-import com.subdual.research_service.api.dto.request.ResearchRequest;
-import com.subdual.research_service.research.model.DiscoveredSource;
-import com.subdual.research_service.research.model.ResearchSource;
-import com.subdual.research_service.research.model.ResearchTarget;
-
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+
+import com.subdual.research_service.api.dto.ResearchRequest;
+import com.subdual.research_service.api.dto.response.EvidenceTuple;
+import com.subdual.research_service.research.model.DiscoveredSource;
+import com.subdual.research_service.research.model.ResearchSource;
+import com.subdual.research_service.research.model.ResearchTarget;
 
 public class ResearchContext {
 

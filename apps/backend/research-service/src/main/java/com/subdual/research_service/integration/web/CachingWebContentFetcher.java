@@ -1,11 +1,12 @@
 package com.subdual.research_service.integration.web;
 
-import com.subdual.research_service.discovery.cache.ThreadSafeSourceCache;
+import java.util.Optional;
+
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Component;
 
-import java.util.Optional;
+import com.subdual.research_service.research.discovery.cache.ThreadSafeSourceCache;
 
 /**
  * GoF Decorator Pattern: Transparently decorates a WebContentFetcher with thread-safe memoization.

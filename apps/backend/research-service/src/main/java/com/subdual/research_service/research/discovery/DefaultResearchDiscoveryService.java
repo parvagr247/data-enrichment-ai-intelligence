@@ -1,0 +1,105 @@
+package com.subdual.research_service.research.discovery;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+
+import com.subdual.research_service.configuration.ResearchDiscoveryProperties;
+import com.subdual.research_service.research.discovery.model.QueryIntent;
+import com.subdual.research_service.research.discovery.model.QueryStrategy;
+import com.subdual.research_service.research.discovery.model.ResearchQuery;
+import com.subdual.research_service.research.discovery.provider.SearchProvider;
+import com.subdual.research_service.research.discovery.ranking.SourceDeduplicator;
+import com.subdual.research_service.research.discovery.ranking.SourceRanker;
+import com.subdual.research_service.research.model.DiscoveredSource;
+import com.subdual.research_service.research.model.ResearchTarget;
+import com.subdual.research_service.shared.exception.BusinessRuleException;
+import com.subdual.research_service.shared.exception.ExternalServiceException;
+
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class DefaultResearchDiscoveryService implements ResearchDiscoveryService {
+
+    private final SearchProvider searchProvider;
+    private final QueryBuilder queryBuilder;
+    private final ResearchDiscoveryProperties discoveryProperties;
+
+    @Override // Discovers candidate web sources for an entity research target.
+    public List<DiscoveredSource> discoverSources(ResearchTarget target) {
+        List<ResearchQuery> queries = queryBuilder.buildRequirementQueries(target);
+        if (queries.isEmpty()) {
+            String primary = queryBuilder.buildDiscoveryQuery(target);
+            if (!primary.isBlank()) {
+                queries = List.of(new ResearchQuery(
+                        primary,
+                        QueryIntent.IDENTITY,
+                        QueryStrategy.CANONICAL_DOMAIN
+                ));
+            }
+        }
+
+        int targetMaxSources = target.depth() != null ? target.depth().maxSources() : discoveryProperties.maxResults();
+        int maxBudget = Math.max(targetMaxSources, discoveryProperties.maxResults());
+
+        List<DiscoveredSource> allRaw = new ArrayList<>();
+        int executedQueries = 0;
+        Exception lastException = null;
+
+        for (var q : queries) {
+            try {
+                int queryLimit = queries.size() <= 1 ? discoveryProperties.maxResults() : Math.min(8, maxBudget);
+                List<DiscoveredSource> res = searchWithProvider(q.queryText(), queryLimit);
+                allRaw.addAll(res);
+                executedQueries++;
+            } catch (Exception ex) {
+                lastException = ex;
+                log.warn("[Pipeline: DISCOVERY_QUERY_FAILED] Query '{}' failed: {}", q.queryText(), ex.getMessage());
+            }
+        }
+
+        if (allRaw.isEmpty() && lastException != null) {
+            if (lastException instanceof BusinessRuleException bre) throw bre;
+            if (lastException instanceof ExternalServiceException ese) throw ese;
+            throw new ExternalServiceException("All discovery queries failed", lastException);
+        }
+
+        var dedupResult = SourceDeduplicator.deduplicate(allRaw);
+        List<DiscoveredSource> ranked = SourceRanker.rankSources(
+                dedupResult.deduplicated(), target, QueryIntent.GENERAL_PROFILE
+        );
+
+        if (ranked.size() > maxBudget) {
+            ranked = ranked.subList(0, maxBudget);
+        }
+
+        return ranked;
+    }
+
+    @Override // Discovers targeted sources to fill identified attribute gaps.
+    public List<DiscoveredSource> discoverAdaptiveSources(ResearchTarget target, List<String> missingFields, int maxResults) {
+        String query = queryBuilder.buildAdaptiveQuery(target, missingFields);
+        List<DiscoveredSource> raw = searchWithProvider(query, Math.max(1, maxResults));
+        var dedupResult = SourceDeduplicator.deduplicate(raw);
+        List<DiscoveredSource> ranked = SourceRanker.rankSources(
+                dedupResult.deduplicated(), target, QueryBuilder.mapFieldToIntent(
+                        missingFields != null && !missingFields.isEmpty() ? missingFields.get(0) : null
+                )
+        );
+
+        return ranked;
+    }
+
+    private List<DiscoveredSource> searchWithProvider(String query, int maxResults) {
+        try {
+            return searchProvider.search(query, maxResults);
+        } catch (BusinessRuleException | ExternalServiceException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw new ExternalServiceException("Failed to retrieve research sources from provider", ex);
+        }
+    }
+}

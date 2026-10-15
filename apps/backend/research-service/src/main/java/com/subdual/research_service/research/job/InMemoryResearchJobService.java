@@ -1,15 +1,5 @@
 package com.subdual.research_service.research.job;
 
-import com.subdual.research_service.api.dto.response.ResearchJobResponse;
-import com.subdual.research_service.api.dto.request.ResearchRequest;
-import com.subdual.research_service.api.dto.response.ResearchResponse;
-import com.subdual.research_service.research.service.ResearchService;
-import lombok.extern.slf4j.Slf4j;
-import org.slf4j.MDC;
-import org.springframework.beans.factory.DisposableBean;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
@@ -19,6 +9,17 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.UnaryOperator;
+
+import lombok.extern.slf4j.Slf4j;
+import org.slf4j.MDC;
+import org.springframework.beans.factory.DisposableBean;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import com.subdual.research_service.api.dto.ResearchRequest;
+import com.subdual.research_service.api.dto.response.ResearchJobResponse;
+import com.subdual.research_service.api.dto.response.ResearchResponse;
+import com.subdual.research_service.research.ResearchService;
 
 @Service
 @Slf4j

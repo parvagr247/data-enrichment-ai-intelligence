@@ -12,10 +12,6 @@ import org.springframework.stereotype.Component;
 import java.util.Locale;
 import java.util.Optional;
 
-/**
- * Encapsulates ChatModel invocation, mock-mode awareness, bounded retries,
- * exponential backoff, and JSON markdown stripping following SOLID Single Responsibility.
- */
 @Component
 @Slf4j
 public class AiPromptExecutor {

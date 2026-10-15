@@ -1,7 +1,8 @@
 package com.subdual.research_service.api.dto.response;
 
-import com.subdual.research_service.research.model.ConfidenceTier;
 import java.util.List;
+
+import com.subdual.research_service.research.model.ConfidenceTier;
 
 public record EvidenceTuple(
         String value,

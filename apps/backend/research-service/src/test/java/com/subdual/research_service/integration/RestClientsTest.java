@@ -1,21 +1,22 @@
 package com.subdual.research_service.integration;
 
-import com.subdual.research_service.api.dto.response.EvidenceTuple;
-import com.subdual.research_service.config.ServiceMeshProperties;
-import com.subdual.research_service.integration.ai.client.RestAiExtractionClient;
-import com.subdual.research_service.integration.ai.dto.AiExtractedFact;
-import com.subdual.research_service.integration.persistence.client.RestDatasetPersistenceClient;
-import com.subdual.research_service.research.model.ConfidenceTier;
-import com.subdual.research_service.research.model.EntityType;
-import com.subdual.research_service.research.model.ResearchSource;
-import com.subdual.research_service.research.model.ResearchTarget;
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
+
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.client.RestClient;
 
-import java.time.Instant;
-import java.util.List;
-import java.util.Map;
+import com.subdual.research_service.api.dto.response.EvidenceTuple;
+import com.subdual.research_service.configuration.ServiceMeshProperties;
+import com.subdual.research_service.integration.ai.RestAiExtractionClient;
+import com.subdual.research_service.integration.ai.dto.AiExtractedFact;
+import com.subdual.research_service.integration.dataset.RestDatasetPersistenceClient;
+import com.subdual.research_service.research.model.ConfidenceTier;
+import com.subdual.research_service.research.model.EntityType;
+import com.subdual.research_service.research.model.ResearchSource;
+import com.subdual.research_service.research.model.ResearchTarget;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;

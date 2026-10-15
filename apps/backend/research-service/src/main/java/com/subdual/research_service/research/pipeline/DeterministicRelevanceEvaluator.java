@@ -8,7 +8,7 @@ import org.springframework.stereotype.Component;
 import com.subdual.research_service.research.model.DiscoveredSource;
 import com.subdual.research_service.research.model.EntityType;
 import com.subdual.research_service.research.model.ResearchTarget;
-import com.subdual.research_service.util.UrlNormalizer;
+import com.subdual.research_service.shared.util.UrlNormalizer;
 
 @Component
 public class DeterministicRelevanceEvaluator implements RelevanceEvaluator {

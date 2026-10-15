@@ -1,5 +1,13 @@
 package com.subdual.research_service.research.pipeline;
 
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+
 import com.subdual.research_service.api.dto.response.EvidenceTuple;
 import com.subdual.research_service.api.dto.response.ResearchResponse;
 import com.subdual.research_service.api.dto.response.SourceItem;
@@ -8,13 +16,6 @@ import com.subdual.research_service.research.model.EntityType;
 import com.subdual.research_service.research.model.ResearchSource;
 import com.subdual.research_service.research.model.ResearchStatus;
 import com.subdual.research_service.research.model.ResearchTarget;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
-
-import java.time.Instant;
-import java.util.List;
-import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

@@ -1,10 +1,11 @@
 package com.subdual.research_service.research.pipeline;
 
-import com.subdual.research_service.research.model.ResearchTarget;
-import org.springframework.stereotype.Component;
-
 import java.net.URI;
 import java.util.Locale;
+
+import org.springframework.stereotype.Component;
+
+import com.subdual.research_service.research.model.ResearchTarget;
 
 @Component
 public class DeterministicSourceClassifier implements SourceClassifier {

@@ -1,7 +1,7 @@
 package com.subdual.dataset_service.enrichment.integration;
 
-import com.subdual.dataset_service.enrichment.api.dto.request.ProfileAssessmentRequest;
-import com.subdual.dataset_service.enrichment.api.dto.response.ProfileAssessmentResponse;
+import com.subdual.dataset_service.enrichment.dto.ProfileAssessmentRequest;
+import com.subdual.dataset_service.enrichment.dto.ProfileAssessmentResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;

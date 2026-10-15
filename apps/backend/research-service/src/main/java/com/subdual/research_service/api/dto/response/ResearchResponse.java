@@ -1,8 +1,9 @@
 package com.subdual.research_service.api.dto.response;
 
-import com.subdual.research_service.research.model.ResearchStatus;
 import java.util.List;
 import java.util.Map;
+
+import com.subdual.research_service.research.model.ResearchStatus;
 
 public record ResearchResponse(
         ResearchStatus status,

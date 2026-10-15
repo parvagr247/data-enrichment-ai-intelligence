@@ -1,10 +1,11 @@
 package com.subdual.research_service.research.pipeline;
 
-import com.subdual.research_service.research.model.EntityType;
-import com.subdual.research_service.research.model.ResearchTarget;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+
+import com.subdual.research_service.research.model.EntityType;
+import com.subdual.research_service.research.model.ResearchTarget;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

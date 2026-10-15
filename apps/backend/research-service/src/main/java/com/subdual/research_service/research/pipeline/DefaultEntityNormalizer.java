@@ -11,10 +11,10 @@ import java.util.Map;
 
 import org.springframework.stereotype.Component;
 
-import com.subdual.research_service.api.dto.request.ResearchRequest;
+import com.subdual.research_service.api.dto.ResearchRequest;
 import com.subdual.research_service.research.model.EntityType;
 import com.subdual.research_service.research.model.ResearchTarget;
-import com.subdual.research_service.util.UrlNormalizer;
+import com.subdual.research_service.shared.util.UrlNormalizer;
 
 @Component
 public class DefaultEntityNormalizer implements EntityNormalizer {
