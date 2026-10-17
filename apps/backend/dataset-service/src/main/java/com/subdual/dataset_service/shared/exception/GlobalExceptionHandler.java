@@ -3,8 +3,7 @@ package com.subdual.dataset_service.shared.exception;
 import java.net.URI;
 import java.time.Instant;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
@@ -18,9 +17,9 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 import com.subdual.dataset_service.shared.filter.CorrelationIdFilter;
 
 @RestControllerAdvice
+@Slf4j
 public class GlobalExceptionHandler {
 
-    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
     private static final URI DEFAULT_TYPE = URI.create("about:blank");
     private static final String INSTANCE_PATH = "/api/v1/entities";
 

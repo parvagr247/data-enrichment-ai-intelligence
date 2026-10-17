@@ -11,9 +11,8 @@ import org.springframework.stereotype.Component;
 import java.io.IOException;
 import java.util.UUID;
 
-/**
- * Propagates X-Correlation-ID across outbound microservice calls.
- */
+
+// Propagates X-Correlation-ID across outbound microservice calls.
 @Component
 public class CorrelationIdClientInterceptor implements ClientHttpRequestInterceptor {
 

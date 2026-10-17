@@ -2,11 +2,20 @@ package com.subdual.dataset_service.enrichment.model;
 
 import com.subdual.dataset_service.enrichment.dto.RowEnrichmentResult;
 
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.ToString;
+
 import java.time.Instant;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
+@Getter
+@Setter
+@ToString
+@NoArgsConstructor
 public class JobState {
     public String jobId;
     public String userId;

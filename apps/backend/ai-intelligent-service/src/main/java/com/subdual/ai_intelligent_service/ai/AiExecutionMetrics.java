@@ -1,8 +1,6 @@
 package com.subdual.ai_intelligent_service.ai;
 
-/**
- * Telemetry and token usage diagnostics for AI invocations.
- */
+
 public record AiExecutionMetrics(
         String model,
         int promptTokens,

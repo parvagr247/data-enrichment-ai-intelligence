@@ -6,8 +6,7 @@ import java.util.List;
 import java.util.Map;
 
 import lombok.RequiredArgsConstructor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import com.subdual.research_service.api.dto.response.EvidenceTuple;
@@ -24,9 +23,8 @@ import com.subdual.research_service.research.pipeline.ResearchDiagnostics;
 
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class DefaultSourceEvidenceService implements SourceEvidenceService {
-
-    private static final Logger log = LoggerFactory.getLogger(DefaultSourceEvidenceService.class);
 
     private final WebContentFetcher webContentFetcher;
     private final ContentExtractor contentExtractor;

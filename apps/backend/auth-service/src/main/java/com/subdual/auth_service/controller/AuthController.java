@@ -7,8 +7,8 @@ import com.subdual.auth_service.dto.UserDto;
 import com.subdual.auth_service.service.AuthService;
 import com.subdual.auth_service.service.JwtTokenService;
 import jakarta.validation.Valid;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -20,17 +20,12 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/v1/auth")
+@RequiredArgsConstructor
+@Slf4j
 public class AuthController {
-
-    private static final Logger log = LoggerFactory.getLogger(AuthController.class);
 
     private final AuthService authService;
     private final JwtTokenService jwtTokenService;
-
-    public AuthController(AuthService authService, JwtTokenService jwtTokenService) {
-        this.authService = authService;
-        this.jwtTokenService = jwtTokenService;
-    }
 
     @PostMapping("/register")
     public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {

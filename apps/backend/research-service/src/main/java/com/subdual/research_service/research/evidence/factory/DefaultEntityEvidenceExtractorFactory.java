@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import com.subdual.research_service.api.dto.response.EvidenceTuple;
@@ -20,24 +21,13 @@ import com.subdual.research_service.research.model.ResearchTarget;
  * Factory that registers and provides entity-type specific evidence extractors.
  */
 @Component
+@RequiredArgsConstructor
 public class DefaultEntityEvidenceExtractorFactory implements EntityEvidenceExtractorFactory {
 
     private final PersonEvidenceExtractor personExtractor;
     private final OrganizationEvidenceExtractor organizationExtractor;
     private final RepositoryEvidenceExtractor repositoryExtractor;
     private final ProductEvidenceExtractor productExtractor;
-
-    public DefaultEntityEvidenceExtractorFactory(
-            PersonEvidenceExtractor personExtractor,
-            OrganizationEvidenceExtractor organizationExtractor,
-            RepositoryEvidenceExtractor repositoryExtractor,
-            ProductEvidenceExtractor productExtractor
-    ) {
-        this.personExtractor = personExtractor;
-        this.organizationExtractor = organizationExtractor;
-        this.repositoryExtractor = repositoryExtractor;
-        this.productExtractor = productExtractor;
-    }
 
     @Override
     public Optional<EntityEvidenceExtractor> getExtractor(EntityType entityType) {

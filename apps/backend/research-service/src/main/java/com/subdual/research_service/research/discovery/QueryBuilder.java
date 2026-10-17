@@ -6,8 +6,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.stream.Collectors;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import com.subdual.research_service.research.discovery.model.QueryIntent;
@@ -17,9 +16,8 @@ import com.subdual.research_service.research.model.EntityType;
 import com.subdual.research_service.research.model.ResearchTarget;
 
 @Component
+@Slf4j
 public class QueryBuilder {
-
-    private static final Logger log = LoggerFactory.getLogger(QueryBuilder.class);
 
     public List<String> buildDiscoveryQueries(ResearchTarget target) {
         if (!isValidTarget(target)) {

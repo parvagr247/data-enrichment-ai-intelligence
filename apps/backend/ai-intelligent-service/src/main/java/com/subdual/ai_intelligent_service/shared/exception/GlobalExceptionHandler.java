@@ -4,8 +4,7 @@ import java.net.URI;
 import java.time.Instant;
 
 import jakarta.servlet.http.HttpServletRequest;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -20,9 +19,9 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import com.subdual.ai_intelligent_service.shared.filter.CorrelationIdFilter;
 
 @RestControllerAdvice
+@Slf4j
 public class GlobalExceptionHandler {
 
-    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
     private static final URI DEFAULT_TYPE = URI.create("about:blank");
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

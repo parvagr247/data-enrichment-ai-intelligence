@@ -22,9 +22,7 @@ import com.subdual.research_service.api.dto.response.ResearchResponse;
 import com.subdual.research_service.research.ResearchService;
 import com.subdual.research_service.research.job.ResearchJobService;
 
-/**
- * REST controller for research operations, directly coordinating domain research services.
- */
+
 @RestController
 @RequestMapping("/api/v1/research")
 @RequiredArgsConstructor

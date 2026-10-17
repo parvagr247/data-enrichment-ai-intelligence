@@ -2,9 +2,6 @@ package com.subdual.dataset_service.shared.model;
 
 import java.time.Instant;
 
-/**
- * Standardized error response model across all microservices.
- */
 public record ApiErrorResponse(
         String code,
         String message,
