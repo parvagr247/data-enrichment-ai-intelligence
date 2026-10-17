@@ -1,8 +1,6 @@
 package com.subdual.dataset_service.dataset.model;
 
-/**
- * Semantic role of a column detected in an uploaded dataset.
- */
+
 public enum ColumnRole {
     NAME,
     FIRST_NAME,

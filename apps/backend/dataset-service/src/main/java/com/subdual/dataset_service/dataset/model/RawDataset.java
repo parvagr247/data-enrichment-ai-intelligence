@@ -4,9 +4,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-/**
- * Raw parsed dataset output preserving all columns and row states.
- */
 public record RawDataset(
         String fileName,
         List<String> headers,

@@ -12,11 +12,7 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 
-/**
- * Robust RFC 4180 compliant CSV parser.
- * Handles commas, semicolons, tabs, quoted cells with embedded commas or newlines,
- * escaped quotes (""), and gracefully isolates malformed rows.
- */
+
 @Component
 public class CsvDatasetParser implements DatasetParser {
 
@@ -34,7 +30,8 @@ public class CsvDatasetParser implements DatasetParser {
             return new RawDataset(fileName, List.of(), List.of(), List.of(), Set.of());
         }
 
-        char delimiter = detectDelimiter(rawLines.get(0));
+        char delimiter = detectDelimiter(rawLines.get(0)); // It detects which character separates the columns in the uploaded file
+        
         List<String> headers = parseHeaders(rawLines.get(0), delimiter);
 
         List<MalformedRow> malformedRows = new ArrayList<>();

@@ -1,40 +1,25 @@
 package com.subdual.dataset_service.configuration;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.validation.annotation.Validated;
 
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Min;
+
+@Validated 
 @ConfigurationProperties(prefix = "enrichment")
 public record EnrichmentProperties(
-        Execution execution,
-        Research research,
-        Timeout timeout,
-        Ai ai
+        @Valid Execution execution,
+        @Valid Research research,
+        @Valid Timeout timeout,
+        @Valid Ai ai
 ) {
-    public EnrichmentProperties {
-        if (execution == null) execution = new Execution(3, 500);
-        if (research == null) research = new Research(5);
-        if (timeout == null) timeout = new Timeout(60, 30);
-        if (ai == null) ai = new Ai(true);
-    }
 
-    public record Execution(int concurrency, int queueCapacity) {
-        public Execution {
-            if (concurrency < 1) concurrency = 1;
-            if (queueCapacity < 10) queueCapacity = 100;
-        }
-    }
+    public record Execution( @Min(1) int concurrency, @Min(10) int queueCapacity ) {}
 
-    public record Research(int maxSourcesPerEntity) {
-        public Research {
-            if (maxSourcesPerEntity < 1) maxSourcesPerEntity = 1;
-        }
-    }
+    public record Research( @Min(1) int maxSourcesPerEntity ) {}
 
-    public record Timeout(long entitySeconds, long jobMinutes) {
-        public Timeout {
-            if (entitySeconds < 5) entitySeconds = 60;
-            if (jobMinutes < 1) jobMinutes = 30;
-        }
-    }
+    public record Timeout( @Min(5) long entitySeconds, @Min(1) long jobMinutes ) {}
 
     public record Ai(boolean enabled) {}
 }
