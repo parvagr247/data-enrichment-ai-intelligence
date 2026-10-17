@@ -6,10 +6,6 @@ import com.subdual.dataset_service.entity.dto.PersistEntityRequest;
 import com.subdual.dataset_service.entity.dto.EntityDetailResponse;
 import com.subdual.dataset_service.entity.dto.EntitySummaryResponse;
 import com.subdual.dataset_service.entity.model.EnrichedEntity;
-import com.subdual.dataset_service.entity.EnrichedEntityRepository;
-import com.subdual.dataset_service.entity.EntityPersistenceService;
-import com.subdual.dataset_service.entity.EntityIdResolver;
-import com.subdual.dataset_service.entity.EntityMapper;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -52,7 +48,7 @@ public class DefaultEntityPersistenceService implements EntityPersistenceService
 
     @Override // Persists or merges enriched entity, attributes, and source evidence.
     public EntityDetailResponse persistOrUpdate(PersistEntityRequest request, String userId) {
-        String effectiveEntityId = resolveScopedEntityId(request.entityId(), userId);
+        String effectiveEntityId = entityIdResolver.resolveScopedEntityId(request.entityId(), userId);
         EnrichedEntity entity = findOrCreateEntity(effectiveEntityId, userId);
         if (userId != null && !userId.isBlank()) {
             entity.setUserId(userId);
@@ -63,10 +59,6 @@ public class DefaultEntityPersistenceService implements EntityPersistenceService
 
         EnrichedEntity saved = entityRepository.save(entity);
         return entityMapper.toDetailResponse(saved);
-    }
-
-    public String resolveScopedEntityId(String rawEntityId, String userId) {
-        return entityIdResolver.resolveScopedEntityId(rawEntityId, userId);
     }
 
     private EnrichedEntity findOrCreateEntity(String entityId, String userId) {

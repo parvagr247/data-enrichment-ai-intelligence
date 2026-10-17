@@ -56,10 +56,7 @@ class DatasetEnrichmentServiceTest {
     void setUp() {
         taskExecutor = new EnrichmentTaskExecutor(
                 new EnrichmentProperties(
-                        new EnrichmentProperties.Execution(3, 100),
-                        new EnrichmentProperties.Research(5),
-                        new EnrichmentProperties.Timeout(60, 30),
-                        new EnrichmentProperties.Ai(true)
+                        new EnrichmentProperties.Execution(3, 100)
                 )
         );
         enrichmentService = new DefaultDatasetEnrichmentService(
@@ -561,27 +558,27 @@ class DatasetEnrichmentServiceTest {
     @DisplayName("Should correctly build composite name with sanitization")
     void shouldBuildCompositeNameWithSanitization() {
         // Case A: First + Last
-        assertEquals("Vardhan Bhati", DefaultDatasetEnrichmentService.buildCompositeName("Vardhan", "Bhati", null, null));
+        assertEquals("Vardhan Bhati", RowIdentityResolver.buildCompositeName("Vardhan", "Bhati", null, null));
 
         // Case B: Extra whitespace & casing
-        assertEquals("Krati Mittal", DefaultDatasetEnrichmentService.buildCompositeName("  Krati  ", " Mittal ", null, null));
+        assertEquals("Krati Mittal", RowIdentityResolver.buildCompositeName("  Krati  ", " Mittal ", null, null));
 
         // Case C: Full name present takes precedence
-        assertEquals("Vardhan Bhati", DefaultDatasetEnrichmentService.buildCompositeName("Vardhan", "Bhati", "Vardhan Bhati", null));
+        assertEquals("Vardhan Bhati", RowIdentityResolver.buildCompositeName("Vardhan", "Bhati", "Vardhan Bhati", null));
 
         // Case D: First Name only
-        assertEquals("Vardhan", DefaultDatasetEnrichmentService.buildCompositeName("Vardhan", null, null, null));
+        assertEquals("Vardhan", RowIdentityResolver.buildCompositeName("Vardhan", null, null, null));
 
         // Case E: Last Name only
-        assertEquals("Bhati", DefaultDatasetEnrichmentService.buildCompositeName(null, "Bhati", null, null));
+        assertEquals("Bhati", RowIdentityResolver.buildCompositeName(null, "Bhati", null, null));
 
         // Case F: "null" / "undefined" string sanitization
-        assertEquals("Vardhan", DefaultDatasetEnrichmentService.buildCompositeName("Vardhan", "null", null, null));
-        assertEquals("Bhati", DefaultDatasetEnrichmentService.buildCompositeName("undefined", "Bhati", null, null));
-        assertNull(DefaultDatasetEnrichmentService.buildCompositeName("null", "undefined", null, null));
+        assertEquals("Vardhan", RowIdentityResolver.buildCompositeName("Vardhan", "null", null, null));
+        assertEquals("Bhati", RowIdentityResolver.buildCompositeName("undefined", "Bhati", null, null));
+        assertNull(RowIdentityResolver.buildCompositeName("null", "undefined", null, null));
 
         // Case G: Legacy fallback
-        assertEquals("Legacy Name", DefaultDatasetEnrichmentService.buildCompositeName(null, null, null, "Legacy Name"));
+        assertEquals("Legacy Name", RowIdentityResolver.buildCompositeName(null, null, null, "Legacy Name"));
     }
 
     @Test

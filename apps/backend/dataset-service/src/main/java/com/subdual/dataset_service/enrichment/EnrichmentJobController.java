@@ -4,7 +4,6 @@ import com.subdual.dataset_service.enrichment.dto.EnrichmentJobRequest;
 import com.subdual.dataset_service.enrichment.dto.SingleEnrichmentRequest;
 import com.subdual.dataset_service.enrichment.dto.EnrichmentJobResponse;
 import com.subdual.dataset_service.enrichment.dto.RowEnrichmentResult;
-import com.subdual.dataset_service.enrichment.DatasetEnrichmentService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;

@@ -18,20 +18,11 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Cohesive manager for enrichment job states and lifecycle transitions.
- * Implements Singleton Pattern via thread-safe static holder alongside Spring managed bean.
  */
 @Component
 @RequiredArgsConstructor
 @Slf4j
 public class EnrichmentJobManager {
-
-    private static class InstanceHolder {
-        private static final EnrichmentJobManager INSTANCE = new EnrichmentJobManager();
-    }
-
-    public static EnrichmentJobManager getInstance() {
-        return InstanceHolder.INSTANCE;
-    }
 
     private final JobEventBroadcaster eventBroadcaster;
     private final Map<String, JobState> activeJobs = new ConcurrentHashMap<>();

@@ -34,7 +34,7 @@ public class DatasetServiceConfiguration {
     public ExecutorService enrichmentJobExecutor() {
         AtomicInteger workerNumber = new AtomicInteger(1);
         ThreadFactory threadFactory = runnable -> {
-            Thread thread = new Thread(runnable, "dataset-enrichment-worker-" + workerNumber.getAndIncrement());
+            Thread thread = new Thread(runnable, "dataset-job-coordinator-" + workerNumber.getAndIncrement());
             thread.setDaemon(true);
             return thread;
         };

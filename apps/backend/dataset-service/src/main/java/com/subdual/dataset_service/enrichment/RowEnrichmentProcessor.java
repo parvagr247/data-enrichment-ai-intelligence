@@ -19,7 +19,6 @@ import com.subdual.dataset_service.enrichment.dto.FactEvidenceDto;
 import com.subdual.dataset_service.enrichment.dto.ProfileAssessmentRequest;
 import com.subdual.dataset_service.enrichment.dto.ProfileAssessmentResponse;
 import com.subdual.dataset_service.enrichment.dto.RowEnrichmentResult;
-import com.subdual.dataset_service.enrichment.EnrichmentEngineFacade;
 import com.subdual.dataset_service.enrichment.integration.AiServiceClient;
 import com.subdual.dataset_service.enrichment.integration.ResearchServiceClient;
 import com.subdual.dataset_service.enrichment.model.JobState;

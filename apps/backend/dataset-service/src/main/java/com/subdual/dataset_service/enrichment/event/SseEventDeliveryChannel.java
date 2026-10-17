@@ -9,11 +9,6 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-/**
- * GoF Bridge Pattern - Concrete Implementor:
- * Encapsulates Spring WebMvc SseEmitter connections, lifecycle pruning,
- * in-memory ring-buffer replay history, and HTTP event stream transmission.
- */
 @Component
 @Slf4j
 public class SseEventDeliveryChannel implements EventDeliveryChannel {
@@ -73,7 +68,7 @@ public class SseEventDeliveryChannel implements EventDeliveryChannel {
     public void replayHistory(String jobId, SseEmitter emitter) throws Exception {
         List<ExecutionEvent> history = jobEventHistory.get(jobId);
         if (history != null) {
-            synchronized (history) {
+            synchronized (history) { // Synchronized to prevent concurrent modification at the same time
                 for (ExecutionEvent ev : history) {
                     emitter.send(SseEmitter.event().name("execution-event").data(ev));
                 }

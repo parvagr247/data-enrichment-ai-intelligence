@@ -2,6 +2,7 @@ package com.subdual.dataset_service.enrichment;
 
 import com.subdual.dataset_service.configuration.EnrichmentProperties;
 import jakarta.annotation.PreDestroy;
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -20,14 +21,18 @@ import java.util.function.Supplier;
  */
 @Component
 @Slf4j
+@Getter 
 public class EnrichmentTaskExecutor {
 
     private final ThreadPoolExecutor executor;
     private final int concurrency;
 
     public EnrichmentTaskExecutor(EnrichmentProperties properties) {
-        this.concurrency = properties.execution().concurrency();
-        int queueCapacity = properties.execution().queueCapacity();
+        EnrichmentProperties.Execution exec = (properties != null && properties.execution() != null)
+                ? properties.execution()
+                : new EnrichmentProperties.Execution(3, 500);
+        this.concurrency = exec.concurrency();
+        int queueCapacity = exec.queueCapacity();
 
         AtomicInteger workerNumber = new AtomicInteger(1);
 
@@ -38,13 +43,13 @@ public class EnrichmentTaskExecutor {
         };
 
         this.executor = new ThreadPoolExecutor(
-                concurrency,
-                concurrency,
-                60L,
-                TimeUnit.SECONDS,
-                new LinkedBlockingQueue<>(queueCapacity),
-                threadFactory,
-                new ThreadPoolExecutor.CallerRunsPolicy()
+            concurrency,
+            concurrency,
+            60L,
+            TimeUnit.SECONDS,
+            new LinkedBlockingQueue<>(queueCapacity),
+            threadFactory,
+            new ThreadPoolExecutor.CallerRunsPolicy()
         );
         this.executor.allowCoreThreadTimeOut(false);
 
@@ -53,18 +58,6 @@ public class EnrichmentTaskExecutor {
 
     public <T> CompletableFuture<T> submitTask(Supplier<T> task) {
         return CompletableFuture.supplyAsync(task, executor);
-    }
-
-    public int getConcurrency() {
-        return concurrency;
-    }
-
-    public int getActiveCount() {
-        return executor.getActiveCount();
-    }
-
-    public int getQueueSize() {
-        return executor.getQueue().size();
     }
 
     @PreDestroy

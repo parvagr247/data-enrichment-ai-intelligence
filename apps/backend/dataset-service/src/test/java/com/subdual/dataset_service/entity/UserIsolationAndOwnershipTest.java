@@ -45,6 +45,7 @@ class UserIsolationAndOwnershipTest {
     @Mock
     private AiServiceClient aiServiceClient;
 
+    private final EntityIdResolver entityIdResolver = new EntityIdResolver();
     private DefaultEntityPersistenceService persistenceService;
     private DefaultDatasetEnrichmentService enrichmentService;
 
@@ -53,10 +54,7 @@ class UserIsolationAndOwnershipTest {
         persistenceService = new DefaultEntityPersistenceService(entityRepository);
         EnrichmentTaskExecutor taskExecutor = new EnrichmentTaskExecutor(
                 new EnrichmentProperties(
-                        new EnrichmentProperties.Execution(3, 100),
-                        new EnrichmentProperties.Research(5),
-                        new EnrichmentProperties.Timeout(60, 30),
-                        new EnrichmentProperties.Ai(true)
+                        new EnrichmentProperties.Execution(3, 100)
                 )
         );
         enrichmentService = new DefaultDatasetEnrichmentService(
@@ -80,7 +78,7 @@ class UserIsolationAndOwnershipTest {
                 Map.of()
         );
 
-        String expectedScopedId = persistenceService.resolveScopedEntityId("ent-1", "user-alice");
+        String expectedScopedId = entityIdResolver.resolveScopedEntityId("ent-1", "user-alice");
 
         EnrichedEntity entityWithUser = EnrichedEntity.builder()
                 .entityId(expectedScopedId)
@@ -171,15 +169,15 @@ class UserIsolationAndOwnershipTest {
     void crossUserDeduplication_generatesDistinctScopedIds() {
         String canonicalHash = "08a16bfa8f06bc536d02f59b295b32c88c1dc198a8487e0abe0d5b86888040c1";
 
-        String aliceScopedId = persistenceService.resolveScopedEntityId(canonicalHash, "user-alice");
-        String bobScopedId = persistenceService.resolveScopedEntityId(canonicalHash, "user-bob");
+        String aliceScopedId = entityIdResolver.resolveScopedEntityId(canonicalHash, "user-alice");
+        String bobScopedId = entityIdResolver.resolveScopedEntityId(canonicalHash, "user-bob");
 
         assertThat(aliceScopedId).isNotNull().hasSize(64);
         assertThat(bobScopedId).isNotNull().hasSize(64);
         assertThat(aliceScopedId).isNotEqualTo(bobScopedId);
 
         // Same user produces identical ID (enabling idempotence / upsert within their own catalog)
-        String aliceScopedIdAgain = persistenceService.resolveScopedEntityId(canonicalHash, "user-alice");
+        String aliceScopedIdAgain = entityIdResolver.resolveScopedEntityId(canonicalHash, "user-alice");
         assertThat(aliceScopedIdAgain).isEqualTo(aliceScopedId);
     }
 

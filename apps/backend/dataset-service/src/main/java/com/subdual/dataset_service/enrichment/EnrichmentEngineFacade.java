@@ -9,10 +9,7 @@ import com.subdual.dataset_service.entity.dto.EntityDetailResponse;
 
 import java.util.Map;
 
-/**
- * GoF Facade Pattern: Unified facade for the downstream mesh integrations and relational persistence.
- * Shields batch row processors and job orchestrators from downstream communication complexities.
- */
+
 public interface EnrichmentEngineFacade {
 
     ResearchServiceClient.ResearchCallResponse executeResearch(ResearchServiceClient.ResearchCallRequest request);

@@ -3,7 +3,6 @@ package com.subdual.dataset_service.entity;
 import com.subdual.dataset_service.entity.dto.PersistEntityRequest;
 import com.subdual.dataset_service.entity.dto.EntityDetailResponse;
 import com.subdual.dataset_service.entity.dto.EntitySummaryResponse;
-import com.subdual.dataset_service.entity.EntityPersistenceService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;

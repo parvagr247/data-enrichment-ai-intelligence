@@ -12,10 +12,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.Map;
 
-/**
- * Concrete implementation of EnrichmentEngineFacade delegating to downstream REST clients
- * and the JPA entity persistence service.
- */
+
 @Component
 @RequiredArgsConstructor
 public class DefaultEnrichmentEngineFacade implements EnrichmentEngineFacade {

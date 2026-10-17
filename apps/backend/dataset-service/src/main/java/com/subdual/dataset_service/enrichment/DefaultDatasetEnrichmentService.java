@@ -8,6 +8,7 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -17,22 +18,12 @@ import com.subdual.dataset_service.enrichment.dto.EnrichmentJobRequest;
 import com.subdual.dataset_service.enrichment.dto.SingleEnrichmentRequest;
 import com.subdual.dataset_service.enrichment.dto.EnrichmentJobResponse;
 import com.subdual.dataset_service.enrichment.dto.RowEnrichmentResult;
-import com.subdual.dataset_service.enrichment.DefaultEnrichmentEngineFacade;
-import com.subdual.dataset_service.enrichment.EnrichmentEngineFacade;
 import com.subdual.dataset_service.enrichment.integration.AiServiceClient;
 import com.subdual.dataset_service.enrichment.integration.ResearchServiceClient;
 import com.subdual.dataset_service.enrichment.model.JobState;
-import com.subdual.dataset_service.enrichment.DatasetEnrichmentService;
-import com.subdual.dataset_service.enrichment.EnrichmentJobManager;
-import com.subdual.dataset_service.enrichment.EnrichmentTaskExecutor;
-import com.subdual.dataset_service.enrichment.RowEnrichmentProcessor;
-import com.subdual.dataset_service.enrichment.RowIdentityResolver;
 import com.subdual.dataset_service.entity.EntityPersistenceService;
 
-/**
- * Clean, minimalistic implementation of DatasetEnrichmentService following SOLID principles.
- * Orchestrates batch enrichment workflows, manages thread pools, and broadcasts SSE updates.
- */
+
 @Service
 @Slf4j
 public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService {
@@ -61,9 +52,7 @@ public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService
         this.rowEnrichmentProcessor = rowEnrichmentProcessor;
     }
 
-    /**
-     * Backward-compatible constructor for testing and direct client injection.
-     */
+    // Backward-compatible constructor for testing and direct client injection
     public DefaultDatasetEnrichmentService(
             ResearchServiceClient researchServiceClient,
             AiServiceClient aiServiceClient,
@@ -79,10 +68,6 @@ public class DefaultDatasetEnrichmentService implements DatasetEnrichmentService
                 new RowIdentityResolver(),
                 new RowEnrichmentProcessor(new DefaultEnrichmentEngineFacade(researchServiceClient, aiServiceClient, persistenceService))
         );
-    }
-
-    public static String buildCompositeName(String firstName, String lastName, String fullName, String legacyName) {
-        return RowIdentityResolver.buildCompositeName(firstName, lastName, fullName, legacyName);
     }
 
     @Override
