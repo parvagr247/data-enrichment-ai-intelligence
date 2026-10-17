@@ -4,6 +4,26 @@ A distributed, production-grade entity intelligence and data enrichment platform
 
 The platform transforms sparse, noisy tabular datasets (CSV/XLSX) into structured, verified, evidence-grounded intelligence profiles backed by verbatim quotes, multi-source corroboration, bounded concurrency, and real-time execution observability.
 
+<table>
+<tr>
+<td>
+
+## 🎬 Project Tutorial & Live Demo
+
+### ▶️ [WATCH THE FULL PROJECT VIDEO](https://drive.google.com/file/d/1Beh_hAvLVhYD5Z6ywqTrQCHaZzWPKbfi/view?usp=sharing)
+
+📁 **Uploaded on Google Drive**  
+🎥 **End-to-End Tutorial & Live Demo**
+
+See the platform in action — from **dataset ingestion and research** to **source discovery, evidence extraction, AI enrichment, and final results**.
+
+**Recommended:** Watch the tutorial first for a quick understanding of the project before exploring the implementation.
+
+</td>
+</tr>
+</table>
+
+
 ---
 
 ## 1. High-Level Architecture
