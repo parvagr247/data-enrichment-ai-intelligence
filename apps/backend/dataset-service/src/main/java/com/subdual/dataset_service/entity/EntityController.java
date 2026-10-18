@@ -6,7 +6,6 @@ import com.subdual.dataset_service.entity.dto.EntitySummaryResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -26,7 +25,7 @@ public class EntityController {
 
     private final EntityPersistenceService persistenceService;
 
-    @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    @PostMapping
     public ResponseEntity<EntityDetailResponse> persistEntity(
             @Valid @RequestBody PersistEntityRequest request,
             @RequestHeader(value = "X-User-Id", required = false) String userId
@@ -37,7 +36,7 @@ public class EntityController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    @GetMapping(value = "/{entityId}", produces = MediaType.APPLICATION_JSON_VALUE)
+    @GetMapping("/{entityId}")
     public ResponseEntity<EntityDetailResponse> getEntity(
             @PathVariable String entityId,
             @RequestHeader(value = "X-User-Id", required = false) String userId
@@ -50,7 +49,7 @@ public class EntityController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
+    @GetMapping
     public ResponseEntity<List<EntitySummaryResponse>> listEntities(
             @RequestParam(required = false) Integer page,
             @RequestParam(required = false) Integer size,

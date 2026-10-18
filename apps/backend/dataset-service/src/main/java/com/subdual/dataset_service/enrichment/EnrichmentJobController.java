@@ -28,7 +28,7 @@ public class EnrichmentJobController {
 
     private final DatasetEnrichmentService datasetEnrichmentService;
 
-    @PostMapping(value = "/jobs", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    @PostMapping("/jobs")
     @ResponseStatus(HttpStatus.ACCEPTED)
     public ResponseEntity<EnrichmentJobResponse> submitJob(
             @Valid @RequestBody EnrichmentJobRequest request,
@@ -38,7 +38,7 @@ public class EnrichmentJobController {
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(response);
     }
 
-    @GetMapping(value = "/jobs/{jobId}", produces = MediaType.APPLICATION_JSON_VALUE)
+    @GetMapping("/jobs/{jobId}")
     public ResponseEntity<EnrichmentJobResponse> getJob(
             @PathVariable String jobId,
             @RequestHeader(value = "X-User-Id", required = false) String userId
@@ -56,7 +56,7 @@ public class EnrichmentJobController {
         return datasetEnrichmentService.subscribeJobEvents(jobId, userId);
     }
 
-    @PostMapping(value = "/jobs/{jobId}/cancel", produces = MediaType.APPLICATION_JSON_VALUE)
+    @PostMapping("/jobs/{jobId}/cancel")
     public ResponseEntity<Void> cancelJob(
             @PathVariable String jobId,
             @RequestHeader(value = "X-User-Id", required = false) String userId
@@ -65,14 +65,14 @@ public class EnrichmentJobController {
         return cancelled ? ResponseEntity.ok().build() : ResponseEntity.notFound().build();
     }
 
-    @GetMapping(value = "/jobs", produces = MediaType.APPLICATION_JSON_VALUE)
+    @GetMapping("/jobs")
     public ResponseEntity<List<EnrichmentJobResponse>> listJobs(
             @RequestHeader(value = "X-User-Id", required = false) String userId
     ) {
         return ResponseEntity.ok(datasetEnrichmentService.listJobs(userId));
     }
 
-    @PostMapping(value = "/single", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    @PostMapping("/single")
     public ResponseEntity<RowEnrichmentResult> enrichSingle(
             @Valid @RequestBody SingleEnrichmentRequest request,
             @RequestHeader(value = "X-User-Id", required = false) String userId

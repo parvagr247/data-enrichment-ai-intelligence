@@ -20,7 +20,7 @@ public class DatasetIngestionController {
 
     private final DatasetIngestionService ingestionService;
 
-    @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<DatasetProfileReport> uploadAndProfile(
             @RequestParam("file") MultipartFile file
     ) throws IOException {
@@ -35,7 +35,7 @@ public class DatasetIngestionController {
         return ResponseEntity.ok(report);
     }
 
-    @PostMapping(value = "/profile", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    @PostMapping("/profile")
     public ResponseEntity<DatasetProfileReport> profileRows(
             @RequestBody DatasetProfileRequest request
     ) {

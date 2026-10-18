@@ -5,7 +5,6 @@ import java.util.Optional;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -31,13 +30,13 @@ public class ResearchController {
     private final ResearchService researchService;
     private final ResearchJobService researchJobService;
 
-    @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    @PostMapping
     public ResponseEntity<ResearchResponse> executeResearch(@Valid @RequestBody ResearchRequest request) {
         ResearchResponse response = researchService.executeResearch(request);
         return ResponseEntity.ok(response);
     }
 
-    @PostMapping(value = "/jobs", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    @PostMapping("/jobs")
     @ResponseStatus(HttpStatus.ACCEPTED)
     public ResponseEntity<ResearchJobResponse> submitJob(
             @Valid @RequestBody ResearchRequest request,
@@ -49,7 +48,7 @@ public class ResearchController {
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(response);
     }
 
-    @GetMapping(value = "/jobs/{jobId}", produces = MediaType.APPLICATION_JSON_VALUE)
+    @GetMapping("/jobs/{jobId}")
     public ResponseEntity<ResearchJobResponse> getJob(
             @PathVariable String jobId,
             @RequestHeader(value = "X-User-Id", required = false) String userId

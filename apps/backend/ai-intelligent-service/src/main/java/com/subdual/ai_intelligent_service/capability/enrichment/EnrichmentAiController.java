@@ -8,7 +8,6 @@ import com.subdual.ai_intelligent_service.capability.enrichment.dto.RequirementI
 import com.subdual.ai_intelligent_service.capability.enrichment.dto.RequirementInterpretationResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -25,21 +24,21 @@ public class EnrichmentAiController {
 
     private final EnrichmentAIService enrichmentAIService;
 
-    @PostMapping(value = "/requirement", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    @PostMapping("/requirement")
     public ResponseEntity<RequirementInterpretationResponse> interpretRequirement(
             @Valid @RequestBody RequirementInterpretationRequest request
     ) {
         return ResponseEntity.ok(enrichmentAIService.interpretRequirement(request));
     }
 
-    @PostMapping(value = "/clean", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    @PostMapping("/clean")
     public ResponseEntity<InputCleansingResponse> cleanInput(
             @Valid @RequestBody InputCleansingRequest request
     ) {
         return ResponseEntity.ok(enrichmentAIService.cleanInput(request));
     }
 
-    @PostMapping(value = "/enrich", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    @PostMapping("/enrich")
     public ResponseEntity<AIEnrichmentResult> synthesizeEnrichment(
             @Valid @RequestBody EnrichmentSynthesisRequest request
     ) {
