@@ -10,7 +10,7 @@ This document is the authoritative endpoint catalog for all REST and Server-Sent
 | :--- | :--- | :--- | :--- |
 | **`auth-service`** | `9739` | `/api/v1/auth/**` | HTTP REST |
 | **`dataset-service`** | `9743` | `/api/v1/enrichment/**`, `/api/v1/entities/**`, `/api/v2/datasets/**` | HTTP REST + SSE |
-| **`research-service`** | `9741` | `/api/v1/research/**`, `/api/v1/sources/**` | HTTP REST |
+| **`research-service`** | `9741` | `/api/v1/research/**` | HTTP REST |
 | **`ai-intelligent-service`** | `9742` | `/api/v1/ai/**`, `/api/v2/ai/**` | HTTP REST |
 | **`api-gateway`** | `8080` / `9738` | Reverse proxy to all above | HTTP / SSE Ingress |
 
@@ -288,10 +288,6 @@ The Research Service runs multi-source web crawlers, extracts text, handles redi
 * **Submit Job**: `POST /api/v1/research/jobs` (Returns `202 Accepted` with `jobId`)
 * **Poll Job**: `GET /api/v1/research/jobs/{jobId}` (Returns `status: "PENDING" | "RUNNING" | "COMPLETED" | "FAILED"`)
 
-### 3.3 Source Inspection
-* **Endpoint**: `GET /api/v1/sources/{sourceId}`
-* **Description**: Retrieves source metadata and raw crawl status for a discovered web resource.
-
 ---
 
 ## 4. AI Intelligent Service (`:9742`)
@@ -381,7 +377,58 @@ The AI Intelligent Service provides Spring AI LLM grounding (Gemini 2.5 Flash), 
   }
   ```
 
-### 4.4 V2 AI Requirement Planning (`/api/v2/ai/requirements/plan`)
+### 4.4 Fact Synthesis & Enrichment (`/api/v1/ai/enrich`)
+* **Endpoint**: `POST /api/v1/ai/enrich`
+* **Description**: Synthesizes multi-source raw research evidence into clean, validated, and normalized entity attributes using Google Gemini or deterministic fallback, computing overall confidence and identifying unresolved fields or conflicts.
+* **Request Body**:
+  ```json
+  {
+    "rawInput": {
+      "Name": "Linus Torvalds",
+      "Website": "https://github.com/torvalds"
+    },
+    "displayName": "Linus Torvalds",
+    "entityType": "PERSON",
+    "canonicalUrl": "https://github.com/torvalds",
+    "userRequirement": "Extract current role and open source contributions",
+    "targetFields": ["role", "projects"],
+    "researchEvidence": {
+      "role": {
+        "value": "Principal Fellow",
+        "exactQuote": "Linus Torvalds is a Principal Fellow at the Linux Foundation",
+        "confidenceScore": 0.95
+      }
+    },
+    "researchSources": ["https://github.com/torvalds", "https://linuxfoundation.org"]
+  }
+  ```
+* **Response `200 OK`**:
+  ```json
+  {
+    "displayName": "Linus Torvalds",
+    "entityType": "PERSON",
+    "canonicalUrl": "https://github.com/torvalds",
+    "attributes": {
+      "role": {
+        "field": "role",
+        "value": "Principal Fellow",
+        "originalValue": "Principal Fellow",
+        "confidence": "HIGH",
+        "status": "CORROBORATED",
+        "sources": ["https://github.com/torvalds"],
+        "evidence": "Linus Torvalds is a Principal Fellow at the Linux Foundation",
+        "notes": "Verified across primary source"
+      }
+    },
+    "unresolvedFields": [],
+    "conflicts": [],
+    "overallConfidence": 0.95,
+    "modelUsed": "gemini-2.5-flash",
+    "executionTimeMs": 240
+  }
+  ```
+
+### 4.5 V2 AI Requirement Planning (`/api/v2/ai/requirements/plan`)
 * **Endpoint**: `POST /api/v2/ai/requirements/plan`
 * **Description**: Plans field strategies (`PRIMARY_SOURCE`, `SECONDARY_DISCOVERY`, `WEB_SEARCH`) and matches against existing dataset columns to eliminate redundant web crawls.
 * **Request Body**:
@@ -419,7 +466,7 @@ The AI Intelligent Service provides Spring AI LLM grounding (Gemini 2.5 Flash), 
   }
   ```
 
-### 4.5 V2 Objective Parsing (`/api/v2/ai/objective/parse`)
+### 4.6 V2 Objective Parsing (`/api/v2/ai/objective/parse`)
 * **Endpoint**: `POST /api/v2/ai/objective/parse`
 * **Request Body**:
   ```json
@@ -438,7 +485,7 @@ The AI Intelligent Service provides Spring AI LLM grounding (Gemini 2.5 Flash), 
   }
   ```
 
-### 4.6 V2 Multi-Dimensional Profile Assessment (`/api/v2/ai/profile/assess`)
+### 4.7 V2 Multi-Dimensional Profile Assessment (`/api/v2/ai/profile/assess`)
 * **Endpoint**: `POST /api/v2/ai/profile/assess`
 * **Request Body**:
   ```json

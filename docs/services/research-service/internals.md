@@ -40,7 +40,7 @@ flowchart LR
     Norm --> Merged["Corroborated Tuples"]
 ```
 
-### Specialized Field Extractors (`extraction/extractor/field/`)
+### Specialized Field Extractors (`research/evidence/extractor/field/`)
 * **`RoleFieldExtractor`**: Detects professional headlines and titles.
 * **`OrganizationFieldExtractor`**: Identifies employers, subsidiaries, and corporate entities.
 * **`EducationFieldExtractor`**: Identifies universities, degrees, and graduation years.

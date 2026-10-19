@@ -49,9 +49,10 @@ flowchart TB
     ApiGateway -->|Reverse Proxy /api/v1/auth/**| AuthService
     ApiGateway -->|Reverse Proxy /api/v1/enrichment/**| DatasetService
     ApiGateway -->|Reverse Proxy /api/v1/entities/**| DatasetService
+    ApiGateway -->|Reverse Proxy /api/v2/datasets/**| DatasetService
     ApiGateway -->|Reverse Proxy /api/v1/research/**| ResearchService
-    ApiGateway -->|Reverse Proxy /api/v1/sources/**| ResearchService
     ApiGateway -->|Reverse Proxy /api/v1/ai/**| AIService
+    ApiGateway -->|Reverse Proxy /api/v2/ai/**| AIService
 
     Backend -.->|Optional Config Fetch| ConfigServer
     Backend -.->|Heartbeat & Discovery| DiscoveryServer

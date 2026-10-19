@@ -24,11 +24,12 @@ In distributed systems, strict boundary enforcement prevents architectural erosi
 ### A. `dataset-service` (Port 9743)
 * **Core Principle**: *"Dataset Service owns dataset ingestion, batch job execution, and relational persistence."*
 * **Key Responsibilities**:
-  1. **Batch Job Submission (`/api/v1/enrichment/jobs`)**: Accepts row payloads and column mappings, assigns a unique `jobId`, associates the job with the authenticated `userId`, and assigns tasks to the worker pool.
-  2. **Bounded Concurrency Orchestration**: Runs tasks on a managed `ThreadPoolTaskExecutor` (default: 3 workers) with a 500-item queue and `CallerRunsPolicy`.
-  3. **Row-Level Error Isolation**: Network timeouts or scraping errors on one row are caught and flagged as `FAILED` or `PARTIAL`, allowing remaining rows to complete uninterrupted.
-  4. **Real-Time SSE Streaming (`/api/v1/enrichment/jobs/{jobId}/events`)**: Streams discrete row lifecycle events (`STARTED`, `RESEARCH`, `AI_EXTRACTION`, `PERSISTENCE`, `COMPLETED`, `FAILED`) with an in-memory replay buffer.
-  5. **User-Scoped Relational Persistence (`/api/v1/entities`)**: Persists canonical entity records, discovered sources, and attribute evidence into MySQL via Spring Data JPA and versioned Flyway migrations.
+  1. **Dataset Ingestion & Profiling (`/api/v2/datasets/upload`, `/profile`)**: Parses uploaded CSV and XLSX spreadsheets with delimiter sniffing, malformed row isolation, semantic column role detection, and data quality scoring.
+  2. **Batch Job Submission (`/api/v1/enrichment/jobs`)**: Accepts row payloads and column mappings, assigns a unique `jobId`, associates the job with the authenticated `userId`, and assigns tasks to the worker pool.
+  3. **Bounded Concurrency Orchestration**: Runs tasks on a managed `EnrichmentTaskExecutor` (default: 3 workers) with a 500-item queue and `CallerRunsPolicy`.
+  4. **Row-Level Error Isolation**: Network timeouts or scraping errors on one row are caught and flagged as `FAILED` or `PARTIAL`, allowing remaining rows to complete uninterrupted.
+  5. **Real-Time SSE Streaming (`/api/v1/enrichment/jobs/{jobId}/events`)**: Streams discrete row lifecycle events (`STARTED`, `RESEARCH`, `AI_EXTRACTION`, `PERSISTENCE`, `COMPLETED`, `FAILED`) with an in-memory replay buffer via the GoF Bridge Pattern.
+  6. **User-Scoped Relational Persistence (`/api/v1/entities`)**: Persists canonical entity records (`EnrichedEntity`), discovered sources, and attribute evidence into MySQL via Spring Data JPA and versioned Flyway migrations.
 
 ### B. `research-service` (Port 9741)
 * **Core Principle**: *"Research produces evidence."*
@@ -44,9 +45,10 @@ In distributed systems, strict boundary enforcement prevents architectural erosi
 * **Key Responsibilities**:
   1. **Requirement Interpretation (`/api/v1/ai/requirement`)**: Translates natural language requirements into concrete target fields and search keywords.
   2. **Input Cleansing (`/api/v1/ai/clean`)**: Cleans noisy entity names, strips emojis, parses compound roles and titles, and normalizes URLs.
-  3. **Grounded Fact Extraction (`/api/v1/ai/enrich`)**: Extracts structured facts from text. Enforces the **Zero-Hallucination Guardrail**: every fact candidate must have an `exactQuote` matching source text verbatim.
-  4. **Profile Assessment (`/api/v2/ai/profile/assess`)**: Computes multi-dimensional fit scores, priority ratings, and recommended engagement strategies against defined objectives.
-  5. **Transparent Fallback**: When LLMs are unreachable or rate-limited, execution automatically falls back to deterministic heuristic engines (`DeterministicAiIntelligence`).
+  3. **Grounded Fact Extraction (`/api/v1/ai/extract` & `/enrich`)**: Extracts structured facts from text. Enforces the **Zero-Hallucination Guardrail**: every fact candidate must have an `exactQuote` matching source text verbatim.
+  4. **Requirement Planning (`/api/v2/ai/requirements/plan`)**: Generates structured field acquisition strategies against existing dataset columns to prevent redundant web crawls.
+  5. **Profile Assessment (`/api/v2/ai/profile/assess`)**: Computes multi-dimensional fit scores, priority ratings, and recommended engagement strategies against defined objectives.
+  6. **Transparent Fallback**: When LLMs are unreachable or rate-limited, execution automatically falls back to deterministic heuristic engines (`DeterministicAiIntelligence`).
 
 ### D. `auth-service` (Port 9739)
 * **Core Principle**: *"Auth Service owns user identity, credential security, and JWT lifecycle."*

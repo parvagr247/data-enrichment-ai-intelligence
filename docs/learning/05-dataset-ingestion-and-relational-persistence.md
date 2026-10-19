@@ -100,36 +100,39 @@ Database schemas are strictly versioned using **Flyway** under `src/main/resourc
 When a user re-enriches an entity, or when a batch job re-runs after a failure, the entity's sources and attributes must update cleanly without creating duplicate rows or orphaned historical records.
 
 ### Atomic Snapshot Replacement via `orphanRemoval`
-In `EntityRecord`:
+In `EnrichedEntity` (`com.subdual.dataset_service.entity.model`):
 ```java
 @OneToMany(mappedBy = "entity", cascade = CascadeType.ALL, orphanRemoval = true)
-private List<SourceRecord> sources = new ArrayList<>();
+private List<EnrichedSource> sources = new ArrayList<>();
 
 @OneToMany(mappedBy = "entity", cascade = CascadeType.ALL, orphanRemoval = true)
-private List<AttributeRecord> attributes = new ArrayList<>();
+private List<EnrichedAttribute> attributes = new ArrayList<>();
 ```
 
-In `DefaultDatasetEnrichmentService`:
+In `DefaultEntityPersistenceService` (`com.subdual.dataset_service.entity`):
 ```java
 @Transactional
-public EntityDetailResponse persistEntity(PersistEntityRequest request) {
-    EntityRecord entity = entityRepository.findById(request.entityId())
-        .orElseGet(() -> new EntityRecord(request.entityId()));
+public EntityDetailResponse persistEntity(PersistEntityRequest request, String userId) {
+    EnrichedEntity entity = entityRepository.findById(request.entityId())
+        .orElseGet(() -> new EnrichedEntity(request.entityId(), request.entityType(), request.displayName(), request.canonicalUrl()));
 
     entity.setDisplayName(request.displayName());
     entity.setCanonicalUrl(request.canonicalUrl());
     entity.setEntityType(request.entityType());
+    if (userId != null && !userId.isBlank()) {
+        entity.setUserId(userId);
+    }
 
-    // Clear existing collections within the transaction
+    // Clear existing collections within the transaction (triggers orphan removal)
     entity.getSources().clear();
     entity.getAttributes().clear();
 
     // Re-populate new sources and attributes
-    request.sources().forEach(s -> entity.addSource(toSourceRecord(s)));
-    request.attributes().forEach((k, v) -> entity.addAttribute(toAttributeRecord(k, v)));
+    request.sources().forEach(s -> entity.addSource(toEnrichedSource(entity, s)));
+    request.attributes().forEach((k, v) -> entity.addAttribute(toEnrichedAttribute(entity, k, v)));
 
-    entityRepository.save(entity);
-    return EntityDetailResponse.from(entity);
+    EnrichedEntity saved = entityRepository.save(entity);
+    return entityMapper.toDetailResponse(saved);
 }
 ```
 

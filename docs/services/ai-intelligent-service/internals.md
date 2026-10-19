@@ -38,9 +38,9 @@ To ensure predictable response times and prevent context window overflow:
 
 ---
 
-## 3. Prompt Template Architecture (`prompt/`)
+## 3. Prompt Template Architecture (`ai/PromptTemplates.java`)
 
-Prompts are externalized and managed through `PromptTemplateService`:
+Prompts are externalized and managed through `PromptTemplateService` (`com.subdual.ai_intelligent_service.ai`):
 * **`PromptTemplates.java`**: Houses structured prompt templates for requirement parsing, entity cleansing, fact extraction, and multi-dimensional profile assessments.
 * **Structured Output Schema**: Uses Spring AI's structured output converters to enforce JSON responses conforming to target Java records (`ExtractionResponse`, `AIEnrichmentResult`, `ProfileAssessmentResponse`).
 

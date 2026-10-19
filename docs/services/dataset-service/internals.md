@@ -4,15 +4,15 @@ This document details the internal design patterns, thread execution models, cli
 
 ---
 
-## 1. Bounded Concurrency (`EnrichmentTaskExecutorConfig`)
+## 1. Bounded Concurrency (`EnrichmentTaskExecutor`)
 
 Sequential dataset processing is unacceptably slow, but unbounded thread spawning risks thread starvation, out-of-memory errors, and rate-limiting from external search APIs.
 
-### ThreadPoolTaskExecutor Architecture
-* **Bean Name**: `enrichmentTaskExecutor`
-* **Core Pool Size**: 3 (configurable via `enrichment.concurrency.workers: 3`)
-* **Max Pool Size**: 10
-* **Queue Capacity**: 500 tasks
+### Managed Executor Architecture
+* **Component**: `EnrichmentTaskExecutor` (`com.subdual.dataset_service.enrichment`)
+* **Thread Pool**: Managed `ThreadPoolExecutor` with daemon worker threads
+* **Core Pool Size / Concurrency**: 3 (configurable via `enrichment.execution.concurrency: 3`)
+* **Queue Capacity**: 500 tasks (configurable via `enrichment.execution.queue-capacity: 500`)
 * **Thread Name Prefix**: `dataset-enrichment-worker-`
 * **Rejection Policy**: `ThreadPoolExecutor.CallerRunsPolicy`
 
@@ -25,16 +25,46 @@ flowchart LR
     Queue -.->|Overflow| Caller["Caller Runs<br/>(Backpressure)"]
 ```
 
-When the 500-item queue fills up, `CallerRunsPolicy` forces the submitting thread to execute the row task directly, throttling new submissions until the worker pool recovers.
+When the 500-item queue fills up, `CallerRunsPolicy` forces the submitting thread to execute the row task directly, throttling new submissions until the worker pool recovers. On application shutdown, `@PreDestroy` executes graceful termination with a 5-second await timeout before escalating to `shutdownNow()`.
 
 ---
 
-## 2. Real-Time Observability via Server-Sent Events (SSE)
+## 2. Real-Time Observability & The GoF Bridge Pattern
+
+To decouple event generation from delivery protocols, `dataset-service` implements the **GoF Bridge Pattern**:
+
+```mermaid
+classDiagram
+    direction LR
+    class JobEventBroadcaster {
+        <<interface>>
+        +broadcast(jobId, event)
+        +subscribe(jobId, lastEventId)
+        +completeJob(jobId)
+    }
+    class DefaultJobEventBroadcaster {
+        -EventDeliveryChannel deliveryChannel
+    }
+    class EventDeliveryChannel {
+        <<interface>>
+        +deliver(jobId, event)
+        +registerSubscriber(jobId, subscriberId)
+        +closeChannel(jobId)
+    }
+    class SseEventDeliveryChannel {
+        -ConcurrentHashMap~String, List~SseEmitter~~ emitters
+        -ConcurrentHashMap~String, Queue~ExecutionEvent~~ replayBuffers
+    }
+
+    JobEventBroadcaster <|.. DefaultJobEventBroadcaster
+    DefaultJobEventBroadcaster o--> EventDeliveryChannel : delegates to
+    EventDeliveryChannel <|.. SseEventDeliveryChannel
+```
 
 ### In-Memory Replay Buffer
-To provide seamless UX during network reconnection or page refreshes, `dataset-service` maintains an in-memory replay buffer:
+To provide seamless UX during network reconnection or page refreshes, `SseEventDeliveryChannel` maintains an in-memory replay buffer:
 * **Capacity**: Last 500 events per job.
-* **Storage**: Thread-safe bounded buffer (`ConcurrentLinkedQueue` or synchronized list).
+* **Storage**: Thread-safe bounded buffer (`ConcurrentLinkedQueue`).
 * **Handshake Sequence**:
   1. Client connects to `GET /api/v1/enrichment/jobs/{jobId}/events`.
   2. The service sends an immediate `init` event containing `jobId`, `totalRows`, and active worker concurrency.
@@ -86,35 +116,36 @@ Persistence is managed using Spring Data JPA backed by versioned Flyway migratio
 3. **`V3__add_user_id.sql`**: Adds nullable `user_id VARCHAR(36)` to `entities` for user-scoped multi-tenancy.
 
 ### Idempotent Snapshot Upserts
-In `EntityRecord`:
+In `EnrichedEntity` (`com.subdual.dataset_service.entity.model`):
 
 ```java
 @OneToMany(mappedBy = "entity", cascade = CascadeType.ALL, orphanRemoval = true)
-private List<EntitySourceRecord> sources = new ArrayList<>();
+private List<EnrichedSource> sources = new ArrayList<>();
 
 @OneToMany(mappedBy = "entity", cascade = CascadeType.ALL, orphanRemoval = true)
-private List<EntityAttributeRecord> attributes = new ArrayList<>();
+private List<EnrichedAttribute> attributes = new ArrayList<>();
 ```
 
-When re-enriching an existing `entityId`, the service replaces the child collections. Hibernate executes atomic deletes of old attributes and inserts the new evidence within a single `@Transactional` boundary, preventing duplicate records or orphaned foreign keys.
+When re-enriching an existing `entityId`, `DefaultEntityPersistenceService` clears and replaces the child collections. Hibernate executes atomic deletes of old attributes and inserts the new evidence within a single `@Transactional` boundary, preventing duplicate records or orphaned foreign keys.
 
 ---
 
 ## 5. Developer Patterns
 
 ### Type-Safe Configuration (`@ConfigurationProperties`)
-Rather than spreading `@Value` annotations across services, configuration is centralized in `@ConfigurationProperties` classes:
-* `EnrichmentTaskExecutorConfig` binds `enrichment.concurrency.*`.
-* Binds defaults with type safety and validation at application startup.
+Rather than spreading `@Value` annotations across services, configuration is centralized in `EnrichmentProperties`:
+* Binds `enrichment.execution.concurrency` (default: `3`).
+* Binds `enrichment.execution.queue-capacity` (default: `500`).
+* Binds defaults with type safety and validation at application startup via `@EnableConfigurationProperties(EnrichmentProperties.class)`.
 
 ### Interface `default` Compatibility Pattern
 As requirements evolve (e.g. introducing `userId` scoping), Java interface `default` methods allow backward compatibility without breaking existing callers or unit tests:
 
 ```java
 public interface DatasetEnrichmentService {
-    default EnrichmentJob getJob(String jobId) {
+    default EnrichmentJobResponse getJob(String jobId) {
         return getJob(jobId, null);
     }
-    EnrichmentJob getJob(String jobId, String userId);
+    EnrichmentJobResponse getJob(String jobId, String userId);
 }
 ```

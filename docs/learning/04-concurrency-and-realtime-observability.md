@@ -12,22 +12,42 @@ When executing dataset enrichment jobs (e.g. 50 or 500 rows), naive implementati
 2. **Unbounded concurrency (`new Thread()` or default `CompletableFuture.runAsync()`)**: Spawning 100 concurrent threads instantly exhausts CPU cores, saturates database connection pools, triggers web scraper HTTP 429 rate limits, and leads to `OutOfMemoryError`.
 
 ### Bounded Concurrency via `EnrichmentTaskExecutor`
-The platform implements a dedicated, bounded `ThreadPoolTaskExecutor`:
+The platform implements a dedicated, bounded executor component:
 ```java
-@Configuration
-public class EnrichmentTaskExecutorConfig {
+@Component
+@Slf4j
+public class EnrichmentTaskExecutor {
 
-    @Bean(name = "enrichmentTaskExecutor")
-    public ThreadPoolTaskExecutor enrichmentTaskExecutor(
-            @Value("${enrichment.concurrency.workers:3}") int workers) {
-        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-        executor.setCorePoolSize(workers);
-        executor.setMaxPoolSize(workers);
-        executor.setQueueCapacity(500);
-        executor.setThreadNamePrefix("dataset-enrichment-worker-");
-        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
-        executor.initialize();
-        return executor;
+    private final ThreadPoolExecutor executor;
+    private final int concurrency;
+
+    public EnrichmentTaskExecutor(EnrichmentProperties properties) {
+        EnrichmentProperties.Execution exec = (properties != null && properties.execution() != null)
+                ? properties.execution()
+                : new EnrichmentProperties.Execution(3, 500);
+        this.concurrency = exec.concurrency();
+        int queueCapacity = exec.queueCapacity();
+
+        AtomicInteger workerNumber = new AtomicInteger(1);
+        ThreadFactory threadFactory = runnable -> {
+            Thread thread = new Thread(runnable, "dataset-enrichment-worker-" + workerNumber.getAndIncrement());
+            thread.setDaemon(true);
+            return thread;
+        };
+
+        this.executor = new ThreadPoolExecutor(
+            concurrency,
+            concurrency,
+            60L,
+            TimeUnit.SECONDS,
+            new LinkedBlockingQueue<>(queueCapacity),
+            threadFactory,
+            new ThreadPoolExecutor.CallerRunsPolicy()
+        );
+    }
+
+    public <T> CompletableFuture<T> submitTask(Supplier<T> task) {
+        return CompletableFuture.supplyAsync(task, executor);
     }
 }
 ```

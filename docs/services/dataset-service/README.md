@@ -18,6 +18,8 @@ The **Dataset Service** (`com.subdual.dataset_service`) is the batch orchestrati
 
 | Method | Path | Description | Public / Auth |
 | :--- | :--- | :--- | :--- |
+| `POST` | `/api/v2/datasets/upload` | Uploads and parses tabular CSV / XLSX files with delimiter sniffing and malformed row detection. | Auth (JWT) |
+| `POST` | `/api/v2/datasets/profile` | Profiles dataset columns, detects semantic roles, identity candidates, and quality score. | Auth (JWT) |
 | `POST` | `/api/v1/enrichment/jobs` | Submits a batch dataset enrichment job across rows. | Auth (JWT) |
 | `GET` | `/api/v1/enrichment/jobs/{jobId}` | Retrieves job metadata, progress counters, and row statuses. | Auth (JWT) |
 | `GET` | `/api/v1/enrichment/jobs/{jobId}/events` | Establishes a Server-Sent Events (SSE) stream for real-time progress. | Auth (JWT) |
@@ -32,78 +34,88 @@ The **Dataset Service** (`com.subdual.dataset_service`) is the batch orchestrati
 
 ## 3. Package Organization
 
-The service strictly adheres to a **feature-centric, cohesive package structure**:
+The service strictly adheres to a **simplified 5-package architecture** with low coupling and high cohesion:
 
 ```
 com.subdual.dataset_service
-├── enrichment/
-│   ├── api/
-│   │   ├── controller/
-│   │   │   └── DatasetEnrichmentController.java
-│   │   └── dto/
-│   │       ├── request/
-│   │       │   ├── BatchEnrichmentRequest.java
-│   │       │   └── SingleRowEnrichmentRequest.java
-│   │       └── response/
-│   │           ├── BatchJobResponse.java
-│   │           ├── EnrichedRowResult.java
-│   │           ├── EnrichmentExecutionEvent.java
-│   │           └── SingleRowEnrichmentResponse.java
-│   ├── service/
-│   │   ├── DatasetEnrichmentService.java
-│   │   ├── impl/
-│   │   │   └── DefaultDatasetEnrichmentService.java
-│   │   └── helper/
-│   │       ├── RowEnrichmentProcessor.java
-│   │       ├── EventPublisherHelper.java
-│   │       └── SchemaMappingHelper.java
-│   ├── integration/
-│   │   ├── ResearchServiceClient.java
-│   │   └── AiServiceClient.java
-│   └── model/
-│       ├── EnrichmentJob.java
-│       ├── EnrichmentJobStatus.java
-│       └── RowExecutionStatus.java
+├── DatasetServiceApplication.java
 │
-├── dataset/
-│   ├── api/
-│   │   ├── controller/
-│   │   │   └── EntityCatalogController.java
-│   │   └── dto/
-│   │       ├── PersistEntityRequest.java
-│   │       └── EntitySummaryResponse.java
-│   ├── entity/
-│   │   ├── EntityRecord.java
-│   │   ├── EntitySourceRecord.java
-│   │   └── EntityAttributeRecord.java
-│   ├── repository/
-│   │   └── EntityRecordRepository.java
-│   └── service/
-│       ├── EntityService.java
-│       └── impl/
-│           └── DefaultEntityService.java
+├── dataset/                                      # Domain 1: Ingestion, parsing & profiling
+│   ├── DatasetIngestionController.java           # POST /api/v2/datasets/upload, /profile
+│   ├── DatasetIngestionService.java              # Ingestion contract
+│   ├── DefaultDatasetIngestionService.java       # Ingestion orchestrator
+│   ├── DatasetParser.java                        # Strategy interface for file parsers
+│   ├── DatasetParserFactory.java                 # Parser factory by Content-Type / extension
+│   ├── CsvDatasetParser.java                     # RFC 4180 CSV parser with delimiter sniffing
+│   ├── ExcelDatasetParser.java                   # Apache POI streaming XLSX parser
+│   ├── DatasetProfiler.java                      # Semantic schema profiler
+│   ├── DefaultDatasetProfiler.java               # Column role detection & quality scoring
+│   ├── ColumnRoleDetector.java                   # Heuristic role classification (Name, URL, etc.)
+│   ├── DatasetValidator.java                     # Upload validation & sanity checks
+│   ├── dto/ (DatasetProfileRequest, DatasetProfileReport)
+│   └── model/ (RawDataset, ColumnProfile, ColumnRole, MalformedRow)
 │
-├── common/
+├── enrichment/                                   # Domain 2: Batch orchestration & SSE streaming
+│   ├── EnrichmentJobController.java              # POST /jobs, GET /jobs/{id}, GET /events
+│   ├── DatasetEnrichmentService.java             # Batch enrichment coordinator contract
+│   ├── DefaultDatasetEnrichmentService.java      # Job lifecycle & bounded thread coordination
+│   ├── EnrichmentEngineFacade.java               # Unified facade interface
+│   ├── DefaultEnrichmentEngineFacade.java        # Facade implementation
+│   ├── EnrichmentJobManager.java                 # Thread-safe in-memory job state repository
+│   ├── EnrichmentTaskExecutor.java               # Bounded ThreadPoolExecutor with CallerRunsPolicy
+│   ├── RowEnrichmentProcessor.java               # Individual row research & AI pipeline execution
+│   ├── RowIdentityResolver.java                  # Entity identity seed resolver
+│   ├── event/                                    # GoF Bridge Pattern for event delivery
+│   │   ├── JobEventBroadcaster.java              # Abstraction interface
+│   │   ├── DefaultJobEventBroadcaster.java       # Event broadcaster implementation
+│   │   ├── EventDeliveryChannel.java             # Implementor interface
+│   │   └── SseEventDeliveryChannel.java          # SSE emitter channel with replay buffer
+│   ├── integration/                              # Downstream RestClient clients
+│   │   ├── ResearchServiceClient.java            # Client to research-service (:9741)
+│   │   └── AiServiceClient.java                  # Client to ai-intelligent-service (:9742)
+│   ├── dto/ (EnrichmentJobRequest, EnrichmentJobResponse, ExecutionEvent, RowEnrichmentResult, etc.)
+│   └── model/ (JobState, ResearchFinding, ResearchProfile, ObjectiveAssessment, etc.)
+│
+├── entity/                                       # Domain 3: Relational persistence & entity catalog
+│   ├── EntityController.java                     # GET /api/v1/entities, GET /{id}, POST /
+│   ├── EntityPersistenceService.java             # Entity snapshot persistence contract
+│   ├── DefaultEntityPersistenceService.java      # JPA entity service with orphan removal
+│   ├── EnrichedEntityRepository.java             # Spring Data JPA repository
+│   ├── EntityIdResolver.java                     # Entity identity resolver
+│   ├── EntityMapper.java                         # Entity <-> DTO mapper
+│   ├── model/
+│   │   ├── EnrichedEntity.java                   # JPA entity with user_id multi-tenancy
+│   │   ├── EnrichedSource.java                   # Discovered web source JPA child
+│   │   └── EnrichedAttribute.java                # Corroborated attribute JPA child
+│   └── dto/ (PersistEntityRequest, EntitySummaryResponse, EntityDetailResponse)
+│
+├── shared/                                       # Cross-cutting utilities & error handling
 │   ├── exception/
-│   │   └── GlobalExceptionHandler.java
-│   └── validation/
-│       └── DatasetValidationUtils.java
+│   │   └── GlobalExceptionHandler.java           # Central RFC 7807 error handler
+│   ├── filter/
+│   │   └── CorrelationIdFilter.java              # Inbound MDC correlation ID filter
+│   ├── interceptor/
+│   │   └── CorrelationIdClientInterceptor.java   # Outbound RestClient tracing interceptor
+│   ├── dto/ (EntityAttributeDto, EntitySourceDto)
+│   └── model/ (ApiErrorResponse)
 │
-└── config/
-    ├── DatasetServiceConfiguration.java
-    ├── EnrichmentTaskExecutorConfig.java
-    └── WebCorsConfiguration.java
+└── configuration/                                # Spring configuration properties & beans
+    ├── DatasetServiceConfiguration.java          # RestClient, RestClientBuilder, JobExecutor beans
+    ├── EnrichmentProperties.java                 # Type-safe @ConfigurationProperties
+    └── WebCorsConfiguration.java                 # CORS policy configuration
 ```
 
 ---
 
 ## 4. Architectural Implementation Highlights
 
-1. **Intentionally Small Service Layer**:
-   `DefaultDatasetEnrichmentService` coordinates the high-level job state machine. Detailed row execution logic is encapsulated inside `RowEnrichmentProcessor`, event broadcasting is isolated in `EventPublisherHelper`, and schema mapping is in `SchemaMappingHelper`.
-2. **Interface `default` Methods for Backward Compatibility**:
-   When `userId` was introduced to enforce multi-tenant scoping, `DatasetEnrichmentService` added default overloaded methods (`getJob(jobId) -> getJob(jobId, null)`), preserving compatibility for legacy tests without breaking contract boundaries.
-3. **Idempotent Relational Persistence**:
-   `EntityRecord` leverages JPA `orphanRemoval = true` within atomic `@Transactional` operations to overwrite existing attributes and sources on re-enrichment, preventing duplicate rows or orphaned evidence.
+1. **Clean 5-Package Architecture**:
+   The service organizes code by business responsibility into `dataset/` (ingestion/profiling), `enrichment/` (concurrency/orchestration), `entity/` (JPA persistence), `shared/` (common models/exceptions), and `configuration/` (Spring beans).
+2. **GoF Bridge Pattern for Observability**:
+   `JobEventBroadcaster` acts as the abstraction while `EventDeliveryChannel` (`SseEventDeliveryChannel`) acts as the implementor, allowing pluggable streaming protocols (SSE, WebSocket, or message queue) without modifying the enrichment engine.
+3. **Bounded Parallel Concurrency**:
+   `EnrichmentTaskExecutor` wraps a managed `ThreadPoolExecutor` enforcing bounded workers (default: 3) and bounded queue capacity (default: 500) with `CallerRunsPolicy` backpressure.
+4. **Idempotent Relational Persistence**:
+   `EnrichedEntity` leverages JPA `orphanRemoval = true` within atomic `@Transactional` operations in `DefaultEntityPersistenceService` to overwrite existing attributes and sources on re-enrichment, preventing duplicate rows or orphaned evidence.
 
-For in-depth implementation patterns (including `ThreadPoolTaskExecutor` tuning, `RestClient` resilience, and Flyway schema details), see **[Dataset Service Internals](internals.md)**.
+For in-depth implementation patterns (including `ThreadPoolExecutor` tuning, `RestClient` resilience, and Flyway schema details), see **[Dataset Service Internals](internals.md)**.

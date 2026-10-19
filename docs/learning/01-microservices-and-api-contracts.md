@@ -110,7 +110,7 @@ public EntityDetailResponse getEntity(String entityId) {
 ## 4. Contract-First API Evolution & DTO Boundaries
 
 ### The Anti-Corruption Layer (ACL)
-Internal JPA entities (`EntityRecord`, `SourceRecord`, `AttributeRecord`) are **never** returned directly through REST controllers. Exposing database entities leads to:
+Internal JPA entities (`EnrichedEntity`, `EnrichedSource`, `EnrichedAttribute`) are **never** returned directly through REST controllers. Exposing database entities leads to:
 1. Accidental leaking of internal database primary keys or audit columns.
 2. Lazy-loading exceptions (`LazyInitializationException`) outside the transaction boundary.
 3. Breaking changes to external API clients whenever a database column is renamed.

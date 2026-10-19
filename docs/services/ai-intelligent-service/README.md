@@ -20,85 +20,76 @@ The **AI Intelligent Service** (`com.subdual.ai_intelligent_service`) encapsulat
 | `POST` | `/api/v1/ai/extract` | Extracts grounded factual tuples from raw text with exact verbatim quotes. | `extraction` |
 | `POST` | `/api/v1/ai/clean` | Cleans noisy input seeds (normalizes names, strips emojis, parses compound roles/titles). | `enrichment` |
 | `POST` | `/api/v1/ai/requirement` | Translates natural language requirements into structured target fields. | `enrichment` |
-| `POST` | `/api/v1/ai/enrich` | Core fact extraction pipeline endpoint used by `research-service`. | `enrichment` |
-| `POST` | `/api/v1/ai/plan` | Generates a structured field-by-field research strategy plan. | `planning` |
+| `POST` | `/api/v1/ai/enrich` | Core fact synthesis and enrichment pipeline endpoint used by `research-service`. | `enrichment` |
+| `POST` | `/api/v2/ai/requirements/plan` | Generates a structured field-by-field research strategy plan against existing columns. | `planning` |
 | `POST` | `/api/v2/ai/objective/parse` | Parses open-ended research objectives into structured dimensions. | `profile` |
 | `POST` | `/api/v2/ai/profile/assess` | Multi-dimensional profile assessment and fit scoring. | `profile` |
 | `GET` | `/actuator/health` | Service health status probe (`UP`). | Public |
 
 ---
 
-## 3. Feature-Centric Package Organization
+## 3. Simplified 4-Package Architecture
 
-The codebase is organized into four distinct, self-contained business domains, supported by a unified AI intelligence abstraction layer:
+The codebase is organized into four clean, top-level packages:
 
 ```
 com.subdual.ai_intelligent_service
-├── ai/                                           # Core AI abstraction layer
-│   ├── AiIntelligence.java                       # Strategy interface
-│   ├── impl/
-│   │   ├── SpringAiIntelligence.java             # Live Google Gemini LLM implementation
-│   │   └── DeterministicAiIntelligence.java      # Heuristic regex & rule-based fallback
-│   ├── helper/
-│   │   └── AiResponseValidator.java              # Output sanity & schema validation
+├── AiIntelligentServiceApplication.java
+│
+├── capability/                                   # Domain business capabilities
+│   ├── enrichment/                               # Capability 1: Input cleansing & fact synthesis
+│   │   ├── EnrichmentAiController.java           # POST /requirement, POST /clean, POST /enrich
+│   │   ├── EnrichmentAIService.java              # Enrichment service contract
+│   │   ├── SpringAiEnrichmentService.java        # Spring AI + fallback implementation
+│   │   ├── DeterministicEnrichmentHelper.java    # Regex & heuristic offline cleansing
+│   │   └── dto/ (AIEnrichmentResult, EnrichmentSynthesisRequest, InputCleansingRequest, etc.)
+│   │
+│   ├── extraction/                               # Capability 2: Grounded verbatim fact extraction
+│   │   ├── ExtractionController.java             # POST /api/v1/ai/extract
+│   │   ├── ExtractionService.java                # Fact extraction contract
+│   │   ├── SpringAiExtractionService.java        # Spring AI verbatim extraction engine
+│   │   ├── DeterministicExtractionHelper.java    # Deterministic regex pattern extractor
+│   │   └── model/ (ExtractionRequest, ExtractionResponse, ExtractedFact)
+│   │
+│   ├── planning/                                 # Capability 3: Strategy planning
+│   │   ├── EnrichmentPlanningController.java     # POST /api/v2/ai/requirements/plan
+│   │   ├── EnrichmentPlanningService.java        # Planning contract
+│   │   ├── DefaultEnrichmentPlanningService.java # Planning orchestrator
+│   │   ├── DefaultPlanGenerator.java             # Strategy generator (Primary, Secondary, Search)
+│   │   ├── RequirementNormalizer.java            # Keyword & requirement normalization
+│   │   ├── RequirementValidator.java             # Input validation & sanity checks
+│   │   └── model/ (EnrichmentPlan, PlannedField, FieldSourceStrategy, EnrichmentRequirement)
+│   │
+│   └── profile/                                  # Capability 4: Dimensional profile assessment
+│       ├── ProfileAssessmentController.java      # POST /objective/parse, POST /profile/assess
+│       ├── ProfileAssessmentEngine.java          # Assessment engine contract
+│       ├── SpringAiProfileAssessmentEngine.java  # Spring AI dimensional evaluator
+│       ├── DeterministicProfileAssessmentEngine.java # Offline arithmetic scoring fallback
+│       ├── ProfileExtractionHelper.java          # Profile attribute aggregation
+│       ├── dto/ (ObjectiveParseRequest, ProfileAssessmentRequest, ProfileAssessmentResponse)
+│       └── model/ (ResearchProfile, ObjectiveAssessment, RecommendedApproach, ResearchFinding)
+│
+├── ai/                                           # Centralized AI infrastructure & prompts
+│   ├── AiPromptExecutor.java                     # Spring AI ChatClient execution coordinator
+│   ├── AiResponseValidator.java                  # Verbatim quote grounding & schema validator
+│   ├── AiExecutionMetrics.java                   # Token telemetry & latency metrics
+│   ├── PromptTemplates.java                      # Externalized prompt templates
+│   └── PromptTemplateService.java                # Dynamic template interpolation service
+│
+├── shared/                                       # Cross-cutting error handling & normalization
+│   ├── exception/
+│   │   ├── AiErrorClassifier.java                # Error categorization (Rate-limit, Timeout, etc.)
+│   │   └── GlobalExceptionHandler.java           # RFC 7807 problem details handler
+│   ├── normalization/
+│   │   └── AiOutputNormalizer.java               # JSON markdown fence stripper & sanitizer
+│   ├── filter/
+│   │   └── CorrelationIdFilter.java              # MDC correlation ID logging filter
 │   └── dto/
-│       └── AiExecutionMetrics.java               # Execution timing & token telemetry
+│       └── FactEvidenceDto.java                  # Inter-capability fact evidence transfer
 │
-├── enrichment/                                   # Domain 1: Ingestion cleansing & requirement parsing
-│   ├── api/
-│   │   ├── controller/EnrichmentAiController.java
-│   │   └── dto/ (request & response)
-│   └── service/
-│       ├── EnrichmentAIService.java
-│       ├── impl/SpringAiEnrichmentService.java
-│       └── helper/DeterministicEnrichmentHelper.java
-│
-├── extraction/                                   # Domain 2: Grounded fact extraction
-│   ├── api/
-│   │   ├── controller/ExtractionController.java
-│   │   └── dto/ (request & response)
-│   ├── model/ExtractedFact.java
-│   └── service/
-│       ├── ExtractionService.java
-│       ├── impl/SpringAiExtractionService.java
-│       └── helper/DeterministicExtractionHelper.java
-│
-├── planning/                                     # Domain 3: Enrichment requirement planning
-│   ├── api/
-│   │   └── controller/EnrichmentPlanningController.java
-│   ├── model/ (EnrichmentPlan, PlannedField, etc.)
-│   └── service/
-│       ├── EnrichmentPlanningService.java
-│       ├── impl/DefaultEnrichmentPlanningService.java
-│       └── helper/ (RequirementValidator, RequirementNormalizer, DefaultPlanGenerator)
-│
-├── profile/                                      # Domain 4: Multi-dimensional profile assessment
-│   ├── api/
-│   │   ├── controller/ProfileAssessmentController.java
-│   │   └── dto/ (request & response)
-│   ├── model/ (ResearchProfile, ObjectiveAssessment, etc.)
-│   └── service/
-│       ├── ProfileAssessmentEngine.java
-│       ├── impl/SpringAiProfileAssessmentEngine.java
-│       ├── impl/DeterministicProfileAssessmentEngine.java
-│       └── helper/ProfileExtractionHelper.java
-│
-├── prompt/                                       # Externalized StringTemplate prompts
-│   ├── PromptTemplates.java
-│   └── PromptTemplateService.java
-│
-├── normalization/                                # Post-processing output normalizers
-│   └── AiOutputNormalizer.java
-│
-├── exception/                                    # Classified error hierarchies
-│   ├── AiErrorClassifier.java
-│   └── GlobalExceptionHandler.java
-│
-└── configuration/                                # Spring AI & HTTP properties
-    ├── AiProperties.java
-    ├── SpringAiConfig.java
-    ├── CorrelationIdFilter.java
-    └── WebCorsConfiguration.java
+└── configuration/                                # Spring configuration properties
+    ├── AiProperties.java                         # gemini-2.5-flash model, timeout & fallback flags
+    └── WebCorsConfiguration.java                 # Web MVC CORS policy configuration
 ```
 
 ---
