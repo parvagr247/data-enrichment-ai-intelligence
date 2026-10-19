@@ -4,6 +4,17 @@ The **Dataset Service** (`com.subdual.dataset_service`) is the batch orchestrati
 
 ---
 
+## Table of Contents
+- [1. Core Responsibilities](#1-core-responsibilities)
+- [2. Key Capabilities & Endpoints](#2-key-capabilities--endpoints)
+- [3. Simplified 5-Package Architecture](#3-simplified-5-package-architecture)
+- [4. Bounded Concurrency (EnrichmentTaskExecutor)](#4-bounded-concurrency-enrichmenttaskexecutor)
+- [5. Real-Time Observability & The GoF Bridge Pattern](#5-real-time-observability--the-gof-bridge-pattern)
+- [6. Inter-Service Communication & Resilience](#6-inter-service-communication--resilience)
+- [7. Relational Data Modeling & Multi-Tenancy](#7-relational-data-modeling--multi-tenancy)
+
+---
+
 ## 1. Core Responsibilities
 
 * **Separation of Volatility**: Web crawling and LLM prompting are non-deterministic, high-latency, and failure-prone. This service isolates ACID transactions, entity data models, and query serving from external network volatility.
@@ -32,7 +43,7 @@ The **Dataset Service** (`com.subdual.dataset_service`) is the batch orchestrati
 
 ---
 
-## 3. Package Organization
+## 3. Simplified 5-Package Architecture
 
 The service strictly adheres to a **simplified 5-package architecture** with low coupling and high cohesion:
 
@@ -70,11 +81,12 @@ com.subdual.dataset_service
 │   │   ├── DefaultJobEventBroadcaster.java       # Event broadcaster implementation
 │   │   ├── EventDeliveryChannel.java             # Implementor interface
 │   │   └── SseEventDeliveryChannel.java          # SSE emitter channel with replay buffer
-│   ├── integration/                              # Downstream RestClient clients
+│   ├── client/                                   # Downstream RestClient clients
 │   │   ├── ResearchServiceClient.java            # Client to research-service (:9741)
-│   │   └── AiServiceClient.java                  # Client to ai-intelligent-service (:9742)
-│   ├── dto/ (EnrichmentJobRequest, EnrichmentJobResponse, ExecutionEvent, RowEnrichmentResult, etc.)
-│   └── model/ (JobState, ResearchFinding, ResearchProfile, ObjectiveAssessment, etc.)
+│   │   ├── AiServiceClient.java                  # Client to ai-intelligent-service (:9742)
+│   │   └── dto/ (ResearchResultPayload, FactExtractionPayload)
+│   ├── dto/ (JobSubmissionRequest, JobStatusResponse, SingleEnrichmentRequest, RowEnrichmentResultResponse)
+│   └── model/ (JobState, ResearchFinding, ResearchProfile, ObjectiveAssessment)
 │
 ├── entity/                                       # Domain 3: Relational persistence & entity catalog
 │   ├── EntityController.java                     # GET /api/v1/entities, GET /{id}, POST /
@@ -90,32 +102,117 @@ com.subdual.dataset_service
 │   └── dto/ (PersistEntityRequest, EntitySummaryResponse, EntityDetailResponse)
 │
 ├── shared/                                       # Cross-cutting utilities & error handling
-│   ├── exception/
-│   │   └── GlobalExceptionHandler.java           # Central RFC 7807 error handler
-│   ├── filter/
-│   │   └── CorrelationIdFilter.java              # Inbound MDC correlation ID filter
-│   ├── interceptor/
-│   │   └── CorrelationIdClientInterceptor.java   # Outbound RestClient tracing interceptor
-│   ├── dto/ (EntityAttributeDto, EntitySourceDto)
-│   └── model/ (ApiErrorResponse)
+│   ├── exception/GlobalExceptionHandler.java     # Central RFC 7807 error handler
+│   ├── filter/CorrelationIdFilter.java           # Inbound MDC correlation ID filter
+│   ├── interceptor/CorrelationIdClientInterceptor.java # Outbound RestClient tracing interceptor
+│   └── model/ApiErrorResponse.java
 │
-└── configuration/                                # Spring configuration properties & beans
-    ├── DatasetServiceConfiguration.java          # RestClient, RestClientBuilder, JobExecutor beans
-    ├── EnrichmentProperties.java                 # Type-safe @ConfigurationProperties
-    └── WebCorsConfiguration.java                 # CORS policy configuration
+└── configuration/                                # Spring configuration & thread execution beans
+    ├── DatasetServiceConfiguration.java          # RestClient, Jackson, and MVC beans
+    ├── EnrichmentProperties.java                 # Concurrency & timeout properties
+    └── WebSecurityConfiguration.java             # Security & CORS configuration
 ```
 
 ---
 
-## 4. Architectural Implementation Highlights
+## 4. Bounded Concurrency (`EnrichmentTaskExecutor`)
 
-1. **Clean 5-Package Architecture**:
-   The service organizes code by business responsibility into `dataset/` (ingestion/profiling), `enrichment/` (concurrency/orchestration), `entity/` (JPA persistence), `shared/` (common models/exceptions), and `configuration/` (Spring beans).
-2. **GoF Bridge Pattern for Observability**:
-   `JobEventBroadcaster` acts as the abstraction while `EventDeliveryChannel` (`SseEventDeliveryChannel`) acts as the implementor, allowing pluggable streaming protocols (SSE, WebSocket, or message queue) without modifying the enrichment engine.
-3. **Bounded Parallel Concurrency**:
-   `EnrichmentTaskExecutor` wraps a managed `ThreadPoolExecutor` enforcing bounded workers (default: 3) and bounded queue capacity (default: 500) with `CallerRunsPolicy` backpressure.
-4. **Idempotent Relational Persistence**:
-   `EnrichedEntity` leverages JPA `orphanRemoval = true` within atomic `@Transactional` operations in `DefaultEntityPersistenceService` to overwrite existing attributes and sources on re-enrichment, preventing duplicate rows or orphaned evidence.
+Sequential dataset processing is unacceptably slow, but unbounded thread spawning risks thread starvation, out-of-memory errors, and rate-limiting from external search APIs.
 
-For in-depth implementation patterns (including `ThreadPoolExecutor` tuning, `RestClient` resilience, and Flyway schema details), see **[Dataset Service Internals](internals.md)**.
+### Managed Executor Architecture
+* **Component**: `EnrichmentTaskExecutor` (`com.subdual.dataset_service.enrichment`)
+* **Thread Pool**: Managed `ThreadPoolExecutor` with daemon worker threads
+* **Core Pool Size / Concurrency**: 3 (configurable via `enrichment.execution.concurrency: 3`)
+* **Queue Capacity**: 500 tasks (configurable via `enrichment.execution.queue-capacity: 500`)
+* **Thread Name Prefix**: `dataset-enrichment-worker-`
+* **Rejection Policy**: `ThreadPoolExecutor.CallerRunsPolicy`
+
+```mermaid
+flowchart LR
+    Job["Batch Request<br/>(N rows)"] --> Queue["Task Queue<br/>(Capacity: 500)"]
+    Queue --> W1["Worker 1<br/>(Row 0)"]
+    Queue --> W2["Worker 2<br/>(Row 1)"]
+    Queue --> W3["Worker 3<br/>(Row 2)"]
+    Queue -.->|Overflow| Caller["Caller Runs<br/>(Backpressure)"]
+```
+
+When the 500-item queue fills up, `CallerRunsPolicy` forces the submitting thread to execute the row task directly, throttling new submissions until the worker pool recovers. On application shutdown, `@PreDestroy` executes graceful termination with a 5-second await timeout before escalating to `shutdownNow()`.
+
+---
+
+## 5. Real-Time Observability & The GoF Bridge Pattern
+
+To decouple event generation from delivery protocols, `dataset-service` implements the **GoF Bridge Pattern**:
+
+```mermaid
+classDiagram
+    direction LR
+    class JobEventBroadcaster {
+        <<interface>>
+        +broadcast(jobId, event)
+        +subscribe(jobId, lastEventId)
+        +completeJob(jobId)
+    }
+    class DefaultJobEventBroadcaster {
+        -EventDeliveryChannel deliveryChannel
+    }
+    class EventDeliveryChannel {
+        <<interface>>
+        +deliver(jobId, event)
+        +registerSubscriber(jobId, subscriberId)
+        +closeChannel(jobId)
+    }
+    class SseEventDeliveryChannel {
+        -ConcurrentHashMap emitters
+        -ConcurrentHashMap replayBuffers
+    }
+
+    JobEventBroadcaster <|.. DefaultJobEventBroadcaster
+    DefaultJobEventBroadcaster o--> EventDeliveryChannel : delegates to
+    EventDeliveryChannel <|.. SseEventDeliveryChannel
+```
+
+### In-Memory Replay Buffer
+To provide seamless UX during network reconnection or page refreshes, `SseEventDeliveryChannel` maintains an in-memory replay buffer:
+* **Capacity**: Last 500 events per job.
+* **Storage**: Thread-safe bounded buffer (`ConcurrentLinkedQueue`).
+* **Handshake Sequence**:
+  1. Client connects to `GET /api/v1/enrichment/jobs/{jobId}/events`.
+  2. The service sends an immediate `init` event containing `jobId`, `totalRows`, and active worker concurrency.
+  3. Replays all historical buffered events in sequence, allowing the client's `LiveExecutionDashboard` to reconstruct current worker cards immediately.
+  4. Keeps the `SseEmitter` open for live event streaming.
+
+---
+
+## 6. Inter-Service Communication & Resilience
+
+The service delegates research and intelligence to downstream microservices using Spring 6's synchronous `RestClient`.
+
+### A. Distributed MDC Tracing (`CorrelationIdClientInterceptor`)
+Every HTTP call attaches the `X-Correlation-ID` header. If an MDC trace does not exist, a new UUID is generated and bound. Downstream services (`research-service` and `ai-intelligent-service`) log using this identifier:
+
+```java
+@Bean
+public RestClient restClient(RestClient.Builder builder, CorrelationIdClientInterceptor interceptor) {
+    return builder
+            .requestInterceptor(interceptor)
+            .build();
+}
+```
+
+### B. Dependency Resilience & Degradation
+* **`ResearchServiceClient` (Hard Dependency)**:
+  - Invokes `POST /api/v1/research`.
+  - No fallback: Web evidence is mandatory. If `research-service` is unreachable or times out, the row status is set to `FAILED`.
+* **`AiServiceClient` (Soft Dependency)**:
+  - Invokes `POST /api/v1/ai/requirement`, `/clean`, `/enrich`, `/profile/assess`.
+  - Resilient fallback: If the AI service is unreachable or rate-limited, raw research tuples are extracted directly without LLM transformation, and the row status is marked `AI_DEGRADED`.
+
+---
+
+## 7. Relational Data Modeling & Multi-Tenancy
+
+Persistence uses MySQL 8.0, Spring Data JPA, and Flyway versioned migrations (`classpath:db/migration`).
+
+### Multi-Tenant Boundary Isolation
+Every entity record (`EnrichedEntity`) is tied to the authenticated user's `userId` (`X-User-Id` injected securely by `api-gateway`). All JPA repository queries enforce `WHERE user_id = :userId` to prevent Insecure Direct Object Reference (IDOR) attacks.

@@ -4,6 +4,25 @@ This document details the ingress architecture, authentication mechanisms, anti-
 
 ---
 
+## Table of Contents
+- [1. Gateway Ingress Layer (:8080 / :9738)](#1-gateway-ingress-layer-8080---9738)
+  - [Ingress Routing Table](#ingress-routing-table)
+- [2. Authentication & Ingress Security](#2-authentication--ingress-security)
+  - [2.1 JWT Bearer Token Authentication](#21-jwt-bearer-token-authentication)
+  - [2.2 Anti-Spoofing Architecture](#22-anti-spoofing-architecture)
+  - [2.3 Whitelisted Endpoints](#23-whitelisted-endpoints)
+  - [2.4 Optional API Key Validation](#24-optional-api-key-validation)
+  - [2.5 Standard Injected Security Headers](#25-standard-injected-security-headers)
+- [3. Distributed Tracing & Correlation](#3-distributed-tracing--correlation)
+- [4. Standard Error Contract (RFC 7807)](#4-standard-error-contract-rfc-7807)
+  - [Standard Status Codes](#standard-status-codes)
+- [5. Public API DTOs vs. Internal Inter-Service DTOs](#5-public-api-dtos-vs-internal-inter-service-dtos)
+  - [5.1 Why Separate Them?](#51-why-separate-them)
+  - [5.2 Concrete Package Boundaries](#52-concrete-package-boundaries)
+- [6. Real-Time Streaming Protocol (Server-Sent Events)](#6-real-time-streaming-protocol-server-sent-events)
+
+---
+
 ## 1. Gateway Ingress Layer (`:8080` / `:9738`)
 
 All external client interactions—including the Next.js Web Frontend, developer SDKs, and third-party integrations—ingress via the **API Gateway**. The Gateway acts as the single unified entry point, enforcing reverse-proxy routing, JWT Bearer token authentication, anti-spoofing header normalization, optional API key checks, strict security headers, and centralized Cross-Origin Resource Sharing (CORS).
@@ -21,9 +40,9 @@ All external client interactions—including the Next.js Web Frontend, developer
                 │  - Inject / Propagate X-Correlation-ID  │
                 └────────────────────┬────────────────────┘
                                      │
-           ┌─────────────────────────┼─────────────────────────┐
-           ▼                         ▼                         ▼
-   auth-service:9739        dataset-service:9743      research-service:9741
+           ┌─────────────────────────┼─────────────────────────┬─────────────────────────┐
+           ▼                         ▼                         ▼                         ▼
+   auth-service:9739        dataset-service:9743      research-service:9741    ai-intelligent-service:9742
 ```
 
 ### Ingress Routing Table
@@ -32,7 +51,6 @@ All external client interactions—including the Next.js Web Frontend, developer
 | :--- | :--- | :--- | :--- |
 | `/api/v1/auth/**` | `auth-service:9739` | `AUTH-SERVICE` | User registration, authentication, token issuance, profile |
 | `/api/v1/research/**` | `research-service:9741` | `RESEARCH-SERVICE` | Synchronous & async entity research pipelines |
-| `/api/v1/sources/**` | `research-service:9741` | `RESEARCH-SERVICE` | Discovered source retrieval & verification |
 | `/api/v1/ai/**` | `ai-intelligent-service:9742` | `AI-INTELLIGENT-SERVICE` | Requirement parsing, data cleansing, LLM grounding |
 | `/api/v2/ai/**` | `ai-intelligent-service:9742` | `AI-INTELLIGENT-SERVICE` | AI requirement planning, objective parsing, profile assessment |
 | `/api/v1/enrichment/**` | `dataset-service:9743` | `DATASET-SERVICE` | Batch dataset enrichment jobs & SSE real-time events |
@@ -165,20 +183,28 @@ A fundamental architectural rule of this platform is the **strict segregation be
 
 ### 5.2 Concrete Package Boundaries
 
-#### Public API Contracts (`api/dto/`)
-Located in each service under `com.subdual.<service>.api.dto`:
-* **`api.dto.request`**: Incoming payload definitions accepted by `@RestController` controllers (e.g., `JobSubmissionRequest`, `SingleEnrichmentRequest`, `LoginRequest`).
-* **`api.dto.response`**: Outgoing JSON representations returned to callers (e.g., `JobStatusResponse`, `RowEnrichmentResultResponse`, `UserProfileResponse`).
-
-#### Internal Inter-Service Contracts (`integration/**/dto/`)
-Located in caller services under `com.subdual.<service>.integration.<target>.dto`:
-* In `dataset-service`:
-  * `integration.ai.dto`: Structures sent to/from `ai-intelligent-service` (e.g., `FactExtractionPayload`, `RequirementPlanPayload`).
-  * `integration.persistence.dto`: Internal data models mapped before writing to MySQL JPA repositories.
+#### Public API Contracts
+Public DTOs are co-located within their feature boundaries or dedicated API layers:
 * In `research-service`:
-  * `integration.ai.dto`: Structs sent to `ai-intelligent-service` during the research pipeline.
-* In caller clients:
-  * `integration.client.dto`: Payloads explicitly modeling downstream REST responses, completely decoupled from the receiving service's public controller DTOs.
+  * `api.dto.ResearchRequest`: Incoming research request payloads accepted by `ResearchController`.
+  * `api.dto.response.*`: Public responses (`ResearchResponse`, `ResearchResult`, `ResearchJobResponse`, `EvidenceTuple`, `SourceItem`).
+* In `dataset-service`:
+  * `dataset.dto.*`: Ingress dataset profiling and ingestion payloads (`DatasetProfileRequest`, `DatasetProfileReport`).
+  * `enrichment.dto.*`: Batch and single enrichment requests/responses (`JobSubmissionRequest`, `JobStatusResponse`, `SingleEnrichmentRequest`, `RowEnrichmentResultResponse`).
+  * `entity.dto.*`: Entity query parameters and persisted entity responses (`EntityResponse`, `EntitySourceResponse`, `EntityAttributeResponse`).
+* In `ai-intelligent-service`:
+  * `capability.extraction.dto.*`: Extraction contracts (`FactExtractionRequest`, `FactExtractionResponse`, `FieldExtractionRequest`).
+  * `capability.planning.dto.*`: Requirement planning contracts (`EnrichmentPlanRequest`, `EnrichmentPlanResponse`).
+
+#### Internal Inter-Service Contracts
+Located in calling services under their respective integration or client packages:
+* In `dataset-service`:
+  * `enrichment.client`: RestClients calling `research-service` (`/api/v1/research`) and `ai-intelligent-service` (`/api/v1/ai/extract`, `/api/v2/ai/requirements/plan`).
+  * `enrichment.client.dto`: Payloads explicitly modeling peer responses (`ResearchResultPayload`, `FactExtractionPayload`), decoupled from the provider's internal entities.
+* In `research-service`:
+  * `integration.ai`: Integration client and DTOs calling `ai-intelligent-service` (`AiExtractionClient`, `AiFactExtractionRequest`).
+* In `ai-intelligent-service`:
+  * Pure intelligence provider exposing domain-grounded extraction without inbound inter-service couplings.
 
 ---
 

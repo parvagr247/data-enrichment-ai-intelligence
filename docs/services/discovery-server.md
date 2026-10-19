@@ -4,6 +4,13 @@ The **Discovery Server** (`com.subdual.discovery_server`) acts as the dynamic se
 
 ---
 
+## Table of Contents
+- [1. Core Responsibilities](#1-core-responsibilities)
+- [2. Server Configuration](#2-server-configuration)
+- [3. Client Registration & Heartbeats](#3-client-registration--heartbeats)
+
+---
+
 ## 1. Core Responsibilities
 
 * **Dynamic Service Registration**: Automatically detects microservice instances as they start up, registering their hostnames, ports, and metadata.

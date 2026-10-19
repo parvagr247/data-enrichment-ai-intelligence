@@ -12,6 +12,24 @@ Each post-mortem follows standard Tier-1 engineering post-mortem structure:
 
 ---
 
+## Table of Contents
+
+| # | Post-Mortem | Subsystem Impacted | Key Failure Pattern |
+| :-: | :--- | :--- | :--- |
+| **01** | [Gemini Model Name Deprecation & Autoconfiguration](#1-gemini-model-name-deprecation--spring-ai-autoconfiguration-gemini-25-flash-404) | `ai-intelligent-service` | HTTP 404 Model Not Found |
+| **02** | [Silent HTTP Fallback Dishonesty](#2-silent-http-fallback-dishonesty-completed-status-masking-upstream-ai-outage) | `dataset-service` | `COMPLETED` Status Masking AI Outage |
+| **03** | [Upstream Content-Type & ProblemDetail Parsing Mismatch](#3-upstream-content-type--problemdetail-parsing-mismatch-applicationproblemjson--octet-stream) | `research-service` &rarr; `ai-intelligent-service` | `RestClient` Deserialization Crash |
+| **04** | [LinkedIn Bot Defense & HTTP 999 Request Denied](#4-linkedin-bot-defense--http-999-request-denied) | `research-service` | Anti-Scraping 999 Status Code |
+| **05** | [Search Provider Snippet Fallback & Extraction Provenance](#5-search-provider-snippet-fallback--extraction-method-provenance) | `research-service` | Blocked Fetch Dead-End & Confidence Discount |
+| **06** | [Single-Query Discovery Starvation vs Multi-Query Expansion](#6-single-query-discovery-starvation-vs-multi-query-expansion) | `research-service` | Sparse Input Zero-Source Yield |
+| **07** | [ResearchDepth Enum Hardcoding & Contract Invariants](#7-researchdepth-enum-hardcoding--contract-invariants) | `research-service` | Client Query Param Enum Deserialization 400 |
+| **08** | [SSE Pipeline Event Desynchronization & Thread Starvation](#8-sse-pipeline-event-desynchronization--thread-pool-starvation) | `dataset-service` | SSE Emitter Hang & Worker Starvation |
+| **09** | [Hallucination vs Grounded Evidence Boundary](#9-hallucination-vs-grounded-evidence-boundary-not_found--unknown-discipline) | `ai-intelligent-service` | LLM Plausible Fabrications |
+| **10** | [Database Schema Evolution & JSON Column Serialization](#10-database-schema-evolution--json-column-serialization-for-deep-profiles) | `dataset-service` | Relational Entity Schema Rigidness |
+| **11** | [Docker Compose Gateway Resolution & Timeouts](#11-docker-compose-microservice-gateway-resolution--timeouts) | `api-gateway` & Docker | Container DNS Lookup & Network Timeouts |
+
+---
+
 ## 1. Gemini Model Name Deprecation & Spring AI Autoconfiguration (`gemini-2.5-flash` 404)
 
 ### 1. Summary & Error Signature

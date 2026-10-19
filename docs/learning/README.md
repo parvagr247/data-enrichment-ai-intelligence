@@ -2,73 +2,116 @@
 
 Welcome to the **Data Enrichment AI Intelligence Platform** engineering learning curriculum.
 
-This series provides deep, production-grade architectural and implementation guides explaining **why** the platform is engineered the way it is, the trade-offs made, failure modes encountered, and real-world distributed systems patterns.
+This curriculum provides production-grade architectural and implementation guides explaining **why** the platform is engineered the way it is, the trade-offs made, failure modes encountered, and real-world distributed systems patterns.
 
 ---
 
-## Curriculum Roadmap
+## Table of Contents
+- [Curriculum Architecture](#curriculum-architecture)
+- [1. 35 Core Engineering & AI Concepts (concepts.md)](#1-35-core-engineering--ai-concepts-conceptsmd)
+  - [Domain Breakdown](#domain-breakdown)
+- [2. Production Failure Modes & Incident Post-Mortems (failure-modes.md)](#2-production-failure-modes--incident-post-mortems-failure-modesmd)
+  - [Incident Taxonomy](#incident-taxonomy)
+- [Related Architecture Documentation](#related-architecture-documentation)
+
+---
+
+## Curriculum Architecture
+
+The engineering learning materials are organized into two comprehensive, production-grade deep-dive catalogs:
 
 ```mermaid
 flowchart TD
-    G1["01. Microservices & API Contracts<br/><i>Boundaries, SOLID, Spring DI, RFC 7807</i>"]
-    G2["02. Research & Evidence Pipeline<br/><i>Adapters, Web Crawling, Quote Grounding, Corroboration</i>"]
-    G3["03. Spring AI & Structured Intelligence<br/><i>ChatModel, StringTemplate, Deterministic Fallbacks, Profiles</i>"]
-    G4["04. Concurrency & Real-Time Observability<br/><i>ThreadPools, Bounded Workers, SSE Streams, MDC Tracing</i>"]
-    G5["05. Ingestion & Relational Persistence<br/><i>SheetJS, Schema Profiling, MySQL, Flyway, Idempotent Upserts</i>"]
-    G6["06. Production Reliability & Post-Mortems<br/><i>11 Real Post-Mortems, Docker Volume Shadowing, Guardrails</i>"]
+    Hub["Engineering Learning Series<br/>(docs/learning/README.md)"]
 
-    G1 --> G2
-    G2 --> G3
-    G3 --> G4
-    G4 --> G5
-    G5 --> G6
+    C["35 Core Engineering & AI Concepts<br/>(docs/learning/concepts.md)"]
+    F["11 Production Post-Mortems Archive<br/>(docs/learning/failure-modes.md)"]
+
+    Hub --> C
+    Hub --> F
+
+    subgraph Concepts ["35 Systems & AI Concepts"]
+        C1["Architecture & Protocols (IoC, RFC 7807, Contracts)"]
+        C2["Search & Evidence (Strategy, Crawling, Corroboration)"]
+        C3["Applied GenAI (Spring AI, Prompts, Anti-Hallucination)"]
+        C4["Concurrency (ThreadPools, Bounded Workers, SSE)"]
+        C5["Persistence (JPA, Multi-Tenancy, Flyway)"]
+    end
+
+    subgraph Failures ["11 Production Post-Mortems"]
+        F1["API Outages (Gemini 404, RestClient Deserialization)"]
+        F2["Scraping Defenses (LinkedIn 999, Bot Defense)"]
+        F3["Concurrency Bugs (SSE Starvation, Reconnection)"]
+        F4["Data Modeling (JSON Columns, Schema Drift)"]
+    end
+
+    C --> Concepts
+    F --> Failures
 ```
 
 ---
 
-## The 6 Core Engineering Guides
+## 1. [35 Core Engineering & AI Concepts](concepts.md)
 
-### 1. [Microservices & API Contracts](01-microservices-and-api-contracts.md)
-* Decomposition of the 3-microservice topology (`dataset-service`, `research-service`, `ai-intelligent-service`).
-* Inversion of Control, constructor injection, and interface segregation.
-* RFC 7807 `application/problem+json` error contracts and content negotiation.
-* Contract-first evolution and DTO boundary isolation.
+An exhaustive, 1,300+ line technical compendium analyzing **35 software engineering, distributed systems, and applied AI concepts** implemented across the platform.
 
-### 2. [Research & Evidence Pipeline](02-research-and-evidence-pipeline.md)
-* Strategy and Adapter patterns in search provider integrations (Tavily + Mock).
-* Multi-source discovery, primary source ranking, and URL canonicalization.
-* Polite web scraping, boilerplate removal, and strict context truncation.
-* Verbatim quote grounding (zero-hallucination verification).
-* Multi-source corroboration, agreement confidence boosting, and conflict detection.
+Each concept is rigorously dissected across 7 mandatory dimensions:
+1. **Core Concept Definition**
+2. **Why It Matters in Real Systems**
+3. **How This System Implements It** (with concrete Java/TypeScript code snippets and class pointers)
+4. **Real Failure Modes & Edge Cases**
+5. **Mental Model & ASCII / Mermaid Diagram**
+6. **Architectural Trade-offs**
+7. **Senior Engineering & Interview Talking Points**
 
-### 3. [Spring AI & Structured Intelligence](03-spring-ai-and-structured-intelligence.md)
-* Spring AI `ChatModel` abstraction and Google Gemini integration.
-* Externalized prompt templates (`.st`) and structured JSON schema extraction.
-* Transparent deterministic heuristic fallback engine during AI outages.
-* Objective-driven research profiles and multi-dimensional scoring.
+### Domain Breakdown
 
-### 4. [Concurrency & Real-Time Observability](04-concurrency-and-realtime-observability.md)
-* Thread pool sizing, unbounded queue hazards, and `CallerRunsPolicy` backpressure.
-* Bounded parallel dataset enrichment (`EnrichmentTaskExecutor`).
-* Server-Sent Events (SSE) streaming (`GET /api/v1/enrichment/jobs/{jobId}/events`).
-* Bounded event replay buffers for client reconnection and instant evidence inspection.
-* Distributed MDC tracing (`correlationId`, `jobId`, `rowId`) across worker threads.
+* **API Protocols & Gateway Ingress**: RFC 7807 problem details, content negotiation, anti-spoofing header normalization, contract-first API evolution, reverse proxy routing.
+* **Architecture & Design Patterns**: Inversion of Control, Strategy pattern for search providers, GoF Bridge pattern for event dispatching, strict DTO boundary segregation.
+* **Search & Evidence Extraction**: Multi-query expansion, primary source ranking, polite web crawling, SSRF protection, multi-source corroboration, and conflict detection.
+* **Applied Generative AI**: Spring AI `ChatModel`, structured JSON output schema enforcement, zero-hallucination verbatim quote grounding, and deterministic heuristic fallback.
+* **Concurrency & Observability**: Fixed worker thread pools (`EnrichmentTaskExecutor`), bounded queue backpressure (`CallerRunsPolicy`), Server-Sent Events (SSE) streaming, bounded replay buffers, and distributed MDC correlation tracing.
+* **Relational Persistence**: MySQL 8.0, Spring Data JPA, orphan removal, versioned Flyway migrations, and multi-tenant user isolation.
 
-### 5. [Dataset Ingestion & Relational Persistence](05-dataset-ingestion-and-relational-persistence.md)
-* Tabular dataset ingestion (CSV/XLSX), browser parsing, and memory safety.
-* Schema detection heuristics, type profiling, and column mapping.
-* Relational data modeling for entities, sources, and attributes.
-* Versioned database migrations via Flyway.
-* Transactional persistence, JPA orphan removal, and idempotent snapshot upserts.
-
-### 6. [Production Reliability & Failure Modes](06-production-reliability-and-failure-modes.md)
-* Cross-OS Docker development, volume shadowing, and Next.js hot-reloading.
-* **11 Root-Cause Post-Mortems**: Gemini 404, LinkedIn HTTP 999 blocking, SSE starvation, Jackson unmarshalling failures, context overflows.
-* Graceful degradation, circuit breakers, and production guardrails.
+👉 **Read the full catalog**: **[35 Core Engineering & AI Concepts](concepts.md)**
 
 ---
 
-For high-level system topology, see [System Architecture](../architecture/overview.md).  
-For the end-to-end data lifecycle, see [Enrichment Flow](../architecture/data-flow.md).  
-For API endpoint documentation, see [API Reference](../api/overview.md).  
-For architectural decisions and ADRs, see [Architecture Decisions](../decisions/README.md).
+## 2. [Production Failure Modes & Incident Post-Mortems](failure-modes.md)
+
+An exhaustive post-mortem archive documenting **11 critical production incidents** encountered, debugged, and architecturally resolved during development and scaling.
+
+Each incident follows the standard Tier-1 engineering post-mortem structure:
+1. **Summary & Error Signature**
+2. **Root Cause Analysis (RCA)**
+3. **Reproducing Scenario & Production Logs**
+4. **Engineering Fix Applied** (with before/after code diffs)
+5. **Verification & Regression Safeguards** (exact automated test classes)
+6. **System Lessons & Senior Engineering Takeaways**
+
+### Incident Taxonomy
+
+| # | Incident Title | Subsystem Impacted | Key Failure Pattern |
+| :-: | :--- | :--- | :--- |
+| **01** | Gemini Model Name Deprecation & Autoconfiguration | `ai-intelligent-service` | HTTP 404 Model Not Found |
+| **02** | Silent HTTP Fallback Dishonesty | `dataset-service` | `COMPLETED` Status Masking AI Outage |
+| **03** | Upstream Content-Type & ProblemDetail Parsing Mismatch | `research-service` &rarr; `ai-service` | `RestClient` Deserialization Crash |
+| **04** | LinkedIn Bot Defense & HTTP 999 Request Denied | `research-service` | Anti-Scraping 999 Status Code |
+| **05** | Search Provider Snippet Fallback & Extraction Provenance | `research-service` | Blocked Fetch Dead-End & Confidence Discount |
+| **06** | Single-Query Discovery Starvation vs Multi-Query Expansion | `research-service` | Sparse Input Zero-Source Yield |
+| **07** | ResearchDepth Enum Hardcoding & Contract Invariants | `research-service` | Client Query Param Enum Deserialization 400 |
+| **08** | SSE Pipeline Event Desynchronization & Thread Starvation | `dataset-service` | SSE Emitter Hang & Worker Starvation |
+| **09** | Hallucination vs Grounded Evidence Boundary | `ai-intelligent-service` | LLM Plausible Fabrications |
+| **10** | Database Schema Evolution & JSON Column Serialization | `dataset-service` | Relational Entity Schema Rigidness |
+| **11** | Docker Compose Gateway Resolution & Timeouts | `api-gateway` & Docker | Container DNS Lookup & Network Timeouts |
+
+👉 **Read the full archive**: **[Production Failure Modes & Post-Mortems](failure-modes.md)**
+
+---
+
+## Related Architecture Documentation
+
+* For high-level system topology, see [System Architecture](../architecture/overview.md).  
+* For the end-to-end data lifecycle, see [Enrichment Flow](../architecture/data-flow.md).  
+* For API endpoint documentation, see [API Reference](../api/overview.md).  
+* For architectural decisions and ADRs, see [Architecture Decisions](../decisions/README.md).

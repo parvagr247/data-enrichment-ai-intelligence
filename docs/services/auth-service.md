@@ -4,6 +4,14 @@ The **Auth Service** (`com.subdual.auth_service`) owns user identity, credential
 
 ---
 
+## Table of Contents
+- [1. Core Responsibilities](#1-core-responsibilities)
+- [2. Key Capabilities & Endpoints](#2-key-capabilities--endpoints)
+- [3. Relational Schema (users table)](#3-relational-schema-users-table)
+- [4. JWT Architecture](#4-jwt-architecture)
+
+---
+
 ## 1. Core Responsibilities
 
 * **Core Principle**: *"Auth Service owns user identity, credential security, and JWT lifecycle."*

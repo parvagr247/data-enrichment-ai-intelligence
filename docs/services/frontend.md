@@ -4,6 +4,17 @@ The **Frontend Application** (`apps/frontend`) is a Next.js 15 web client provid
 
 ---
 
+## Table of Contents
+- [1. Product Workflow](#1-product-workflow)
+- [2. Key Architecture & Features](#2-key-architecture--features)
+  - [A. Client-Side SheetJS Parsing](#a-client-side-sheetjs-parsing)
+  - [B. Real-Time Observability Dashboard](#b-real-time-observability-dashboard)
+  - [C. Incremental Evidence Modal Inspection](#c-incremental-evidence-modal-inspection)
+  - [D. Non-Destructive Export](#d-non-destructive-export)
+- [3. Running Locally](#3-running-locally)
+
+---
+
 ## 1. Product Workflow
 
 ```
@@ -57,5 +68,3 @@ npm run dev
 # Build for production
 npm run build
 ```
-
-The frontend runs on `http://localhost:3000` and routes all API requests through the API Gateway at `http://localhost:9738`.

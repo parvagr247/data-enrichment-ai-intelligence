@@ -4,6 +4,13 @@ The **Config Server** (`com.subdual.config_server`) provides centralized, extern
 
 ---
 
+## Table of Contents
+- [1. Core Responsibilities](#1-core-responsibilities)
+- [2. Configuration Profiles & Property Files](#2-configuration-profiles--property-files)
+- [3. Client Microservice Integration](#3-client-microservice-integration)
+
+---
+
 ## 1. Core Responsibilities
 
 * **Centralized Configuration**: Decouples application settings, database credentials, timeouts, and provider API keys from compiled JAR files.
@@ -21,7 +28,7 @@ Configurations are located in the repository root directory `config/`:
 | **`application.yml`** | All Microservices | Eureka client discovery, Actuator health probes, Logback MDC pattern. |
 | **`auth-service.yml`** | `auth-service` (:9739) | MySQL datasource, Flyway migrations, JWT secret and token expiration. |
 | **`research-service.yml`** | `research-service` (:9741) | Search provider selection, crawler socket timeouts, buffer caps, and max sources. |
-| **`ai-intelligent-service.yml`** | `ai-intelligent-service` (:9742) | Gemini model name (`gemini-3.5-flash-lite`), temperature, and fallback thresholds. |
+| **`ai-intelligent-service.yml`** | `ai-intelligent-service` (:9742) | Gemini model name (`gemini-2.5-flash`), temperature, and fallback thresholds. |
 | **`dataset-service.yml`** | `dataset-service` (:9743) | Bounded worker pool concurrency, queue size, JPA pool, and downstream service URLs. |
 | **`api-gateway.yml`** | `api-gateway` (:9738) | Route definitions, CORS allowed origins, and anti-spoofing settings. |
 

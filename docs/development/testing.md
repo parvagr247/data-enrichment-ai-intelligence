@@ -4,6 +4,18 @@ This document details the automated testing suites, health probe verification, P
 
 ---
 
+## Table of Contents
+- [1. Automated Test Suites](#1-automated-test-suites)
+  - [1.1 Backend Unit & Integration Tests](#11-backend-unit--integration-tests)
+  - [1.2 Key Test Focus Areas](#12-key-test-focus-areas)
+- [2. Frontend Verification & Typechecking](#2-frontend-verification--typechecking)
+- [3. Health & Liveness Actuator Probes](#3-health--liveness-actuator-probes)
+  - [Quick CLI Health Check Script](#quick-cli-health-check-script)
+- [4. Postman & Newman End-to-End API Testing](#4-postman--newman-end-to-end-api-testing)
+  - [Running Headless Tests with Newman CLI](#running-headless-tests-with-newman-cli)
+
+---
+
 ## 1. Automated Test Suites
 
 The backend microservices utilize JUnit 5, AssertJ, and Mockito. All tests can be executed from Maven CLI or directly in an IDE.
@@ -11,15 +23,15 @@ The backend microservices utilize JUnit 5, AssertJ, and Mockito. All tests can b
 ### 1.1 Backend Unit & Integration Tests
 
 ```bash
-# Test AI Intelligent Service
+# Test AI Intelligent Service (30 tests)
 cd apps/backend/ai-intelligent-service
 mvn clean test
 
-# Test Research Service
+# Test Research Service (165 tests)
 cd apps/backend/research-service
 mvn clean test
 
-# Test Dataset Service (Batch coordinator, SSE streaming, profiling)
+# Test Dataset Service (36 tests)
 cd apps/backend/dataset-service
 mvn clean test
 
@@ -31,22 +43,26 @@ mvn clean test
 ### 1.2 Key Test Focus Areas
 
 #### `dataset-service` Test Suite
-* **`JobSubmissionRequestTest`**: Validates request DTO constraints, column mapping validations, and empty row rejection.
-* **`SseEmitterServiceTest`**: Validates multi-subscriber registry, event broadcasting, client disconnection handling, and graceful emitter cleanup.
-* **`BoundedExecutorServiceTest`**: Validates that concurrent thread pools strictly adhere to `enrichment.concurrency.workers` limits and queue rejection semantics.
-* **`DatasetProfilingServiceTest`**: Verifies column role classification heuristics (Name, URL, Org, Role), completeness percentages, and quality scoring.
-* **`DelimiterSnifferTest`**: Tests delimiter detection across comma, semicolon, tab, and pipe formats.
-* **`MalformedRowIsolatorTest`**: Validates non-blocking isolation of malformed CSV rows.
+* **`DatasetIngestionControllerTest`**: Validates multipart file uploads (CSV, XLSX), automatic delimiter sniffing, and `/profile` request dispatching.
+* **`DatasetIngestionServiceTest`**: Validates tabular parsing, header sanitization, column role heuristics (Name, URL, Org, Role), and completeness metrics.
+* **`DatasetEnrichmentServiceTest`**: Validates batch enrichment orchestration, `EnrichmentTaskExecutor` concurrency, asynchronous job execution, SSE event streaming, and job state transitions.
+* **`EntityControllerTest`**: Validates persisted entity querying, multi-attribute retrieval, and pagination.
+* **`UserIsolationAndOwnershipTest`**: Verifies multi-tenant ownership enforcement via `X-User-Id`, ensuring cross-tenant isolation and 403/404 responses on mismatched job/entity access.
 
 #### `research-service` Test Suite
-* **`ResearchExecutionCoordinatorTest`**: Verifies synchronous pipeline execution, URL validation, and attribute corroboration.
-* **`SecurityValidatorTest`**: Verifies private IP, localhost, and RFC 1918 blocking for SSRF protection.
-* **`ConfidenceScoringHelperTest`**: Validates multi-source corroboration and conflict penalties.
+* **`ResearchControllerTest`**: Validates synchronous research (`POST /api/v1/research`) and asynchronous polling (`POST /api/v1/research/jobs`, `GET /api/v1/research/jobs/{jobId}`).
+* **`ResearchOrchestratorTest`**: Validates multi-stage pipeline orchestration: search discovery, web fetching, evidence extraction, corroboration, and confidence scoring.
+* **`DefaultWebContentFetcherTest`**: Validates SSRF protection (blocking localhost, private subnets, cloud metadata), timeouts, payload size limits, and HTML parsing.
+* **`EntityAccuracyAndSourceQualityTest`**: Validates multi-source corroboration, conflict detection, and confidence tier boosting.
+* **`SourceRankerTest` & `SourceDeduplicatorTest`**: Validates domain authority ranking, duplicate URL stripping, and content relevance evaluation.
+* **`DefaultSourceEvidenceServiceTest` & `FieldExtractorTest`**: Validates attribute extraction, fuzzy matching, and entity name/organization normalization.
 
 #### `ai-intelligent-service` Test Suite
-* **`FactExtractorTest`**: Verifies Spring AI fact extraction and verbatim quote anchoring.
-* **`DeterministicFactExtractorFallbackTest`**: Validates fallback extraction when Spring AI is unavailable.
-* **`SeedCleanserTest`**: Tests URL normalization and corporate legal suffix stripping.
+* **`ExtractionControllerTest`**: Validates fact extraction (`/api/v1/ai/extract`), structured enrichment (`/api/v1/ai/enrich`), and requirement planning (`/api/v2/ai/requirements/plan`).
+* **`EnrichmentAiServiceTest`**: Validates Spring AI Gemini model interaction, prompt rendering, verbatim quote anchoring, and transparent deterministic heuristic fallback.
+* **`EnrichmentPlanningServiceTest`**: Validates unstructured prompt parsing, field objective formulation, and profile assessment.
+* **`PromptTemplateServiceTest`**: Validates StringTemplate prompt rendering with strict JSON schema definitions.
+* **`AiResponseValidatorTest` & `AiOutputNormalizerTest`**: Validates LLM response JSON schema compliance, markdown fence stripping, and value sanitization.
 
 ---
 

@@ -128,14 +128,14 @@ All platform documentation is centrally organized under `docs/` (see **[Document
 * **[API Endpoints Catalog](docs/api/endpoints.md)**: Complete request and response specifications for REST and SSE interfaces across all services.
 
 ### 📦 Services Documentation
-* **[Dataset Service](docs/services/dataset-service/README.md)** ([Internals](docs/services/dataset-service/internals.md))
-* **[AI Intelligent Service](docs/services/ai-intelligent-service/README.md)** ([Internals](docs/services/ai-intelligent-service/internals.md))
-* **[Research Service](docs/services/research-service/README.md)** ([Internals](docs/services/research-service/internals.md))
-* **[Auth Service](docs/services/auth-service/README.md)**
-* **[API Gateway](docs/services/api-gateway/README.md)**
-* **[Config Server](docs/services/config-server/README.md)**
-* **[Discovery Server](docs/services/discovery-server/README.md)**
-* **[Frontend Application](docs/services/frontend/README.md)**
+* **[Dataset Service](docs/services/dataset-service.md)**: Batch orchestration, bounded concurrency, SSE stream, and relational persistence.
+* **[AI Intelligent Service](docs/services/ai-intelligent-service.md)**: Spring AI Gemini integration, zero-hallucination quote guardrails, and deterministic fallbacks.
+* **[Research Service](docs/services/research-service.md)**: Multi-query discovery, web crawling guardrails, and evidence extraction.
+* **[Auth Service](docs/services/auth-service.md)**: User accounts, BCrypt passwords, and HMAC-SHA256 JWT lifecycle.
+* **[API Gateway](docs/services/api-gateway.md)**: Spring Cloud Gateway reverse proxy, JWT validation, anti-spoofing, and CORS.
+* **[Config Server](docs/services/config-server.md)**: Spring Cloud Config Server native profile and local YAML fallback.
+* **[Discovery Server](docs/services/discovery-server.md)**: Spring Cloud Netflix Eureka registry and heartbeat management.
+* **[Frontend Application](docs/services/frontend.md)**: Next.js 15, in-browser SheetJS parsing, live SSE dashboard, and non-destructive export.
 
 ### 🛠️ Development & Deployment
 * **[Local Setup](docs/development/setup.md)**: Prerequisites, environment configuration, and startup instructions.
@@ -148,4 +148,4 @@ All platform documentation is centrally organized under `docs/` (see **[Document
 * **[Architecture Decisions (ADRs)](docs/decisions/README.md)**: ADRs 01 through 09, system evolution timeline, and strategic roadmap.
 * **[Configuration Reference](docs/reference/configuration.md)**: Comprehensive environment variables and Spring properties matrix.
 * **[Domain Glossary](docs/reference/glossary.md)**: Definitions of core domain terms and algorithmic concepts.
-* **[Engineering Learning Series](docs/learning/README.md)**: 35 comprehensive engineering concepts covering microservices, evidence pipelines, Spring AI, concurrency, config server, Eureka, API Gateway, and security.
+* **[Engineering Learning Series](docs/learning/README.md)**: Exhaustive engineering curriculum featuring **[35 Core Concepts](docs/learning/concepts.md)** and **[11 Production Post-Mortems Archive](docs/learning/failure-modes.md)**.

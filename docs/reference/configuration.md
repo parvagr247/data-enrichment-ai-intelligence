@@ -4,6 +4,19 @@ This reference catalogs all environment variables and Spring Boot application pr
 
 ---
 
+## Table of Contents
+- [1. Environment Variables Matrix](#1-environment-variables-matrix)
+- [2. Spring Boot Properties by Service](#2-spring-boot-properties-by-service)
+  - [2.1 API Gateway (api-gateway)](#21-api-gateway-api-gateway)
+  - [2.2 Auth Service (auth-service)](#22-auth-service-auth-service)
+  - [2.3 Dataset Service (dataset-service)](#23-dataset-service-dataset-service)
+  - [2.4 Research Service (research-service)](#24-research-service-research-service)
+  - [2.5 AI Intelligent Service (ai-intelligent-service)](#25-ai-intelligent-service-ai-intelligent-service)
+  - [2.6 Config Server (config-server)](#26-config-server-config-server)
+  - [2.7 Discovery Server (discovery-server)](#27-discovery-server-discovery-server)
+
+---
+
 ## 1. Environment Variables Matrix
 
 | Environment Variable | Target Service(s) | Default Value | Description |
@@ -20,7 +33,8 @@ This reference catalogs all environment variables and Spring Boot application pr
 | `GEMINI_API_KEY` | `ai-intelligent-service` | `""` (activates heuristic fallback) | Google AI Studio API key |
 | `SEARCH_PROVIDER_NAME` | `research-service` | `tavily` | Search provider engine (`tavily`, `mock`) |
 | `SEARCH_PROVIDER_API_KEY` | `research-service` | `""` | Search API credentials (required for Tavily) |
-| `ENRICHMENT_CONCURRENCY_WORKERS` | `dataset-service` | `3` | Number of concurrent worker threads per job |
+| `ENRICHMENT_CONCURRENCY` | `dataset-service` | `3` | Worker thread pool core/max size per job |
+| `ENRICHMENT_QUEUE_CAPACITY` | `dataset-service` | `500` | Bounded task queue capacity for row enrichment |
 | `EUREKA_CLIENT_SERVICEURL_DEFAULTZONE` | All Eureka clients | `http://localhost:8761/eureka/` | Service registry URL |
 | `SPRING_CLOUD_CONFIG_URI` | All Config clients | `http://localhost:8888` | Central configuration server URI |
 | `NEXT_PUBLIC_GATEWAY_URL` | `apps/frontend` | `http://localhost:8080` | Public API Gateway URL for browser HTTP/SSE calls |
@@ -68,8 +82,9 @@ This reference catalogs all environment variables and Spring Boot application pr
 * Properties:
   ```yaml
   enrichment:
-    concurrency:
-      workers: ${ENRICHMENT_CONCURRENCY_WORKERS:3}
+    execution:
+      concurrency: ${ENRICHMENT_CONCURRENCY:3}
+      queue-capacity: ${ENRICHMENT_QUEUE_CAPACITY:500}
     http:
       connect-timeout-ms: 5000
       read-timeout-ms: 15000
@@ -77,7 +92,7 @@ This reference catalogs all environment variables and Spring Boot application pr
     research:
       url: ${RESEARCH_SERVICE_URL:http://localhost:9741}
     ai:
-      url: ${AI_SERVICE_URL:http://localhost:9742}
+      url: ${AI_INTELLIGENT_SERVICE_URL:http://localhost:9742}
   spring:
     datasource:
       url: ${SPRING_DATASOURCE_URL}

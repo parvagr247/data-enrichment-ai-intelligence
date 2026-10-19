@@ -4,13 +4,31 @@ This glossary defines core terminology, algorithmic concepts, and architectural 
 
 ---
 
+## Table of Contents
+- [Anti-Spoofing Architecture](#anti-spoofing-architecture)
+- [Bounded Concurrency](#bounded-concurrency)
+- [Confidence Tier](#confidence-tier)
+- [Corroboration](#corroboration)
+- [Delimiter Sniffing](#delimiter-sniffing)
+- [Deterministic Fallback](#deterministic-fallback)
+- [Evidence Tuple](#evidence-tuple)
+- [IDOR Protection (Insecure Direct Object Reference)](#idor-protection-insecure-direct-object-reference)
+- [Malformed Row Isolation](#malformed-row-isolation)
+- [Non-Destructive Export](#non-destructive-export)
+- [Problem Details (RFC 7807)](#problem-details-rfc-7807)
+- [Seed Cleansing](#seed-cleansing)
+- [SSRF Protection (Server-Side Request Forgery)](#ssrf-protection-server-side-request-forgery)
+- [Verbatim Evidence Grounding (Zero-Hallucination Principle)](#verbatim-evidence-grounding-zero-hallucination-principle)
+
+---
+
 ### Anti-Spoofing Architecture
 An ingress security design implemented in `api-gateway` where all client-supplied identity headers (such as `X-User-Id`, `X-User-Email`, and `X-User-Roles`) are unconditionally stripped by a request wrapper. After verifying the signature and expiration of the client's JWT Bearer token, the Gateway injects verified `X-User-Id` and `X-User-Email` headers downstream.
 
 ---
 
 ### Bounded Concurrency
-A concurrency design pattern implemented via `BoundedExecutorService` that constrains parallel row processing to a fixed thread pool (default: 3 workers) with a bounded queue and caller-runs / rejection policies. This prevents thread starvation, high CPU churn, and third-party API rate-limiting (HTTP 429).
+A concurrency design pattern implemented via `EnrichmentTaskExecutor` that constrains parallel row processing to a fixed thread pool (`enrichment.execution.concurrency: 3`) with a bounded queue (`enrichment.execution.queue-capacity: 500`) and caller-runs / rejection policies. This prevents thread starvation, high CPU churn, and third-party API rate-limiting (HTTP 429).
 
 ---
 
@@ -29,7 +47,7 @@ The process of independently confirming a factual attribute across two or more d
 ---
 
 ### Delimiter Sniffing
-An automated heuristic implemented in `DelimiterSniffer` (`dataset-service`) that inspects the first several lines of an uploaded text file to identify its delimiter (comma `,`, semicolon `;`, tab `\t`, or pipe `|`), eliminating manual CSV format configuration.
+An automated heuristic implemented in `CsvDatasetParser` (`dataset-service`) that inspects the first several lines of an uploaded text file to identify its delimiter (comma `,`, semicolon `;`, tab `\t`, or pipe `|`), eliminating manual CSV format configuration.
 
 ---
 
@@ -49,7 +67,7 @@ A multi-tenant data boundary pattern where all batch jobs (`JobState`) and persi
 ---
 
 ### Malformed Row Isolation
-An ingestion safeguard implemented in `MalformedRowIsolator` (`dataset-service`) that detects and quarantines rows with ragged column counts, unclosed quotes, or encoding corruption into an isolated error report without failing the batch processing of valid rows.
+An ingestion safeguard implemented in `CsvDatasetParser` (`dataset-service`) that detects and quarantines rows with ragged column counts, unclosed quotes, or encoding corruption into isolated `MalformedRow` error reports without failing the batch processing of valid rows.
 
 ---
 

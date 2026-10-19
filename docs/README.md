@@ -14,13 +14,13 @@ flowchart TD
     Hub["docs/README.md<br/><i>Documentation Hub (You are here)</i>"]
 
     Arch["docs/architecture/<br/><i>System Topology, Boundaries & Flow</i>"]
-    Serv["docs/services/<br/><i>Service Guides & Internals</i>"]
+    Serv["docs/services/<br/><i>Microservice Guides</i>"]
     API["docs/api/<br/><i>REST/SSE Contracts & DTO Models</i>"]
     Dev["docs/development/<br/><i>Setup, Testing & Conventions</i>"]
     Dep["docs/deployment/<br/><i>Docker & Cloud VM Operations</i>"]
     ADR["docs/decisions/<br/><i>ADRs & Architectural Evolution</i>"]
     Ref["docs/reference/<br/><i>Configuration & Glossary</i>"]
-    Learn["docs/learning/<br/><i>6-Chapter Engineering Curriculum</i>"]
+    Learn["docs/learning/<br/><i>Core Concepts & Post-Mortems Archive</i>"]
 
     Root --> Hub
     Hub --> Arch
@@ -44,19 +44,19 @@ Foundational system-wide architectural specifications, boundaries, and communica
 * **[Inter-Service Communication](architecture/communication.md)**: Synchronous `RestClient` orchestration, dynamic Eureka resolution, distributed MDC tracing, and security header propagation.
 * **[End-to-End Data Flow](architecture/data-flow.md)**: Complete dataset lifecycle sequence, bounded worker concurrency, and Server-Sent Events (SSE) streaming.
 
-### ⚙️ [Services](services/dataset-service/README.md)
+### ⚙️ [Services](services/dataset-service.md)
 Dedicated guides and internal implementation details for each platform service:
 * **Core Business Services**:
-  * **[Dataset Service](services/dataset-service/README.md)**: Ingestion, bounded async batch workers, SSE stream provider, and MySQL persistence ([Internals](services/dataset-service/internals.md)).
-  * **[AI Intelligent Service](services/ai-intelligent-service/README.md)**: Spring AI Gemini integration, zero-hallucination quote guardrails, and deterministic fallbacks ([Internals](services/ai-intelligent-service/internals.md)).
-  * **[Research Service](services/research-service/README.md)**: Multi-query discovery, web scraping guardrails, and evidence extraction ([Internals](services/research-service/internals.md)).
+  * **[Dataset Service](services/dataset-service.md)**: Ingestion, bounded async batch workers, SSE stream provider, and MySQL persistence.
+  * **[AI Intelligent Service](services/ai-intelligent-service.md)**: Spring AI Gemini integration, zero-hallucination quote guardrails, and deterministic fallbacks.
+  * **[Research Service](services/research-service.md)**: Multi-query discovery, web scraping guardrails, and evidence extraction.
 * **Platform Infrastructure Services**:
-  * **[API Gateway](services/api-gateway/README.md)**: Spring Cloud Gateway, ingress routing, JWT validation, anti-spoofing header normalization, and CORS.
-  * **[Auth Service](services/auth-service/README.md)**: User accounts, BCrypt passwords, and HMAC-SHA256 JWT lifecycle.
-  * **[Config Server](services/config-server/README.md)**: Spring Cloud Config Server native profile and local YAML fallback semantics.
-  * **[Discovery Server](services/discovery-server/README.md)**: Spring Cloud Netflix Eureka registry, heartbeat tuning, and dynamic resolution.
+  * **[API Gateway](services/api-gateway.md)**: Spring Cloud Gateway, ingress routing, JWT validation, anti-spoofing header normalization, and CORS.
+  * **[Auth Service](services/auth-service.md)**: User accounts, BCrypt passwords, and HMAC-SHA256 JWT lifecycle.
+  * **[Config Server](services/config-server.md)**: Spring Cloud Config Server native profile and local YAML fallback semantics.
+  * **[Discovery Server](services/discovery-server.md)**: Spring Cloud Netflix Eureka registry, heartbeat tuning, and dynamic resolution.
 * **Frontend Client**:
-  * **[Frontend Client](services/frontend/README.md)**: Next.js 15, in-browser SheetJS parsing, live SSE dashboard, and non-destructive export.
+  * **[Frontend Client](services/frontend.md)**: Next.js 15, in-browser SheetJS parsing, live SSE dashboard, and non-destructive export.
 
 ### 🔌 [API Contracts](api/overview.md)
 Authoritative catalog of all external HTTP and streaming contracts:
@@ -85,10 +85,6 @@ Cross-cutting configuration tables and terminology:
 * **[Glossary](reference/glossary.md)**: Authoritative definitions of platform domain terms (Evidence Tuple, Corroboration, Confidence Tier, etc.).
 
 ### 🎓 [Engineering Learning Curriculum](learning/README.md)
-A 6-chapter deep-dive masterclass into the platform's distributed systems patterns:
-1. [01. Microservices & API Contracts](learning/01-microservices-and-api-contracts.md)
-2. [02. Research & Evidence Pipeline](learning/02-research-and-evidence-pipeline.md)
-3. [03. Spring AI & Structured Intelligence](learning/03-spring-ai-and-structured-intelligence.md)
-4. [04. Concurrency & Real-Time Observability](learning/04-concurrency-and-realtime-observability.md)
-5. [05. Ingestion & Relational Persistence](learning/05-dataset-ingestion-and-relational-persistence.md)
-6. [06. Production Reliability & Post-Mortems](learning/06-production-reliability-and-failure-modes.md)
+Production-grade distributed systems and AI architecture masterclass:
+* **[35 Core Engineering Concepts](learning/concepts.md)**: Exhaustive architectural catalog of 35 patterns, concurrency primitives, and AI grounding mechanisms.
+* **[Production Failure Modes Archive](learning/failure-modes.md)**: 11 real production post-mortems with root causes, fixes, and regression tests.

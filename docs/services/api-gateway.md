@@ -4,6 +4,15 @@ The **API Gateway** (`com.subdual.api_gateway`) is the unified ingress entry poi
 
 ---
 
+## Table of Contents
+- [1. Core Responsibilities](#1-core-responsibilities)
+- [2. Ingress Routing Table](#2-ingress-routing-table)
+- [3. Anti-Spoofing Security Architecture](#3-anti-spoofing-security-architecture)
+  - [Whitelisted Public Endpoints](#whitelisted-public-endpoints)
+- [4. Injected Security Headers](#4-injected-security-headers)
+
+---
+
 ## 1. Core Responsibilities
 
 * **Unified Host Ingress**: In production, the Gateway (Port `9738`) is the sole backend port exposed to the public Internet or client browser.
@@ -21,9 +30,10 @@ The **API Gateway** (`com.subdual.api_gateway`) is the unified ingress entry poi
 | `/api/v1/auth/**` | `auth-service` | `http://auth-service:9739` | Registration, login, token issuance, user profile |
 | `/api/v1/enrichment/**` | `dataset-service` | `http://dataset-service:9743` | Batch dataset enrichment jobs & SSE streaming |
 | `/api/v1/entities/**` | `dataset-service` | `http://dataset-service:9743` | Persisted entity catalog, sources, and attributes |
+| `/api/v2/datasets/**` | `dataset-service` | `http://dataset-service:9743` | Multipart dataset upload, delimiter sniffing, schema profiling |
 | `/api/v1/research/**` | `research-service` | `http://research-service:9741` | Synchronous & async web research pipelines |
-| `/api/v1/sources/**` | `research-service` | `http://research-service:9741` | Discovered source inspection and verification |
 | `/api/v1/ai/**` | `ai-intelligent-service` | `http://ai-intelligent-service:9742` | Requirement parsing, data cleansing, LLM grounding |
+| `/api/v2/ai/**` | `ai-intelligent-service` | `http://ai-intelligent-service:9742` | AI requirement planning, objective parsing, profile assessment |
 | `/actuator/**` | Local Gateway | Localhost:9738 | Gateway health and runtime status |
 
 ---

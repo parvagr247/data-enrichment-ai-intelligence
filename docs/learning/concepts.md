@@ -1,6 +1,6 @@
 # Core Software Engineering & Distributed AI Concepts
 
-This document provides an exhaustive, production-grade guide to **31 software engineering, distributed systems, and applied AI concepts** implemented throughout the **Data Enrichment AI Intelligence Platform**.
+This document provides an exhaustive, production-grade guide to **35 software engineering, distributed systems, and applied AI concepts** implemented throughout the **Data Enrichment AI Intelligence Platform**.
 
 Each concept is rigorously analyzed across seven mandatory dimensions:
 1. **Core Concept**
@@ -10,6 +10,48 @@ Each concept is rigorously analyzed across seven mandatory dimensions:
 5. **Mental Model & Diagram**
 6. **Architectural Trade-offs**
 7. **Senior Engineering & Interview Talking Points**
+
+---
+
+## Table of Contents
+
+| # | Concept Name | Domain / Subsystem |
+| :-: | :--- | :--- |
+| **01** | [RFC 7807 Problem Details & Content Negotiation](#1-rfc-7807-problem-details--content-negotiation) | API Protocols & Error Handling |
+| **02** | [Service Layer Abstraction & Inversion of Control (IoC)](#2-service-layer-abstraction--inversion-of-control-ioc) | Architecture & Spring IoC |
+| **03** | [Strategy Pattern in Multi-Provider Search Integrations](#3-strategy-pattern-in-multi-provider-search-integrations) | Design Patterns & Discovery |
+| **04** | [Multi-Query Search Expansion & Query Decomposition](#4-multi-query-search-expansion--query-decomposition) | Research & Information Retrieval |
+| **05** | [Web Scraping Defenses & Search Provider Snippet Fallback](#5-web-scraping-defenses--search-provider-snippet-fallback) | Web Scraping & Resilience |
+| **06** | [Extraction Method Provenance & Confidence Discounting](#6-extraction-method-provenance--confidence-discounting) | Data Provenance & Trust |
+| **07** | [Anti-Hallucination Prompt Engineering & Grounding Directives](#7-anti-hallucination-prompt-engineering--grounding-directives) | Applied Generative AI |
+| **08** | [Bounded Concurrency & Task Executor Thread Pools](#8-bounded-concurrency--task-executor-thread-pools) | Concurrency & Multithreading |
+| **09** | [Server-Sent Events (SSE) & Connection Lifecycle Management](#9-server-sent-events-sse--connection-lifecycle-management) | Real-Time Observability |
+| **10** | [Honest Execution Status Taxonomies & Degradation Visibility](#10-honest-execution-status-taxonomies--degradation-visibility) | Reliability & UX Transparency |
+| **11** | [Multi-Dimensional Fit Scoring & Algorithmic Priority Tiering](#11-multi-dimensional-fit-scoring--algorithmic-priority-tiering) | AI Profile Assessment |
+| **12** | [Conversational Lead Strategy & Actionable Talking Point Synthesis](#12-conversational-lead-strategy--actionable-talking-point-synthesis) | LLM Reasoning & Synthesis |
+| **13** | [Hybrid Relational/Document Data Modeling with Flyway Migrations](#13-hybrid-relationaldocument-data-modeling-with-flyway-migrations) | Persistence & Database Schema |
+| **14** | [Contract-First API Evolution & Backward Compatibility](#14-contract-first-api-evolution--backward-compatibility) | API Design & Governance |
+| **15** | [Containerized Microservice Networking & Service Discovery](#15-containerized-microservice-networking--service-discovery) | DevOps & Distributed Systems |
+| **16** | [Source Deduplication & Canonical URL Normalization](#16-source-deduplication--canonical-url-normalization) | Data Quality & Deduplication |
+| **17** | [Domain Authority Weighting & Source Ranking](#17-domain-authority-weighting--source-ranking) | Search & Scoring Algorithms |
+| **18** | [Multi-Source Corroboration & Conflict Flagging](#18-multi-source-corroboration--conflict-flagging) | Evidence Validation |
+| **19** | [Asynchronous Job State Machines & Worker Isolation](#19-asynchronous-job-state-machines--worker-isolation) | State Machines & Job Queues |
+| **20** | [Dataset Schema Profiling & Heuristic Column Role Detection](#20-dataset-schema-profiling--heuristic-column-role-detection) | Ingestion & Schema Detection |
+| **21** | [Entity Resolution & Identity Anchoring](#21-entity-resolution--identity-anchoring) | Identity & Disambiguation |
+| **22** | [Resilient HTTP Clients & Connection Pool Timeout Hierarchies](#22-resilient-http-clients--connection-pool-timeout-hierarchies) | Distributed Networking |
+| **23** | [Distributed Tracing & MDC Logging in Multi-Threaded Pipelines](#23-distributed-tracing--mdc-logging-in-multi-threaded-pipelines) | Observability & Tracing |
+| **24** | [Idempotent Data Enrichment & Deduplication Caching](#24-idempotent-data-enrichment--deduplication-caching) | Idempotency & Caching |
+| **25** | [Dual-Mode UI Architectures (Prioritized Dashboard vs Raw Grid)](#25-dual-mode-ui-architectures-prioritized-dashboard-vs-raw-grid) | Frontend Architecture |
+| **26** | [Decoupling Domain Enums from External Infrastructure Ceilings](#26-decoupling-domain-enums-from-external-infrastructure-ceilings) | Domain-Driven Design (DDD) |
+| **27** | [Cross-Language Type Synchronization (TypeScript DTOs vs Java Records)](#27-cross-language-type-synchronization-typescript-dtos-vs-java-records) | Type Safety & Code Sharing |
+| **28** | [Defensive Nullability & Java 25 Record Compact Constructors](#28-defensive-nullability--java-25-record-compact-constructors) | Modern Java & Immutability |
+| **29** | [Event Replay & Late-Joining Real-Time Subscribers](#29-event-replay--late-joining-real-time-subscribers) | Event Streaming Patterns |
+| **30** | [Hot-Reloading & Cross-OS File Watching in Dockerized Next.js/Spring](#30-hot-reloading--cross-os-file-watching-in-dockerized-nextjsspring) | Developer Productivity |
+| **31** | [Structured JSON Schema Enforcement in Generative AI Workflows](#31-structured-json-schema-enforcement-in-generative-ai-workflows) | LLM Structured Outputs |
+| **32** | [Externalized Centralized Configuration (Spring Cloud Config Native Model)](#32-externalized-centralized-configuration-spring-cloud-config-native-model) | Cloud Native Configuration |
+| **33** | [Client-Side Service Discovery & Registry Heartbeats (Netflix Eureka)](#33-client-side-service-discovery--registry-heartbeats-netflix-eureka) | Service Discovery & Registry |
+| **34** | [Reverse Proxy Routing & Unified Ingress Gateway (Spring Cloud Gateway WebMvc)](#34-reverse-proxy-routing--unified-ingress-gateway-spring-cloud-gateway-webmvc) | Gateway & Ingress Routing |
+| **35** | [Defense-in-Depth Ingress Protection & Security Headers](#35-defense-in-depth-ingress-protection--security-headers) | Security & Anti-Spoofing |
 
 ---
 
