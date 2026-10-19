@@ -1,6 +1,6 @@
-# Unified Configuration Reference
+# Configuration Reference & Domain Glossary
 
-This reference catalogs all environment variables and Spring Boot application properties across the microservices mesh and frontend application.
+This document serves as the unified reference for all environment variables, Spring Boot configuration properties, and platform domain terminology across the microservices mesh.
 
 ---
 
@@ -14,6 +14,7 @@ This reference catalogs all environment variables and Spring Boot application pr
   - [2.5 AI Intelligent Service (ai-intelligent-service)](#25-ai-intelligent-service-ai-intelligent-service)
   - [2.6 Config Server (config-server)](#26-config-server-config-server)
   - [2.7 Discovery Server (discovery-server)](#27-discovery-server-discovery-server)
+- [3. Domain Glossary & Terminology](#3-domain-glossary--terminology)
 
 ---
 
@@ -56,11 +57,21 @@ This reference catalogs all environment variables and Spring Boot application pr
   spring:
     cloud:
       gateway:
-        routes:
-          - id: auth-service
-            uri: lb://AUTH-SERVICE
-            predicates:
-              - Path=/api/v1/auth/**
+        server:
+          webmvc:
+            routes:
+              - id: research-service-sync
+                uri: ${RESEARCH_SERVICE_URL:http://localhost:9741}
+                predicates:
+                  - Path=/api/v1/research
+              - id: ai-service-v1
+                uri: ${AI_INTELLIGENT_SERVICE_URL:http://localhost:9742}
+                predicates:
+                  - Path=/api/v1/ai/**
+              - id: dataset-service-v1-enrichment
+                uri: ${DATASET_SERVICE_URL:http://localhost:9743}
+                predicates:
+                  - Path=/api/v1/enrichment/**
   ```
 
 ### 2.2 Auth Service (`auth-service`)
@@ -118,7 +129,7 @@ This reference catalogs all environment variables and Spring Boot application pr
       user-agent: "DataEnrichmentBot/1.0 (+https://enrichment.platform/bot)"
       connect-timeout-ms: 5000
       read-timeout-ms: 10000
-      max-content-length-bytes: 1048576 # 1 MB
+      max-content-length-bytes: 524288 # 500 KB
     security:
       allow-private-ips: false # SSRF protection guard
   ```
@@ -133,7 +144,7 @@ This reference catalogs all environment variables and Spring Boot application pr
         api-key: ${GEMINI_API_KEY:}
         chat:
           options:
-            model: gemini-2.5-flash
+            model: ${GEMINI_MODEL:gemini-2.5-flash}
             temperature: 0.1
   ai:
     extraction:
@@ -143,7 +154,7 @@ This reference catalogs all environment variables and Spring Boot application pr
   ```
 
 ### 2.6 Config Server (`config-server`)
-* **Default Port**: `8888` (or `9736` in production)
+* **Default Port**: `9736` (or `8888`)
 * Properties:
   ```yaml
   spring:
@@ -151,11 +162,11 @@ This reference catalogs all environment variables and Spring Boot application pr
       config:
         server:
           native:
-            search-locations: classpath:/config
+            search-locations: file:/config
   ```
 
 ### 2.7 Discovery Server (`discovery-server`)
-* **Default Port**: `8761` (or `9737` in production)
+* **Default Port**: `9737` (or `8761`)
 * Properties:
   ```yaml
   eureka:
@@ -163,5 +174,55 @@ This reference catalogs all environment variables and Spring Boot application pr
       register-with-eureka: false
       fetch-registry: false
     server:
-      enable-self-preservation: false
+      enable-self-preservation: true
   ```
+
+---
+
+## 3. Domain Glossary & Terminology
+
+### Anti-Spoofing Architecture
+An ingress security design in `api-gateway` where all client-supplied identity headers (`X-User-Id`, `X-User-Email`) are unconditionally stripped by a request wrapper. After verifying the client's JWT Bearer token, the Gateway injects verified `X-User-Id` downstream.
+
+### Bounded Concurrency
+A concurrency design pattern implemented via `EnrichmentTaskExecutor` that constrains parallel row processing to a fixed thread pool (`enrichment.execution.concurrency: 3`) with a bounded queue (`queue-capacity: 500`) and `CallerRunsPolicy` backpressure.
+
+### Confidence Tier
+A discrete classification (`HIGH`, `MEDIUM`, `LOW`, `UNKNOWN`) assigned to an enriched attribute:
+* **`HIGH`**: Corroborated across multiple independent domains or anchored by an exact verbatim quote from an authoritative primary domain.
+* **`MEDIUM`**: Sourced from a single reputable secondary source or verified search snippet.
+* **`LOW`**: Inferred from contextual heuristics or uncorroborated third-party snippets.
+* **`UNKNOWN`**: Attribute requested but no verifiable source evidence was discovered.
+
+### Corroboration
+The process of independently confirming a factual attribute across two or more distinct web domains. Corroboration increases the attribute's confidence score and detects conflicting information.
+
+### Delimiter Sniffing
+An automated heuristic in `CsvDatasetParser` that inspects the first several lines of an uploaded text file to identify its delimiter (comma `,`, semicolon `;`, tab `\t`, or pipe `|`), eliminating manual CSV format configuration.
+
+### Deterministic Fallback
+An architectural resilience pattern where operations (Spring AI LLM extraction or web crawling) transparently fall back to deterministic regex, heuristic parsing, or mock providers upon external API quota exhaustion, network timeouts, or rate limits.
+
+### Evidence Tuple
+The immutable factual triad `(value, exactQuote, sourceUrl)` backing every enriched attribute. No fact is admitted into the platform database without this grounding proof.
+
+### IDOR Protection (Insecure Direct Object Reference)
+A multi-tenant data boundary pattern where all batch jobs and persisted entities are bound to the owner's `userId`. Requests to access jobs or entities owned by another user are rejected with `404 Not Found` or `403 Forbidden`.
+
+### Malformed Row Isolation
+An ingestion safeguard in `CsvDatasetParser` that detects and quarantines rows with ragged column counts, unclosed quotes, or encoding corruption into isolated `MalformedRow` reports without failing valid rows.
+
+### Non-Destructive Export
+The guarantee that dataset export operations (CSV / XLSX) preserve all original user columns, ordering, and formatting unaltered, appending newly discovered attributes with an `Enriched_` prefix.
+
+### Problem Details (RFC 7807)
+The IETF standard specification for HTTP API error responses (`application/problem+json`). Formatted as JSON with fields: `type`, `title`, `status`, `detail`, `instance`, `code`, `requestId`, and `timestamp`.
+
+### Seed Cleansing
+The pre-processing pipeline in `ai-intelligent-service` that normalizes raw entity input: stripping corporate suffixes (`Inc.`, `LLC`), removing honorifics (`Dr.`, `Ph.D.`), stripping URL tracking parameters (`utm_source`), and resolving canonical domain names.
+
+### SSRF Protection (Server-Side Request Forgery)
+A defensive validation guard in `SecurityValidator` (`research-service`) that checks all target URLs before dispatching HTTP web crawlers, blocking `localhost`, loopback addresses, RFC 1918 private subnets, and cloud instance metadata endpoints.
+
+### Verbatim Evidence Grounding (Zero-Hallucination Principle)
+The invariant enforced by `ai-intelligent-service` requiring every LLM-extracted claim to be accompanied by a verbatim snippet (`exactQuote`). The service verifies programmatically that `sourceText.contains(exactQuote)`. If the quote cannot be found verbatim in the crawled text, the fact is rejected.

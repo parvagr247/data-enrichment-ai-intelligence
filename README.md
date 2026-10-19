@@ -117,17 +117,17 @@ docker compose -f infrastructure/docker/docker-compose-dev-all.yml up -d --build
 
 All platform documentation is centrally organized under `docs/` (see **[Documentation Hub](docs/README.md)**):
 
-### 🏛️ System Architecture
-* **[Architecture Overview](docs/architecture/overview.md)**: System topology, relational persistence, and design invariants.
-* **[Service Boundaries](docs/architecture/service-boundaries.md)**: Explicit boundaries, capabilities, and responsibilities per microservice.
-* **[Communication & Resiliency](docs/architecture/communication.md)**: Synchronous orchestration, dynamic Eureka resolution, distributed MDC tracing, and fallback contracts.
-* **[End-to-End Data Flow](docs/architecture/data-flow.md)**: Ingestion lifecycle, sequence diagrams, bounded concurrency, and non-destructive export.
+### 🏛️ System Architecture (`docs/architecture/`)
+* **[Architecture Guide](docs/architecture/architecture.md)**: System topology, relational persistence, synchronous RestClient orchestration, dynamic Eureka resolution, distributed MDC tracing, and the 6-stage enrichment lifecycle.
+* **[API Reference](docs/architecture/api.md)**: Ingress routing, JWT authentication, anti-spoofing security, RFC 7807 problem details, DTO segregation rules, and complete REST/SSE endpoint catalog.
+* **[Architecture Decisions (ADRs)](docs/architecture/decisions.md)**: ADRs 01 through 09, system evolution timeline, and strategic roadmap.
 
-### 🔌 API Reference
-* **[API Architecture & Ingress](docs/api/overview.md)**: Ingress routing, JWT authentication, anti-spoofing security, RFC 7807 problem details, and DTO segregation rules.
-* **[API Endpoints Catalog](docs/api/endpoints.md)**: Complete request and response specifications for REST and SSE interfaces across all services.
+### 🛠️ Operational Guides (`docs/guides/`)
+* **[Development Guide](docs/guides/development.md)**: Local setup prerequisites, feature-centric package philosophy, small service layers, Lombok + JEP 482 preview guardrails, and automated testing.
+* **[Deployment Guide](docs/guides/deployment.md)**: Docker Compose topologies (`dev-all`, `dev`, `prod`), Compose Watch hot-reloading, volume isolation, and GCP VM provisioning / CI/CD.
+* **[Configuration & Reference](docs/guides/reference.md)**: Comprehensive environment variables matrix, Spring properties matrix across all 7 services, and domain glossary.
 
-### 📦 Services Documentation
+### 📦 Services Documentation (`docs/services/`)
 * **[Dataset Service](docs/services/dataset-service.md)**: Batch orchestration, bounded concurrency, SSE stream, and relational persistence.
 * **[AI Intelligent Service](docs/services/ai-intelligent-service.md)**: Spring AI Gemini integration, zero-hallucination quote guardrails, and deterministic fallbacks.
 * **[Research Service](docs/services/research-service.md)**: Multi-query discovery, web crawling guardrails, and evidence extraction.
@@ -137,15 +137,6 @@ All platform documentation is centrally organized under `docs/` (see **[Document
 * **[Discovery Server](docs/services/discovery-server.md)**: Spring Cloud Netflix Eureka registry and heartbeat management.
 * **[Frontend Application](docs/services/frontend.md)**: Next.js 15, in-browser SheetJS parsing, live SSE dashboard, and non-destructive export.
 
-### 🛠️ Development & Deployment
-* **[Local Setup](docs/development/setup.md)**: Prerequisites, environment configuration, and startup instructions.
-* **[Testing & QA](docs/development/testing.md)**: Unit tests, health probes, Postman/Newman collections, and regression flows.
-* **[Codebase Conventions](docs/development/conventions.md)**: Feature-centric package philosophy, small service layers, and DTO segregation.
-* **[Docker Topologies](docs/deployment/docker.md)**: Development watch hot-reload, volume isolation, and production Compose topologies.
-* **[GCP VM Deployment](docs/deployment/gcp-vm-deployment.md)**: GCP Compute Engine provisioning, VPC firewall configuration, and automated CI/CD.
-
-### 📜 Reference & Architecture Decisions
-* **[Architecture Decisions (ADRs)](docs/decisions/README.md)**: ADRs 01 through 09, system evolution timeline, and strategic roadmap.
-* **[Configuration Reference](docs/reference/configuration.md)**: Comprehensive environment variables and Spring properties matrix.
-* **[Domain Glossary](docs/reference/glossary.md)**: Definitions of core domain terms and algorithmic concepts.
-* **[Engineering Learning Series](docs/learning/README.md)**: Exhaustive engineering curriculum featuring **[35 Core Concepts](docs/learning/concepts.md)** and **[11 Production Post-Mortems Archive](docs/learning/failure-modes.md)**.
+### 🧠 Knowledge Base (`docs/knowledge/`)
+* **[Core Concepts](docs/knowledge/concepts.md)**: 35 deep-dive systems and applied AI concepts explaining the engineering foundations of the platform.
+* **[Production Failure Modes](docs/knowledge/failure-modes.md)**: 11 real-world production incident post-mortems and root-cause analyses.

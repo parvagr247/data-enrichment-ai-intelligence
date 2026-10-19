@@ -2,10 +2,22 @@
   "info": {
     "_postman_id": "e9f0a1b2-3c4d-5e6f-7a8b-9c0d1e2f3a4b",
     "name": "Data Enrichment AI Intelligence Platform",
-    "description": "# Data Enrichment AI Intelligence Platform API Collection\n\nProduction Postman collection for validating, testing, and demonstrating the 3-microservice **Data Enrichment AI Intelligence Platform**.\n\n## Microservices Architecture\n- **dataset-service** (`{{datasetBaseUrl}}` default `:9743`): Batch enrichment jobs, row-level tracking, MySQL entity persistence.\n- **research-service** (`{{researchBaseUrl}}` default `:9741`): Multi-source web discovery, crawling, scraping, evidence collection.\n- **ai-intelligent-service** (`{{aiBaseUrl}}` default `:9742`): Requirement interpretation, input cleansing, grounded fact extraction (Spring AI + Gemini).\n",
+    "description": "# Data Enrichment AI Intelligence Platform API Collection\n\nProduction Postman collection for validating, testing, and demonstrating the 5-microservice **Data Enrichment AI Intelligence Platform**.\n\n## Microservices Architecture & Ports\n- **api-gateway** (`{{gatewayBaseUrl}}` default `:9738` / `:8080`): Public entrypoint, JWT Bearer verification, anti-spoofing.\n- **auth-service** (`{{authBaseUrl}}` default `:9739`): User registration, BCrypt credential hashing, HMAC-SHA256 JWT tokens.\n- **dataset-service** (`{{datasetBaseUrl}}` default `:9743`): Tabular parsing, schema profiling, bounded async workers (3), SSE streaming, MySQL user-isolated persistence.\n- **research-service** (`{{researchBaseUrl}}` default `:9741`): Multi-source web discovery, crawling, scraping guardrails, evidence corroboration.\n- **ai-intelligent-service** (`{{aiBaseUrl}}` default `:9742`): Requirement interpretation, input cleansing, grounded fact extraction (Spring AI + Gemini Flash).\n",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
+    {
+      "key": "gatewayBaseUrl",
+      "value": "http://localhost:9738",
+      "type": "string",
+      "description": "Base URL for the API Gateway"
+    },
+    {
+      "key": "authBaseUrl",
+      "value": "http://localhost:9739",
+      "type": "string",
+      "description": "Base URL for the Auth Service"
+    },
     {
       "key": "datasetBaseUrl",
       "value": "http://localhost:9743",
@@ -23,6 +35,18 @@
       "value": "http://localhost:9742",
       "type": "string",
       "description": "Base URL for the AI Intelligent Service"
+    },
+    {
+      "key": "authToken",
+      "value": "",
+      "type": "string",
+      "description": "Dynamically captured JWT Bearer token"
+    },
+    {
+      "key": "userId",
+      "value": "",
+      "type": "string",
+      "description": "Dynamically captured User ID from JWT or registration"
     },
     {
       "key": "jobId",
@@ -45,11 +69,72 @@
   ],
   "item": [
     {
-      "name": "01 Health",
-      "description": "Probes Spring Boot Actuator health endpoints across all 3 microservices to confirm availability and readiness.",
+      "name": "00 Authentication",
+      "description": "User lifecycle: registration, login, JWT token issuance, and authenticated identity validation.",
       "item": [
         {
-          "name": "Dataset Service Health Check",
+          "name": "01 Register User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 201 Created or 200 OK\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                  "});",
+                  "pm.test(\"Response contains JWT token and user info\", function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property(\"token\");",
+                  "    pm.expect(json).to.have.property(\"user\");",
+                  "    if (json.token) {",
+                  "        pm.environment.set(\"authToken\", json.token);",
+                  "        pm.collectionVariables.set(\"authToken\", json.token);",
+                  "    }",
+                  "    if (json.user && json.user.id) {",
+                  "        pm.environment.set(\"userId\", String(json.user.id));",
+                  "        pm.collectionVariables.set(\"userId\", String(json.user.id));",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Platform Developer\",\n  \"email\": \"developer@example.com\",\n  \"password\": \"Password123!\"\n}"
+            },
+            "url": {
+              "raw": "{{gatewayBaseUrl}}/api/v1/auth/register",
+              "host": [
+                "{{gatewayBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "register"
+              ]
+            },
+            "description": "Registers a new user account in MySQL and returns signed HMAC-SHA256 JWT."
+          }
+        },
+        {
+          "name": "02 Login User",
           "event": [
             {
               "listen": "test",
@@ -58,9 +143,69 @@
                   "pm.test(\"Status code is 200 OK\", function () {",
                   "    pm.response.to.have.status(200);",
                   "});",
-                  "pm.test(\"Application status is UP\", function () {",
+                  "pm.test(\"Response contains valid JWT token\", function () {",
                   "    const json = pm.response.json();",
-                  "    pm.expect(json.status).to.eql(\"UP\");",
+                  "    pm.expect(json).to.have.property(\"token\");",
+                  "    if (json.token) {",
+                  "        pm.environment.set(\"authToken\", json.token);",
+                  "        pm.collectionVariables.set(\"authToken\", json.token);",
+                  "    }",
+                  "    if (json.user && json.user.id) {",
+                  "        pm.environment.set(\"userId\", String(json.user.id));",
+                  "        pm.collectionVariables.set(\"userId\", String(json.user.id));",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"developer@example.com\",\n  \"password\": \"Password123!\"\n}"
+            },
+            "url": {
+              "raw": "{{gatewayBaseUrl}}/api/v1/auth/login",
+              "host": [
+                "{{gatewayBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Authenticates credentials against BCrypt hash in MySQL and issues JWT."
+          }
+        },
+        {
+          "name": "03 Get Current User Profile",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"User profile matches authenticated JWT\", function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property(\"email\");",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -70,12 +215,142 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Accept", "value": "application/json", "type": "text" }
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{gatewayBaseUrl}}/api/v1/auth/me",
+              "host": [
+                "{{gatewayBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "me"
+              ]
+            },
+            "description": "Inspects currently authenticated identity using Bearer token."
+          }
+        }
+      ]
+    },
+    {
+      "name": "01 Health Probes",
+      "description": "Spring Boot Actuator health checks across all microservices and the API Gateway.",
+      "item": [
+        {
+          "name": "API Gateway Health Check",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status is 200 OK\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Status is UP\", function () { pm.expect(pm.response.json().status).to.eql(\"UP\"); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{gatewayBaseUrl}}/actuator/health",
+              "host": [
+                "{{gatewayBaseUrl}}"
+              ],
+              "path": [
+                "actuator",
+                "health"
+              ]
+            },
+            "description": "Health probe for API Gateway (:9738 / :8080)"
+          }
+        },
+        {
+          "name": "Auth Service Health Check",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status is 200 OK\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Status is UP\", function () { pm.expect(pm.response.json().status).to.eql(\"UP\"); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{authBaseUrl}}/actuator/health",
+              "host": [
+                "{{authBaseUrl}}"
+              ],
+              "path": [
+                "actuator",
+                "health"
+              ]
+            },
+            "description": "Health probe for Auth Service (:9739)"
+          }
+        },
+        {
+          "name": "Dataset Service Health Check",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status is 200 OK\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Status is UP\", function () { pm.expect(pm.response.json().status).to.eql(\"UP\"); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
             ],
             "url": {
               "raw": "{{datasetBaseUrl}}/actuator/health",
-              "host": ["{{datasetBaseUrl}}"],
-              "path": ["actuator", "health"]
+              "host": [
+                "{{datasetBaseUrl}}"
+              ],
+              "path": [
+                "actuator",
+                "health"
+              ]
             },
             "description": "Health check for Dataset Service (:9743)"
           }
@@ -87,13 +362,8 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test(\"Status code is 200 OK\", function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});",
-                  "pm.test(\"Application status is UP\", function () {",
-                  "    const json = pm.response.json();",
-                  "    pm.expect(json.status).to.eql(\"UP\");",
-                  "});"
+                  "pm.test(\"Status is 200 OK\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Status is UP\", function () { pm.expect(pm.response.json().status).to.eql(\"UP\"); });"
                 ],
                 "type": "text/javascript"
               }
@@ -102,12 +372,21 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Accept", "value": "application/json", "type": "text" }
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
             ],
             "url": {
               "raw": "{{researchBaseUrl}}/actuator/health",
-              "host": ["{{researchBaseUrl}}"],
-              "path": ["actuator", "health"]
+              "host": [
+                "{{researchBaseUrl}}"
+              ],
+              "path": [
+                "actuator",
+                "health"
+              ]
             },
             "description": "Health check for Research Service (:9741)"
           }
@@ -119,13 +398,8 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test(\"Status code is 200 OK\", function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});",
-                  "pm.test(\"Application status is UP\", function () {",
-                  "    const json = pm.response.json();",
-                  "    pm.expect(json.status).to.eql(\"UP\");",
-                  "});"
+                  "pm.test(\"Status is 200 OK\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Status is UP\", function () { pm.expect(pm.response.json().status).to.eql(\"UP\"); });"
                 ],
                 "type": "text/javascript"
               }
@@ -134,12 +408,21 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Accept", "value": "application/json", "type": "text" }
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
             ],
             "url": {
               "raw": "{{aiBaseUrl}}/actuator/health",
-              "host": ["{{aiBaseUrl}}"],
-              "path": ["actuator", "health"]
+              "host": [
+                "{{aiBaseUrl}}"
+              ],
+              "path": [
+                "actuator",
+                "health"
+              ]
             },
             "description": "Health check for AI Intelligent Service (:9742)"
           }
@@ -147,9 +430,172 @@
       ]
     },
     {
-      "name": "02 Dataset",
-      "description": "Dataset preparation, column confirmation, and seed cleansing operations.",
+      "name": "02 Ingestion & Profiling (V2)",
+      "description": "Tabular dataset parsing, CSV/Excel schema profiling, and AI requirement planning.",
       "item": [
+        {
+          "name": "Upload Dataset File (V2)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Raw dataset returned headers and rows\", function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('headers');",
+                  "    pm.expect(json).to.have.property('rows');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{datasetBaseUrl}}/api/v2/datasets/upload",
+              "host": [
+                "{{datasetBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v2",
+                "datasets",
+                "upload"
+              ]
+            },
+            "description": "Uploads and parses CSV or XLSX dataset with delimiter sniffing and malformed row isolation."
+          }
+        },
+        {
+          "name": "Profile Dataset Quality & Schemas (V2)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Report contains qualityScore, columnProfiles, and recommendedMappings\", function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('overallQualityScore');",
+                  "    pm.expect(json).to.have.property('columnProfiles');",
+                  "    pm.expect(json).to.have.property('recommendedMappings');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dataset\": {\n    \"datasetName\": \"sample_candidates.csv\",\n    \"headers\": [\"Full Name\", \"Company\", \"Role\", \"LinkedIn Profile\"],\n    \"rows\": [\n      {\"Full Name\": \"Alice Smith\", \"Company\": \"Stripe\", \"Role\": \"Engineer\", \"LinkedIn Profile\": \"https://linkedin.com/in/alicesmith\"},\n      {\"Full Name\": \"Bob Jones\", \"Company\": \"Google\", \"Role\": \"Staff SRE\", \"LinkedIn Profile\": \"https://linkedin.com/in/bobjones\"}\n    ]\n  }\n}"
+            },
+            "url": {
+              "raw": "{{datasetBaseUrl}}/api/v2/datasets/profile",
+              "host": [
+                "{{datasetBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v2",
+                "datasets",
+                "profile"
+              ]
+            },
+            "description": "Profiles dataset columns, detects entity columns, row conflicts, computes 0-100 quality score, and generates recommended mappings."
+          }
+        },
+        {
+          "name": "Generate AI Enrichment Plan (V2)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Enrichment plan contains planned fields and strategies\", function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('plannedFields');",
+                  "    pm.expect(json).to.have.property('userGoalSummary');",
+                  "    pm.expect(json.plannedFields).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userRequirement\": \"Find employer, educational background, and tech skills\",\n  \"entityType\": \"PERSON\",\n  \"datasetColumns\": [\"Full Name\", \"LinkedIn Profile\"]\n}"
+            },
+            "url": {
+              "raw": "{{aiBaseUrl}}/api/v2/ai/requirements/plan",
+              "host": [
+                "{{aiBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v2",
+                "ai",
+                "requirements",
+                "plan"
+              ]
+            },
+            "description": "Translates unstructured user requirements into a structured, executable EnrichmentPlan with field strategies."
+          }
+        },
         {
           "name": "Cleanse Dataset Seed Input",
           "event": [
@@ -173,63 +619,40 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json", "type": "text" },
-              { "key": "Accept", "value": "application/json", "type": "text" }
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"rawName\": \"  Dr. Linus Torvalds, PhD 🚀 \",\n  \"rawUrl\": \"https://github.com/torvalds?tab=repositories\",\n  \"rawOrganization\": \"Linux Foundation, Inc.\",\n  \"rawRole\": \"Principal Fellow & Creator\"\n}"
+              "raw": "{\n  \"rawName\": \"  Dr. Linus Torvalds, PhD \ud83d\ude80 \",\n  \"rawUrl\": \"https://github.com/torvalds?tab=repositories\",\n  \"rawOrganization\": \"Linux Foundation, Inc.\",\n  \"rawRole\": \"Principal Fellow & Creator\"\n}"
             },
             "url": {
               "raw": "{{aiBaseUrl}}/api/v1/ai/clean",
-              "host": ["{{aiBaseUrl}}"],
-              "path": ["api", "v1", "ai", "clean"]
+              "host": [
+                "{{aiBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ai",
+                "clean"
+              ]
             },
             "description": "Cleans sparse, noisy input rows before starting batch enrichment."
-          }
-        },
-        {
-          "name": "Direct Single-Record Enrichment Preview",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test(\"Status code is 200 OK\", function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});",
-                  "pm.test(\"Row enrichment result returned\", function () {",
-                  "    const json = pm.response.json();",
-                  "    pm.expect(json).to.have.property('status');",
-                  "    pm.expect(json).to.have.property('rowIndex');",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              { "key": "Content-Type", "value": "application/json", "type": "text" },
-              { "key": "Accept", "value": "application/json", "type": "text" }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"row\": {\n    \"Name\": \"Spring Boot\",\n    \"URL\": \"https://github.com/spring-projects/spring-boot\",\n    \"Role\": \"Framework\"\n  },\n  \"columnMapping\": {\n    \"nameColumn\": \"Name\",\n    \"urlColumn\": \"URL\",\n    \"roleColumn\": \"Role\"\n  },\n  \"entityType\": \"REPOSITORY\",\n  \"userRequirement\": \"Extract primary programming language, stars count, and license\"\n}"
-            },
-            "url": {
-              "raw": "{{datasetBaseUrl}}/api/v1/enrichment/single",
-              "host": ["{{datasetBaseUrl}}"],
-              "path": ["api", "v1", "enrichment", "single"]
-            },
-            "description": "Enriches a single mapped row synchronously."
           }
         }
       ]
     },
     {
-      "name": "03 Enrichment",
+      "name": "03 Batch Enrichment Orchestration",
       "description": "Batch dataset enrichment jobs and row-level status tracking.",
       "item": [
         {
@@ -254,8 +677,26 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json", "type": "text" },
-              { "key": "Accept", "value": "application/json", "type": "text" }
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              },
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}",
+                "type": "text"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -263,8 +704,15 @@
             },
             "url": {
               "raw": "{{datasetBaseUrl}}/api/v1/enrichment/jobs",
-              "host": ["{{datasetBaseUrl}}"],
-              "path": ["api", "v1", "enrichment", "jobs"]
+              "host": [
+                "{{datasetBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "enrichment",
+                "jobs"
+              ]
             },
             "description": "Dispatches an asynchronous batch enrichment job with row-level error isolation."
           }
@@ -294,12 +742,34 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Accept", "value": "application/json", "type": "text" }
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              },
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}",
+                "type": "text"
+              }
             ],
             "url": {
               "raw": "{{datasetBaseUrl}}/api/v1/enrichment/jobs/{{jobId}}",
-              "host": ["{{datasetBaseUrl}}"],
-              "path": ["api", "v1", "enrichment", "jobs", "{{jobId}}"]
+              "host": [
+                "{{datasetBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "enrichment",
+                "jobs",
+                "{{jobId}}"
+              ]
             },
             "description": "Polls the status and row results of a batch enrichment job."
           }
@@ -309,12 +779,35 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Accept", "value": "text/event-stream", "type": "text" }
+              {
+                "key": "Accept",
+                "value": "text/event-stream",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              },
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}",
+                "type": "text"
+              }
             ],
             "url": {
               "raw": "{{datasetBaseUrl}}/api/v1/enrichment/jobs/{{jobId}}/events",
-              "host": ["{{datasetBaseUrl}}"],
-              "path": ["api", "v1", "enrichment", "jobs", "{{jobId}}", "events"]
+              "host": [
+                "{{datasetBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "enrichment",
+                "jobs",
+                "{{jobId}}",
+                "events"
+              ]
             },
             "description": "Subscribes to live Server-Sent Events (SSE) stream for real-time observable execution, dynamic worker cards, and incremental row completions."
           }
@@ -341,12 +834,35 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Accept", "value": "application/json", "type": "text" }
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              },
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}",
+                "type": "text"
+              }
             ],
             "url": {
               "raw": "{{datasetBaseUrl}}/api/v1/enrichment/jobs/{{jobId}}/cancel",
-              "host": ["{{datasetBaseUrl}}"],
-              "path": ["api", "v1", "enrichment", "jobs", "{{jobId}}", "cancel"]
+              "host": [
+                "{{datasetBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "enrichment",
+                "jobs",
+                "{{jobId}}",
+                "cancel"
+              ]
             },
             "description": "Cancels a running or queued batch enrichment job."
           }
@@ -354,7 +870,7 @@
       ]
     },
     {
-      "name": "04 Research",
+      "name": "04 Research Engine",
       "description": "Core web research, source discovery, and multi-source corroboration endpoints.",
       "item": [
         {
@@ -381,8 +897,16 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json", "type": "text" },
-              { "key": "Accept", "value": "application/json", "type": "text" }
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -390,8 +914,14 @@
             },
             "url": {
               "raw": "{{researchBaseUrl}}/api/v1/research",
-              "host": ["{{researchBaseUrl}}"],
-              "path": ["api", "v1", "research"]
+              "host": [
+                "{{researchBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "research"
+              ]
             },
             "description": "Synchronous end-to-end research with requirement-aware discovery."
           }
@@ -418,8 +948,16 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json", "type": "text" },
-              { "key": "Accept", "value": "application/json", "type": "text" }
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -427,8 +965,15 @@
             },
             "url": {
               "raw": "{{researchBaseUrl}}/api/v1/research/jobs",
-              "host": ["{{researchBaseUrl}}"],
-              "path": ["api", "v1", "research", "jobs"]
+              "host": [
+                "{{researchBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "research",
+                "jobs"
+              ]
             },
             "description": "Submits an async background research task."
           }
@@ -451,12 +996,24 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Accept", "value": "application/json", "type": "text" }
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
             ],
             "url": {
               "raw": "{{researchBaseUrl}}/api/v1/research/jobs/{{researchJobId}}",
-              "host": ["{{researchBaseUrl}}"],
-              "path": ["api", "v1", "research", "jobs", "{{researchJobId}}"]
+              "host": [
+                "{{researchBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "research",
+                "jobs",
+                "{{researchJobId}}"
+              ]
             },
             "description": "Polls async research job result."
           }
@@ -464,7 +1021,7 @@
       ]
     },
     {
-      "name": "05 AI",
+      "name": "05 AI Intelligence",
       "description": "AI intelligence services powered by Spring AI and Google Gemini with heuristic fallbacks.",
       "item": [
         {
@@ -490,8 +1047,16 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json", "type": "text" },
-              { "key": "Accept", "value": "application/json", "type": "text" }
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -499,8 +1064,15 @@
             },
             "url": {
               "raw": "{{aiBaseUrl}}/api/v1/ai/requirement",
-              "host": ["{{aiBaseUrl}}"],
-              "path": ["api", "v1", "ai", "requirement"]
+              "host": [
+                "{{aiBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ai",
+                "requirement"
+              ]
             },
             "description": "Parses natural language requirements into structured search guidance."
           }
@@ -527,8 +1099,16 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json", "type": "text" },
-              { "key": "Accept", "value": "application/json", "type": "text" }
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -536,8 +1116,15 @@
             },
             "url": {
               "raw": "{{aiBaseUrl}}/api/v1/ai/clean",
-              "host": ["{{aiBaseUrl}}"],
-              "path": ["api", "v1", "ai", "clean"]
+              "host": [
+                "{{aiBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ai",
+                "clean"
+              ]
             },
             "description": "Strips honorifics, corporate suffixes, and tracking tokens from seeds."
           }
@@ -564,8 +1151,16 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json", "type": "text" },
-              { "key": "Accept", "value": "application/json", "type": "text" }
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -573,8 +1168,15 @@
             },
             "url": {
               "raw": "{{aiBaseUrl}}/api/v1/ai/enrich",
-              "host": ["{{aiBaseUrl}}"],
-              "path": ["api", "v1", "ai", "enrich"]
+              "host": [
+                "{{aiBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ai",
+                "enrich"
+              ]
             },
             "description": "Extracts structured attributes from scraped content grounded in verbatim quotes."
           }
@@ -582,9 +1184,71 @@
       ]
     },
     {
-      "name": "06 Results",
-      "description": "Saved entities catalog and persistent audit trail in MySQL.",
+      "name": "06 Persisted Entities Catalog",
+      "description": "User-isolated entity storage, deduplication, and query endpoints in MySQL.",
       "item": [
+        {
+          "name": "Persist Entity Snapshot",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 201 Created\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "if (json.entityId) {",
+                  "    pm.environment.set(\"entityId\", json.entityId);",
+                  "    pm.collectionVariables.set(\"entityId\", json.entityId);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              },
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"entityId\": \"base-satya-nadella-hash\",\n  \"displayName\": \"Satya Nadella\",\n  \"entityType\": \"PERSON\",\n  \"canonicalUrl\": \"https://www.linkedin.com/in/satyanadella\",\n  \"sources\": [\n    {\n      \"url\": \"https://www.microsoft.com/executives/satya-nadella\",\n      \"title\": \"Microsoft Leadership - Satya Nadella\",\n      \"snippet\": \"Satya Nadella is Chairman and Chief Executive Officer of Microsoft.\",\n      \"sourceType\": \"PROFILE\",\n      \"domain\": \"microsoft.com\",\n      \"provider\": \"mock\",\n      \"relevance\": 0.98\n    }\n  ],\n  \"attributes\": {\n    \"title\": {\n      \"value\": \"Chairman and CEO\",\n      \"sourceUrl\": \"https://www.microsoft.com/executives/satya-nadella\",\n      \"confidence\": \"HIGH\"\n    },\n    \"company\": {\n      \"value\": \"Microsoft\",\n      \"sourceUrl\": \"https://www.microsoft.com/executives/satya-nadella\",\n      \"confidence\": \"HIGH\"\n    }\n  }\n}"
+            },
+            "url": {
+              "raw": "{{datasetBaseUrl}}/api/v1/entities",
+              "host": [
+                "{{datasetBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "entities"
+              ]
+            },
+            "description": "Persists an evidence-backed entity record into MySQL scoped to the authenticated user."
+          }
+        },
         {
           "name": "Get Saved Entities Catalog",
           "event": [
@@ -597,8 +1261,9 @@
                   "});",
                   "const json = pm.response.json();",
                   "if (Array.isArray(json) && json.length > 0) {",
-                  "    pm.collectionVariables.set(\"entityId\", json[0].id);",
-                  "}"
+                  "    pm.collectionVariables.set(\"entityId\", json[0].entityId);",
+                  "}",
+                  "pm.environment.set(\"entityId\", json[0].entityId);"
                 ],
                 "type": "text/javascript"
               }
@@ -607,15 +1272,41 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Accept", "value": "application/json", "type": "text" }
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              },
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}",
+                "type": "text"
+              }
             ],
             "url": {
               "raw": "{{datasetBaseUrl}}/api/v1/entities?page=0&size=20",
-              "host": ["{{datasetBaseUrl}}"],
-              "path": ["api", "v1", "entities"],
+              "host": [
+                "{{datasetBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "entities"
+              ],
               "query": [
-                { "key": "page", "value": "0" },
-                { "key": "size", "value": "20" }
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "20"
+                }
               ]
             },
             "description": "Fetches paginated list of saved entity snapshots from MySQL."
@@ -639,141 +1330,35 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Accept", "value": "application/json", "type": "text" }
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              },
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}",
+                "type": "text"
+              }
             ],
             "url": {
               "raw": "{{datasetBaseUrl}}/api/v1/entities/{{entityId}}",
-              "host": ["{{datasetBaseUrl}}"],
-              "path": ["api", "v1", "entities", "{{entityId}}"]
-            },
-            "description": "Fetches complete entity profile including all corroborating sources and attributes."
-          }
-        }
-      ]
-    },
-    {
-      "name": "06 V2 Intelligence & Ingestion",
-      "description": "V2 Modular Dataset Ingestion, Quality Profiling, and AI Requirement Planning endpoints.",
-      "item": [
-        {
-          "name": "Upload Dataset File (V2)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test(\"Status code is 200 OK\", function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});",
-                  "pm.test(\"Raw dataset returned headers and rows\", function () {",
-                  "    const json = pm.response.json();",
-                  "    pm.expect(json).to.have.property('headers');",
-                  "    pm.expect(json).to.have.property('rows');",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              { "key": "Accept", "value": "application/json", "type": "text" }
-            ],
-            "body": {
-              "mode": "formdata",
-              "formdata": [
-                {
-                  "key": "file",
-                  "type": "file",
-                  "src": []
-                }
+              "host": [
+                "{{datasetBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "entities",
+                "{{entityId}}"
               ]
             },
-            "url": {
-              "raw": "{{datasetBaseUrl}}/api/v2/datasets/upload",
-              "host": ["{{datasetBaseUrl}}"],
-              "path": ["api", "v2", "datasets", "upload"]
-            },
-            "description": "Uploads and parses CSV or XLSX dataset with delimiter sniffing and malformed row isolation."
-          }
-        },
-        {
-          "name": "Profile Dataset Quality & Schemas (V2)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test(\"Status code is 200 OK\", function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});",
-                  "pm.test(\"Report contains qualityScore, columnProfiles, and recommendedMappings\", function () {",
-                  "    const json = pm.response.json();",
-                  "    pm.expect(json).to.have.property('overallQualityScore');",
-                  "    pm.expect(json).to.have.property('columnProfiles');",
-                  "    pm.expect(json).to.have.property('recommendedMappings');",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              { "key": "Content-Type", "value": "application/json", "type": "text" },
-              { "key": "Accept", "value": "application/json", "type": "text" }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"dataset\": {\n    \"datasetName\": \"sample_candidates.csv\",\n    \"headers\": [\"Full Name\", \"Company\", \"Role\", \"LinkedIn Profile\"],\n    \"rows\": [\n      {\"Full Name\": \"Alice Smith\", \"Company\": \"Stripe\", \"Role\": \"Engineer\", \"LinkedIn Profile\": \"https://linkedin.com/in/alicesmith\"},\n      {\"Full Name\": \"Bob Jones\", \"Company\": \"Google\", \"Role\": \"Staff SRE\", \"LinkedIn Profile\": \"https://linkedin.com/in/bobjones\"}\n    ]\n  }\n}"
-            },
-            "url": {
-              "raw": "{{datasetBaseUrl}}/api/v2/datasets/profile",
-              "host": ["{{datasetBaseUrl}}"],
-              "path": ["api", "v2", "datasets", "profile"]
-            },
-            "description": "Profiles dataset columns, detects entity columns, row conflicts, computes 0-100 quality score, and generates recommended mappings."
-          }
-        },
-        {
-          "name": "Generate AI Enrichment Plan (V2)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test(\"Status code is 200 OK\", function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});",
-                  "pm.test(\"Enrichment plan contains planned fields and strategies\", function () {",
-                  "    const json = pm.response.json();",
-                  "    pm.expect(json).to.have.property('plannedFields');",
-                  "    pm.expect(json).to.have.property('userGoalSummary');",
-                  "    pm.expect(json.plannedFields).to.be.an('array');",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              { "key": "Content-Type", "value": "application/json", "type": "text" },
-              { "key": "Accept", "value": "application/json", "type": "text" }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"userRequirement\": \"Find employer, educational background, and tech skills\",\n  \"entityType\": \"PERSON\",\n  \"datasetColumns\": [\"Full Name\", \"LinkedIn Profile\"]\n}"
-            },
-            "url": {
-              "raw": "{{aiBaseUrl}}/api/v2/ai/requirements/plan",
-              "host": ["{{aiBaseUrl}}"],
-              "path": ["api", "v2", "ai", "requirements", "plan"]
-            },
-            "description": "Translates unstructured user requirements into a structured, executable EnrichmentPlan with field strategies."
+            "description": "Fetches complete entity profile including all corroborating sources and attributes."
           }
         }
       ]
@@ -806,8 +1391,16 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json", "type": "text" },
-              { "key": "Accept", "value": "application/json", "type": "text" }
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -815,8 +1408,16 @@
             },
             "url": {
               "raw": "{{aiBaseUrl}}/api/v2/ai/requirements/plan",
-              "host": ["{{aiBaseUrl}}"],
-              "path": ["api", "v2", "ai", "requirements", "plan"]
+              "host": [
+                "{{aiBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v2",
+                "ai",
+                "requirements",
+                "plan"
+              ]
             },
             "description": "Scenario 1: Evaluates user requirement parsing into targeted field extraction strategies."
           }
@@ -844,8 +1445,16 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json", "type": "text" },
-              { "key": "Accept", "value": "application/json", "type": "text" }
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -853,8 +1462,16 @@
             },
             "url": {
               "raw": "{{aiBaseUrl}}/api/v2/ai/requirements/plan",
-              "host": ["{{aiBaseUrl}}"],
-              "path": ["api", "v2", "ai", "requirements", "plan"]
+              "host": [
+                "{{aiBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v2",
+                "ai",
+                "requirements",
+                "plan"
+              ]
             },
             "description": "Scenario 2: Evaluates graceful fallback to standard scope when no user requirement is provided."
           }
@@ -882,8 +1499,16 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json", "type": "text" },
-              { "key": "Accept", "value": "application/json", "type": "text" }
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -891,8 +1516,14 @@
             },
             "url": {
               "raw": "{{researchBaseUrl}}/api/v1/research",
-              "host": ["{{researchBaseUrl}}"],
-              "path": ["api", "v1", "research"]
+              "host": [
+                "{{researchBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "research"
+              ]
             },
             "description": "Scenario 3: Executes requirement-aware adaptive queries targeting missing attributes."
           }
@@ -920,8 +1551,16 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json", "type": "text" },
-              { "key": "Accept", "value": "application/json", "type": "text" }
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -929,8 +1568,14 @@
             },
             "url": {
               "raw": "{{researchBaseUrl}}/api/v1/research",
-              "host": ["{{researchBaseUrl}}"],
-              "path": ["api", "v1", "research"]
+              "host": [
+                "{{researchBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "research"
+              ]
             },
             "description": "Scenario 4: Discovers permitted public sources using multi-strategy query generation."
           }
@@ -958,8 +1603,16 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json", "type": "text" },
-              { "key": "Accept", "value": "application/json", "type": "text" }
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -967,8 +1620,14 @@
             },
             "url": {
               "raw": "{{researchBaseUrl}}/api/v1/research",
-              "host": ["{{researchBaseUrl}}"],
-              "path": ["api", "v1", "research"]
+              "host": [
+                "{{researchBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "research"
+              ]
             },
             "description": "Scenario 5: Prioritizes high-reliability authoritative sources over general web sources."
           }
@@ -998,8 +1657,16 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json", "type": "text" },
-              { "key": "Accept", "value": "application/json", "type": "text" }
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -1007,8 +1674,15 @@
             },
             "url": {
               "raw": "{{aiBaseUrl}}/api/v1/ai/extract",
-              "host": ["{{aiBaseUrl}}"],
-              "path": ["api", "v1", "ai", "extract"]
+              "host": [
+                "{{aiBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ai",
+                "extract"
+              ]
             },
             "description": "Scenario 6: Validates that extracted facts contain verbatim source quotes with zero hallucination."
           }
@@ -1036,8 +1710,16 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json", "type": "text" },
-              { "key": "Accept", "value": "application/json", "type": "text" }
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -1045,8 +1727,14 @@
             },
             "url": {
               "raw": "{{researchBaseUrl}}/api/v1/research",
-              "host": ["{{researchBaseUrl}}"],
-              "path": ["api", "v1", "research"]
+              "host": [
+                "{{researchBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "research"
+              ]
             },
             "description": "Scenario 7: Disambiguates common names and penalizes confidence when entity anchor is weak."
           }
@@ -1074,8 +1762,16 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json", "type": "text" },
-              { "key": "Accept", "value": "application/json", "type": "text" }
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -1083,8 +1779,14 @@
             },
             "url": {
               "raw": "{{researchBaseUrl}}/api/v1/research",
-              "host": ["{{researchBaseUrl}}"],
-              "path": ["api", "v1", "research"]
+              "host": [
+                "{{researchBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "research"
+              ]
             },
             "description": "Scenario 8: Multi-source corroboration and non-destructive conflict recording."
           }
@@ -1113,8 +1815,16 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json", "type": "text" },
-              { "key": "Accept", "value": "application/json", "type": "text" }
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -1122,8 +1832,15 @@
             },
             "url": {
               "raw": "{{aiBaseUrl}}/api/v1/ai/extract",
-              "host": ["{{aiBaseUrl}}"],
-              "path": ["api", "v1", "ai", "extract"]
+              "host": [
+                "{{aiBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ai",
+                "extract"
+              ]
             },
             "description": "Scenario 9: Structured extraction using externalized templates and JSON schema validation."
           }
@@ -1151,8 +1868,16 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json", "type": "text" },
-              { "key": "Accept", "value": "application/json", "type": "text" }
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -1160,8 +1885,15 @@
             },
             "url": {
               "raw": "{{aiBaseUrl}}/api/v1/ai/extract",
-              "host": ["{{aiBaseUrl}}"],
-              "path": ["api", "v1", "ai", "extract"]
+              "host": [
+                "{{aiBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ai",
+                "extract"
+              ]
             },
             "description": "Scenario 10: Resiliency verification: heuristic fallback guarantees pipeline continuity if LLM calls fail."
           }
@@ -1196,17 +1928,33 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json", "type": "text" },
-              { "key": "Accept", "value": "application/json", "type": "text" }
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"objective\": \"Identify and enrich the profiles of people most likely to help with a Java/Spring Boot/backend internship — especially recruiters, hiring managers, Java/Spring engineers, engineering leaders, founders, or people who could provide guidance/referrals\"\n}"
+              "raw": "{\n  \"objective\": \"Identify and enrich the profiles of people most likely to help with a Java/Spring Boot/backend internship \u2014 especially recruiters, hiring managers, Java/Spring engineers, engineering leaders, founders, or people who could provide guidance/referrals\"\n}"
             },
             "url": {
               "raw": "{{aiBaseUrl}}/api/v2/ai/objective/parse",
-              "host": ["{{aiBaseUrl}}"],
-              "path": ["api", "v2", "ai", "objective", "parse"]
+              "host": [
+                "{{aiBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v2",
+                "ai",
+                "objective",
+                "parse"
+              ]
             },
             "description": "Parses natural language research objectives into structured characteristics, topics, and criteria."
           }
@@ -1236,8 +1984,16 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json", "type": "text" },
-              { "key": "Accept", "value": "application/json", "type": "text" }
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -1245,8 +2001,16 @@
             },
             "url": {
               "raw": "{{aiBaseUrl}}/api/v2/ai/profile/assess",
-              "host": ["{{aiBaseUrl}}"],
-              "path": ["api", "v2", "ai", "profile", "assess"]
+              "host": [
+                "{{aiBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v2",
+                "ai",
+                "profile",
+                "assess"
+              ]
             },
             "description": "Evaluates candidate profile against Java internship recruiter objective."
           }
@@ -1275,8 +2039,16 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json", "type": "text" },
-              { "key": "Accept", "value": "application/json", "type": "text" }
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -1284,8 +2056,16 @@
             },
             "url": {
               "raw": "{{aiBaseUrl}}/api/v2/ai/profile/assess",
-              "host": ["{{aiBaseUrl}}"],
-              "path": ["api", "v2", "ai", "profile", "assess"]
+              "host": [
+                "{{aiBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v2",
+                "ai",
+                "profile",
+                "assess"
+              ]
             },
             "description": "Evaluates technical architect profile against mentorship and guidance objective."
           }
@@ -1313,8 +2093,16 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json", "type": "text" },
-              { "key": "Accept", "value": "application/json", "type": "text" }
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -1322,8 +2110,16 @@
             },
             "url": {
               "raw": "{{aiBaseUrl}}/api/v2/ai/profile/assess",
-              "host": ["{{aiBaseUrl}}"],
-              "path": ["api", "v2", "ai", "profile", "assess"]
+              "host": [
+                "{{aiBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v2",
+                "ai",
+                "profile",
+                "assess"
+              ]
             },
             "description": "Verifies that a blank objective never fabricates claims or relevance scores."
           }
@@ -1353,8 +2149,16 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json", "type": "text" },
-              { "key": "Accept", "value": "application/json", "type": "text" }
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -1362,8 +2166,15 @@
             },
             "url": {
               "raw": "{{datasetBaseUrl}}/api/v1/enrichment/single",
-              "host": ["{{datasetBaseUrl}}"],
-              "path": ["api", "v1", "enrichment", "single"]
+              "host": [
+                "{{datasetBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "enrichment",
+                "single"
+              ]
             },
             "description": "End-to-end execution of single-row objective-driven research and profile assessment."
           }

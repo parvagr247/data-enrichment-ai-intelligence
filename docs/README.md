@@ -2,89 +2,70 @@
 
 Welcome to the **Data Enrichment AI Intelligence Platform** documentation hub.
 
-This directory is the single authoritative home for all platform documentation: system-level architecture, service guides, API references, development standards, deployment topologies, architectural decisions, and the engineering learning curriculum.
+This directory is the single authoritative home for all platform specifications: system architecture, API contracts, microservice implementation guides, development standards, container deployment topologies, architectural decisions, and senior engineering reference catalogs.
 
 ---
 
-## 1. Documentation Map & Navigation
+## 1. Documentation Architecture
 
 ```mermaid
 flowchart TD
     Root["README.md<br/><i>Repository Overview & Quick Start</i>"]
-    Hub["docs/README.md<br/><i>Documentation Hub (You are here)</i>"]
+    Hub["docs/README.md<br/><i>Platform Documentation Hub (You are here)</i>"]
 
-    Arch["docs/architecture/<br/><i>System Topology, Boundaries & Flow</i>"]
-    Serv["docs/services/<br/><i>Microservice Guides</i>"]
-    API["docs/api/<br/><i>REST/SSE Contracts & DTO Models</i>"]
-    Dev["docs/development/<br/><i>Setup, Testing & Conventions</i>"]
-    Dep["docs/deployment/<br/><i>Docker & Cloud VM Operations</i>"]
-    ADR["docs/decisions/<br/><i>ADRs & Architectural Evolution</i>"]
-    Ref["docs/reference/<br/><i>Configuration & Glossary</i>"]
-    Learn["docs/learning/<br/><i>Core Concepts & Post-Mortems Archive</i>"]
+    Arch["docs/architecture/<br/><i>Architecture, API & ADRs</i>"]
+    Guides["docs/guides/<br/><i>Development, Deployment & Reference</i>"]
+    Knowledge["docs/knowledge/<br/><i>35 Core Concepts & 11 Post-Mortems</i>"]
+    Serv["docs/services/<br/><i>8 Microservice Deep Dives</i>"]
 
     Root --> Hub
     Hub --> Arch
+    Hub --> Guides
+    Hub --> Knowledge
     Hub --> Serv
-    Hub --> API
-    Hub --> Dev
-    Hub --> Dep
-    Hub --> ADR
-    Hub --> Ref
-    Hub --> Learn
 ```
 
 ---
 
-## 2. Directory Index
+## 2. Platform Architecture & Design (`architecture/`)
 
-### 🏛️ [Architecture](architecture/overview.md)
-Foundational system-wide architectural specifications, boundaries, and communication patterns:
-* **[System Overview](architecture/overview.md)**: Multi-service topology, host ingress, port assignments, MySQL relational schema, and core design principles.
-* **[Service Boundaries](architecture/service-boundaries.md)**: Detailed bounded contexts and responsibilities for all 7 backend services and the frontend client.
-* **[Inter-Service Communication](architecture/communication.md)**: Synchronous `RestClient` orchestration, dynamic Eureka resolution, distributed MDC tracing, and security header propagation.
-* **[End-to-End Data Flow](architecture/data-flow.md)**: Complete dataset lifecycle sequence, bounded worker concurrency, and Server-Sent Events (SSE) streaming.
+| Document | Core Focus Areas |
+| :--- | :--- |
+| **[System Architecture](architecture/architecture.md)** | Multi-service topology, port assignments, synchronous `RestClient` orchestration, dynamic Eureka discovery, distributed MDC tracing, and 6-stage dataset enrichment sequence. |
+| **[API Specifications & Contracts](architecture/api.md)** | Ingress routing table, HMAC-SHA256 JWT validation, anti-spoofing header normalization, RFC 7807 error schema, DTO boundary rules, and full endpoints catalog. |
+| **[Architecture Decisions (ADRs)](architecture/decisions.md)** | ADRs 01 through 09 (boundary decomposition, verbatim quote grounding, deterministic fallbacks, bounded concurrency, SSE streaming, MySQL schema, DTO segregation) and platform timeline. |
 
-### ⚙️ [Services](services/dataset-service.md)
-Dedicated guides and internal implementation details for each platform service:
-* **Core Business Services**:
-  * **[Dataset Service](services/dataset-service.md)**: Ingestion, bounded async batch workers, SSE stream provider, and MySQL persistence.
-  * **[AI Intelligent Service](services/ai-intelligent-service.md)**: Spring AI Gemini integration, zero-hallucination quote guardrails, and deterministic fallbacks.
-  * **[Research Service](services/research-service.md)**: Multi-query discovery, web scraping guardrails, and evidence extraction.
-* **Platform Infrastructure Services**:
-  * **[API Gateway](services/api-gateway.md)**: Spring Cloud Gateway, ingress routing, JWT validation, anti-spoofing header normalization, and CORS.
-  * **[Auth Service](services/auth-service.md)**: User accounts, BCrypt passwords, and HMAC-SHA256 JWT lifecycle.
-  * **[Config Server](services/config-server.md)**: Spring Cloud Config Server native profile and local YAML fallback semantics.
-  * **[Discovery Server](services/discovery-server.md)**: Spring Cloud Netflix Eureka registry, heartbeat tuning, and dynamic resolution.
-* **Frontend Client**:
-  * **[Frontend Client](services/frontend.md)**: Next.js 15, in-browser SheetJS parsing, live SSE dashboard, and non-destructive export.
+---
 
-### 🔌 [API Contracts](api/overview.md)
-Authoritative catalog of all external HTTP and streaming contracts:
-* **[API Overview & DTO Segregation](api/overview.md)**: Ingress routing, authentication formats, RFC 7807 error schema, and the fundamental architectural distinction between **Public API DTOs** and **Internal Inter-Service DTOs**.
-* **[Endpoints Catalog](api/endpoints.md)**: Exhaustive request and response specifications across auth, dataset, research, and AI services.
+## 3. Operational Guides & Standards (`guides/`)
 
-### 💻 [Development](development/setup.md)
-Developer setup, test execution, and code standards:
-* **[Local Setup & Startup](development/setup.md)**: Prerequisites (JDK 25, Node 22), Docker Compose workflows, `.env` configuration, and IDE debugging.
-* **[Testing Strategy](development/testing.md)**: Unit tests, integration suites, Postman/Newman collections, and the V1 regression dataset.
-* **[Coding Conventions](development/conventions.md)**: Feature-centric packaging, small service layers, interface/impl/helper patterns, and lightweight intent comments.
+| Document | Core Focus Areas |
+| :--- | :--- |
+| **[Development & Engineering Standards](guides/development.md)** | Local development prerequisites (JDK 25, Node 22), simplified 5-package and 4-package architectures, Lombok + Java 25 preview constructor guardrails, and JUnit 5 test suites. |
+| **[Deployment & Infrastructure Guide](guides/deployment.md)** | Docker Compose topologies (`dev-all`, `dev`, `prod`), watch hot-reloading, anonymous volume shadowing, GCP Compute Engine VM provisioning, firewall rules, and CI/CD. |
+| **[Configuration & Glossary](guides/reference.md)** | Consolidated environment variables matrix, Spring Boot application property keys across all services, and domain glossary (Confidence Tiers, Delimiter Sniffing, Evidence Tuples). |
 
-### 🚀 [Deployment](deployment/docker.md)
-Containerization and infrastructure operations:
-* **[Docker Infrastructure](deployment/docker.md)**: Multi-container Compose topologies (dev-all, db-only, prod), port bindings, and networking.
-* **[GCP VM Deployment](deployment/gcp-vm-deployment.md)**: Provisioning Google Cloud Compute Engine VMs, firewall rules, automated GitHub Actions CI/CD, swap configuration, and backups.
+---
 
-### 📋 [Decisions & Roadmap](decisions/README.md)
-Architecture Decision Records (ADRs) and long-term technical direction:
-* **[ADRs 01–09](decisions/README.md)**: Documented decisions on microservice boundaries, verbatim evidence grounding, deterministic fallbacks, bounded concurrency, SSE streaming, MySQL schema, Gemini model selection, URL normalization, and DTO segregation.
-* **[Evolution & Roadmap](decisions/README.md#system-evolution-history)**: Platform milestone timeline and future capabilities.
+## 4. Microservice Deep Dives (`services/`)
 
-### 📖 [Reference](reference/configuration.md)
-Cross-cutting configuration tables and terminology:
-* **[Configuration & Environment](reference/configuration.md)**: Consolidated environment variables, port mappings, and application property keys.
-* **[Glossary](reference/glossary.md)**: Authoritative definitions of platform domain terms (Evidence Tuple, Corroboration, Confidence Tier, etc.).
+Comprehensive, self-contained implementation guides for each independently deployable microservice:
 
-### 🎓 [Engineering Learning Curriculum](learning/README.md)
-Production-grade distributed systems and AI architecture masterclass:
-* **[35 Core Engineering Concepts](learning/concepts.md)**: Exhaustive architectural catalog of 35 patterns, concurrency primitives, and AI grounding mechanisms.
-* **[Production Failure Modes Archive](learning/failure-modes.md)**: 11 real production post-mortems with root causes, fixes, and regression tests.
+### Core Business Services
+* **[Dataset Service](services/dataset-service.md)** (`:9743`): Ingestion, tabular parsing, schema profiling, bounded async batch workers (`EnrichmentTaskExecutor`), GoF Bridge pattern for real-time SSE streaming, and MySQL relational persistence.
+* **[Research Service](services/research-service.md)** (`:9741`): Contextual `QueryBuilder`, Tavily/Mock search providers, defensive web crawler, SSRF protection, specialized field extractors, and multi-source corroboration engine (`EvidenceMerger`).
+* **[AI Intelligent Service](services/ai-intelligent-service.md)** (`:9742`): Spring AI Gemini Flash integration, zero-hallucination verbatim quote verification guard, prompt templating, error classification, and transparent deterministic heuristic fallback.
+
+### Platform Infrastructure & Client
+* **[API Gateway](services/api-gateway.md)** (`:9738` / `:8080`): Spring Cloud Gateway reverse proxy, JWT validation, anti-spoofing header normalization, CORS, and security headers.
+* **[Auth Service](services/auth-service.md)** (`:9739`): User registration, BCrypt credential hashing, Flyway `users` schema, and signed HMAC-SHA256 JWT lifecycle.
+* **[Config Server](services/config-server.md)** (`:9736`): Spring Cloud Config Server native search profile and local YAML fallback semantics.
+* **[Discovery Server](services/discovery-server.md)** (`:9737`): Spring Cloud Netflix Eureka service registry, heartbeat tuning, and instance health tracking.
+* **[Frontend Application](services/frontend.md)** (`:3000`): Next.js 15, in-browser SheetJS parsing, live SSE execution dashboard with active worker cards, and non-destructive spreadsheet export.
+
+---
+
+## 5. Senior Engineering Knowledge Base (`knowledge/`)
+
+* **[35 Core Engineering & AI Concepts](knowledge/concepts.md)**: An exhaustive 1,300+ line reference analyzing 35 design patterns, concurrency primitives, and applied GenAI grounding architectures implemented across the codebase.
+* **[Production Failure Modes & Post-Mortems Archive](knowledge/failure-modes.md)**: 11 real production post-mortems documenting root-cause analysis, reproduction logs, code remediation, and regression test guards.

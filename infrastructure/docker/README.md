@@ -36,7 +36,7 @@ docker compose -f docker-compose-dev.yml up -d
 
 All detailed deployment specifications, networking architecture, and operations guides have been centralized:
 
-* 🐳 **[Docker Compose Topologies & Hot-Reloading Guide](../../docs/deployment/docker.md)**
-* ☁️ **[GCP VM Production Deployment & CI/CD Guide](../../docs/deployment/gcp-vm-deployment.md)**
-* 🏛️ **[System Architecture & Network Isolation](../../docs/architecture/overview.md)**
-* ⚙️ **[Unified Configuration Reference](../../docs/reference/configuration.md)**
+* 🐳 **[Docker Compose Topologies & Hot-Reloading Guide](../../docs/guides/deployment.md#docker-compose-topologies)**
+* ☁️ **[GCP VM Production Deployment & CI/CD Guide](../../docs/guides/deployment.md#gcp-vm-deployment)**
+* 🏛️ **[System Architecture & Network Isolation](../../docs/architecture/architecture.md)**
+* ⚙️ **[Unified Configuration Reference](../../docs/guides/reference.md)**

@@ -1,126 +1,135 @@
-# Postman Collection: Data Enrichment & Research Engine
+# Postman Collections & API Validation Suites
 
-Production-grade Postman collection and environment for validating, inspecting, and evaluating the **Data Enrichment & Research Engine** (`research-service`).
-
----
-
-## 1. Overview
-
-The collection is designed to evaluate the core platform capability:
-> **"Can sparse entity information be converted into a useful, evidence-backed enriched record?"**
-
-All requests in the collection target real Spring Boot backend endpoints (`/api/v1/research`, `/api/v1/research/jobs`, `/actuator/health`, `/actuator/info`). There are zero fictional endpoints or synthetic mock paths.
-
-### Files
-- **Collection**: `postman/data-enrichment-research-engine.postman_collection.json` (and `data-enrichment-ai-intelligence.postman_collection.json`)
-- **Environment**: `postman/data-enrichment-local.postman_environment.json`
+This directory contains the production-grade Postman collections, environments, and canonical sample test datasets for the **Data Enrichment AI Intelligence Platform**.
 
 ---
 
-## 2. Collection Structure (25 Requests across 6 Folders)
+## 1. Overview & Available Collections
 
+| File | Scope | Requests | Focus Areas |
+| :--- | :--- | :--- | :--- |
+| **`data-enrichment-ai-intelligence.postman_collection.json`** | **Full Platform Suite** | **40 Requests (9 Folders)** | End-to-end platform validation: Auth lifecycle, Gateway routing, Dataset parsing/profiling, Batch async enrichment (SSE), Research Engine, AI fact extraction, User-isolated MySQL entities, and Objective profiles. |
+| **`data-enrichment-research-engine.postman_collection.json`** | **Research Service Suite** | **25 Requests (6 Folders)** | Deep isolated testing of `research-service` (:9741): Multi-query builder, web crawling guardrails, target-field extraction, and SSRF prevention. |
+| **`data-enrichment-local.postman_environment.json`** | **Local Environment** | **10 Variables** | Central environment defining service base URLs, JWT credentials, and dynamically captured identifiers (`authToken`, `userId`, `jobId`, `entityId`, `researchJobId`). |
+| **`samples/v1-regression-dataset.csv`** | **Regression Dataset** | **5 Entities** | Baseline tabular test dataset for evaluating parsing, column detection, web discovery, and ambiguity handling. |
+
+---
+
+## 2. Full Platform Collection Structure (`data-enrichment-ai-intelligence`)
+
+```text
+Data Enrichment AI Intelligence Platform (40 Requests)
+│
+├── 00 Authentication (3 requests)
+│   ├── 01 Register User (POST {{gatewayBaseUrl}}/api/v1/auth/register -> captures {{authToken}}, {{userId}})
+│   ├── 02 Login User (POST {{gatewayBaseUrl}}/api/v1/auth/login -> captures {{authToken}}, {{userId}})
+│   └── 03 Get Current User Profile (GET {{gatewayBaseUrl}}/api/v1/auth/me)
+│
+├── 01 Health Probes (5 requests)
+│   ├── API Gateway Health Check (GET {{gatewayBaseUrl}}/actuator/health)
+│   ├── Auth Service Health Check (GET {{authBaseUrl}}/actuator/health)
+│   ├── Dataset Service Health Check (GET {{datasetBaseUrl}}/actuator/health)
+│   ├── Research Service Health Check (GET {{researchBaseUrl}}/actuator/health)
+│   └── AI Intelligent Service Health Check (GET {{aiBaseUrl}}/actuator/health)
+│
+├── 02 Ingestion & Profiling (V2) (4 requests)
+│   ├── Upload Dataset File (V2) (POST {{datasetBaseUrl}}/api/v2/datasets/upload)
+│   ├── Profile Dataset Quality & Schemas (V2) (POST {{datasetBaseUrl}}/api/v2/datasets/profile)
+│   ├── Generate AI Enrichment Plan (V2) (POST {{aiBaseUrl}}/api/v2/ai/requirements/plan)
+│   └── Cleanse Dataset Seed Input (POST {{aiBaseUrl}}/api/v1/ai/clean)
+│
+├── 03 Batch Enrichment Orchestration (4 requests)
+│   ├── Start Batch Enrichment Job (POST {{datasetBaseUrl}}/api/v1/enrichment/jobs -> captures {{jobId}})
+│   ├── Get Enrichment Job Status (GET {{datasetBaseUrl}}/api/v1/enrichment/jobs/{{jobId}})
+│   ├── Subscribe Real-Time Events (SSE) (GET {{datasetBaseUrl}}/api/v1/enrichment/jobs/{{jobId}}/events)
+│   └── Cancel Batch Job (POST {{datasetBaseUrl}}/api/v1/enrichment/jobs/{{jobId}}/cancel)
+│
+├── 04 Research Engine (3 requests)
+│   ├── Execute Direct Research (POST {{researchBaseUrl}}/api/v1/research)
+│   ├── Start Async Research Job (POST {{researchBaseUrl}}/api/v1/research/jobs -> captures {{researchJobId}})
+│   └── Get Research Job Status (GET {{researchBaseUrl}}/api/v1/research/jobs/{{researchJobId}})
+│
+├── 05 AI Intelligence (3 requests)
+│   ├── AI Requirement Interpretation (POST {{aiBaseUrl}}/api/v1/ai/requirement)
+│   ├── AI Input Cleansing (POST {{aiBaseUrl}}/api/v1/ai/clean)
+│   └── AI Fact Extraction (POST {{aiBaseUrl}}/api/v1/ai/enrich)
+│
+├── 06 Persisted Entities Catalog (3 requests)
+│   ├── Persist Entity Snapshot (POST {{datasetBaseUrl}}/api/v1/entities -> captures {{entityId}})
+│   ├── Get Saved Entities Catalog (GET {{datasetBaseUrl}}/api/v1/entities?page=0&size=20)
+│   └── Get Entity Detail By ID (GET {{datasetBaseUrl}}/api/v1/entities/{{entityId}})
+│
+├── 07 V2 Scenarios (Tasks 51-80) (10 requests)
+│   ├── Scenario 01: Requirement-Driven Enrichment
+│   ├── Scenario 02: Blank Requirement Fallback
+│   ├── Scenario 03: Adaptive Research (Target-Field Driven)
+│   ├── Scenario 04: Multi-Source Web Discovery
+│   ├── Scenario 05: Source Ranking & Reliability
+│   ├── Scenario 06: Evidence-Backed Grounded Extraction
+│   ├── Scenario 07: Ambiguous Entity Disambiguation
+│   ├── Scenario 08: Conflicting Evidence Corroboration
+│   ├── Scenario 09: AI Structured Fact Extraction
+│   └── Scenario 10: AI Failure Resiliency & Heuristic Fallback
+│
+└── 08 Objective-Driven Research Profiles (5 requests)
+    ├── 01 Parse Research Objective
+    ├── 02 Profile Assessment - Recruiter (High Priority)
+    ├── 03 Profile Assessment - Staff Architect (High Priority)
+    ├── 04 Profile Assessment - Neutral Blank Objective
+    └── 05 End-to-End Single Entity Objective Enrichment
 ```
-Data Enrichment & Research Engine
-│
-├── 01 - Health (2 requests)
-│   ├── Health Check (GET /actuator/health)
-│   └── Service Info (GET /actuator/info)
-│
-├── 02 - Research - Basic (5 requests)
-│   ├── Person (POST /api/v1/research - Linus Torvalds)
-│   ├── Organization (POST /api/v1/research - GitHub)
-│   ├── Product (POST /api/v1/research - Git SCM)
-│   ├── Repository (POST /api/v1/research - torvalds/linux)
-│   └── Website (POST /api/v1/research - Example Domain)
-│
-├── 03 - Research - Input Variations (5 requests)
-│   ├── URL Only (POST /api/v1/research - Tim Berners-Lee URL)
-│   ├── Name Only (POST /api/v1/research - Guido van Rossum -> URN resolution)
-│   ├── Name + Organization (POST /api/v1/research - Satya Nadella + Microsoft)
-│   ├── Name + Role (POST /api/v1/research - Demis Hassabis + CEO + DeepMind)
-│   └── Sparse Input (POST /api/v1/research - Ada Lovelace name only)
-│
-├── 04 - Research - Target Fields (3 requests)
-│   ├── Person Fields (POST /api/v1/research - Alan Turing with target fields)
-│   ├── Organization Fields (POST /api/v1/research - Apache Software Foundation)
-│   └── Custom Fields (POST /api/v1/research - Grace Hopper with unverified metric -> UNKNOWN)
-│
-├── 05 - Validation & Errors (6 requests)
-│   ├── Missing Required Input (POST /api/v1/research - 400 Bad Request)
-│   ├── Empty Input (POST /api/v1/research - 400 Bad Request)
-│   ├── Invalid Entity Type (POST /api/v1/research - 400 Bad Request)
-│   ├── Invalid URL (POST /api/v1/research - 400 Bad Request)
-│   ├── Blank Name with Missing URL (POST /api/v1/research - 400 Bad Request)
-│   └── Nonexistent Research Job (GET /api/v1/research/jobs/{uuid} - 404 Not Found)
-│
-└── 06 - End-to-End Scenarios (4 requests)
-    ├── E2E 01 - Synchronous Research (Captures {{entityId}})
-    ├── E2E 02 - Submit Async Research Job (Captures {{researchJobId}})
-    ├── E2E 03 - Poll Async Job Status (Queries {{researchJobId}})
-    └── E2E 04 - Deep Adaptive Research (Executes depth DEEP)
-```
 
 ---
 
-## 3. Environment Variables
-
-All requests in the collection use `{{baseResearchUrl}}`.
+## 3. Environment Variables Reference
 
 | Variable | Default Value | Description |
 | :--- | :--- | :--- |
-| `baseResearchUrl` | `http://localhost:8080` | Base URL for the Research Engine. (When running standalone Spring Boot without a gateway, set this to `http://localhost:9741`.) |
-| `entityId` | *(dynamically captured)* | Auto-saved SHA-256 entity identifier from research responses. |
-| `researchJobId` | *(dynamically captured)* | Auto-saved UUID from background asynchronous research jobs. |
+| `gatewayBaseUrl` | `http://localhost:9738` | Unified API Gateway ingress point (or `:8080` in dev). |
+| `authBaseUrl` | `http://localhost:9739` | Authentication Service direct endpoint. |
+| `datasetBaseUrl` | `http://localhost:9743` | Dataset Service direct endpoint. |
+| `researchBaseUrl` | `http://localhost:9741` | Research Service direct endpoint. |
+| `aiBaseUrl` | `http://localhost:9742` | AI Intelligent Service direct endpoint. |
+| `authToken` | *(dynamically captured)* | Auto-saved JWT Bearer token from `00 Authentication` requests. |
+| `userId` | *(dynamically captured)* | Auto-saved User ID for tenant-isolated catalog queries. |
+| `jobId` | *(dynamically captured)* | Auto-saved UUID from batch enrichment jobs. |
+| `entityId` | *(dynamically captured)* | Auto-saved SHA-256 entity identifier from persisted snapshots. |
+| `researchJobId` | *(dynamically captured)* | Auto-saved UUID from background research jobs. |
 
 ---
 
-## 4. What to Inspect in the Responses
+## 4. Execution via Newman CLI
 
-For successful enrichment requests, inspect:
-1. **`result.displayName` & `result.canonicalUrl`**: Confirm whether the engine properly resolved the entity's canonical identity (or deterministic `urn:entity:<type>:<slug>` when URL is omitted).
-2. **`entityId`**: 64-character deterministic SHA-256 hash.
-3. **`result.attributes`**:
-   - Evidence-backed attributes include `value`, `sourceUrl`, `evidenceSnippet`, `confidence` (`HIGH`, `MEDIUM`, `LOW`), `corroboratingSources`, and `conflictDetected`.
-   - Unverified requested target fields cleanly synthesize `value: "UNKNOWN"` with `confidence: "UNKNOWN"`.
-4. **`sources`**: List of ranked discovered web sources with `relevance` scores and provenance metadata.
-5. **`metadata`**: Pipeline metrics including `totalSourcesDiscovered`, `totalSourcesRanked`, and `attributesExtracted`.
-6. **`warnings`**: Pipeline warnings or diagnostics (e.g. crawler degradation, timeouts).
-
----
-
-## 5. Automated Tests
-
-The collection includes robust, behavior-driven tests:
-- **Status Codes**: Asserts `200 OK`, `202 Accepted`, `400 Bad Request`, and `404 Not Found`.
-- **RFC 7807 Compliance**: Asserts Spring Boot `ProblemDetail` structures (`title: "Bad Request"`, `status: 400`, `instance: "/api/v1/research"`, and descriptive `detail`).
-- **Schema Contracts**: Verifies data types, non-empty identifiers, valid enum states (`COMPLETED`, `PARTIAL`, `SUBMITTED`, etc.).
-- **Dynamic State Passing**: Automatically extracts `entityId` and `researchJobId` to chain requests across `06 - End-to-End Scenarios`.
-
----
-
-## 6. How to Import and Run
-
-### In Postman GUI:
-1. Open Postman.
-2. Click **Import** (top-left).
-3. Select both:
-   - `postman/data-enrichment-research-engine.postman_collection.json`
-   - `postman/data-enrichment-local.postman_environment.json`
-4. In the environment dropdown (top-right), select **Data Enrichment - Local Environment**.
-5. Set `baseResearchUrl` to `http://localhost:9741` (if running research-service directly) or leave `http://localhost:8080` (if running behind reverse proxy).
-6. Open the **Collection Runner** to execute individual folders or the entire collection.
-
-### In Newman CLI:
+### Run Complete Platform Suite:
 ```bash
-# Run the entire collection with the local environment
+# Execute the full 40-request platform test suite
+newman run postman/data-enrichment-ai-intelligence.postman_collection.json \
+  -e postman/data-enrichment-local.postman_environment.json \
+  --reporters cli
+```
+
+### Run Authenticated Flow (Auth -> Persisted Entities):
+```bash
+newman run postman/data-enrichment-ai-intelligence.postman_collection.json \
+  -e postman/data-enrichment-local.postman_environment.json \
+  --folder "00 Authentication" \
+  --folder "06 Persisted Entities Catalog"
+```
+
+### Run Research Engine Regression Suite:
+```bash
 newman run postman/data-enrichment-research-engine.postman_collection.json \
   -e postman/data-enrichment-local.postman_environment.json \
   --env-var "baseResearchUrl=http://localhost:9741"
-
-# Run only the End-to-End Scenarios folder
-newman run postman/data-enrichment-research-engine.postman_collection.json \
-  -e postman/data-enrichment-local.postman_environment.json \
-  --env-var "baseResearchUrl=http://localhost:9741" \
-  --folder "06 - End-to-End Scenarios"
 ```
 
+---
+
+## 5. Sample Dataset (`samples/`)
+
+The [`samples/v1-regression-dataset.csv`](./samples/v1-regression-dataset.csv) dataset provides a 5-record canonical benchmark:
+1. **Linus Torvalds**: High-confidence profile anchor match.
+2. **Guido van Rossum**: Multi-signal disambiguation without anchor URL.
+3. **Satya Nadella**: Employer-contextual disambiguation.
+4. **Martin Fowler**: Custom domain personal authority anchor.
+5. **John Smith**: Common name ambiguity preservation (`UNKNOWN` attributes).

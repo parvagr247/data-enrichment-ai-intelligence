@@ -64,9 +64,4 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Staged Data (preserve .gitkeep)
-data/input/*
-!data/input/.gitkeep
-data/output/*
-!data/output/.gitkeep
 

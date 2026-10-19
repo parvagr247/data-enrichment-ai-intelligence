@@ -4,6 +4,22 @@ This document records the foundational **Architecture Decision Records (ADRs)**,
 
 ---
 
+## Table of Contents
+- [1. Architecture Decision Records (ADRs)](#1-architecture-decision-records-adrs)
+  - [ADR 01: Multi-Microservice Boundary Decomposition](#adr-01-multi-microservice-boundary-decomposition)
+  - [ADR 02: Verbatim Evidence Grounding (Zero-Hallucination Principle)](#adr-02-verbatim-evidence-grounding-zero-hallucination-principle)
+  - [ADR 03: Deterministic Fallback Engine for AI Extraction](#adr-03-deterministic-fallback-engine-for-ai-extraction)
+  - [ADR 04: Bounded Concurrency over Unbounded Thread Spawning](#adr-04-bounded-concurrency-over-unbounded-thread-spawning)
+  - [ADR 05: Server-Sent Events (SSE) for Real-Time Execution Observability](#adr-05-server-sent-events-sse-for-real-time-execution-observability)
+  - [ADR 06: Relational MySQL Persistence with Flyway Migrations](#adr-06-relational-mysql-persistence-with-flyway-migrations)
+  - [ADR 07: AI Error Classification, Bounded Timeouts, and Gemini Flash](#adr-07-ai-error-classification-bounded-timeouts-and-gemini-flash)
+  - [ADR 08: Idempotent URL Normalization and Evidence Quality Tiering](#adr-08-idempotent-url-normalization-and-evidence-quality-tiering)
+  - [ADR 09: Strict Segregation of Public Ingress DTOs and Internal Inter-Service DTOs](#adr-09-strict-segregation-of-public-ingress-dtos-and-internal-inter-service-dtos)
+- [2. System Evolution History](#2-system-evolution-history)
+- [3. Strategic Future Roadmap](#3-strategic-future-roadmap)
+
+---
+
 ## 1. Architecture Decision Records (ADRs)
 
 ### ADR 01: Multi-Microservice Boundary Decomposition
@@ -14,8 +30,8 @@ This document records the foundational **Architecture Decision Records (ADRs)**,
   2. `auth-service` (:9739) — Bounded context: User credentials, BCrypt hashing, JWT issuance.
   3. `research-service` (:9741) — Bounded context: Autonomous web discovery, scraping, SSRF validation, boilerplate cleaning, and multi-source evidence corroboration.
   4. `ai-intelligent-service` (:9742) — Bounded context: Spring AI interactions, Google Gemini prompt execution, requirement planning, and structured fact extraction with verbatim quote grounding.
-  5. `dataset-service` (:9743) — Bounded context: Dataset ingestion, delimiter sniffing, profiling, batch job orchestration, bounded worker pools, SSE streaming, and MySQL relational persistence.
-  6. `config-server` (:8888 / :9736) & `discovery-server` (:8761 / :9737) — Core Spring Cloud configuration and Eureka service discovery.
+  5. `dataset-service` (:9743) — Bounded context: Dataset ingestion, delimiter sniffing, profiling, batch job orchestration, bounded worker pools (`EnrichmentTaskExecutor`), SSE streaming, and MySQL relational persistence.
+  6. `config-server` (:9736) & `discovery-server` (:9737) — Core Spring Cloud configuration and Eureka service discovery.
 * **Consequences**:
   - *Positive*: Independent failure domains. High-latency LLM calls or rate-limited web searches cannot block database transactions or frontend polling.
   - *Positive*: Independent scaling and resource allocation (e.g. higher memory/CPU for scraping, network bandwidth for AI).
@@ -61,7 +77,7 @@ This document records the foundational **Architecture Decision Records (ADRs)**,
 ### ADR 04: Bounded Concurrency over Unbounded Thread Spawning
 * **Status**: Accepted & Active
 * **Context**: Processing multi-row datasets sequentially is too slow, but spawning unbounded threads causes thread exhaustion, CPU starvation, and provider rate-limiting (HTTP 429).
-* **Decision**: Use a managed, configurable `ThreadPoolExecutor` (`BoundedExecutorService`) with bounded queue and caller-runs / rejection policies. Expose dynamic pool capacity via API (`concurrency: 3`).
+* **Decision**: Use a managed, configurable `ThreadPoolExecutor` (`EnrichmentTaskExecutor`) with bounded queue and caller-runs backpressure. Expose dynamic pool capacity via configuration (`enrichment.execution.concurrency: 3`, `queue-capacity: 500`).
 * **Consequences**:
   - *Positive*: Controlled parallel throughput without overloading external search APIs or the database.
   - *Positive*: Predictable memory and thread footprints.
@@ -70,7 +86,7 @@ This document records the foundational **Architecture Decision Records (ADRs)**,
 
 ### ADR 05: Server-Sent Events (SSE) for Real-Time Execution Observability
 * **Status**: Accepted & Active
-* **Context**: Sequential progress indicators (`"Processing 0 of 4 records..."`) leave users blind to parallel worker activities, stage transitions (`RESEARCH` &rarr; `AI_EXTRACTION` &rarr; `PERSISTENCE`), and completed row results.
+* **Context**: Sequential progress indicators leave users blind to parallel worker activities, stage transitions (`RESEARCH` &rarr; `AI_EXTRACTION` &rarr; `PERSISTENCE`), and completed row results.
 * **Decision**: Implement unidirectional Server-Sent Events (`GET /api/v1/enrichment/jobs/{jobId}/events`) using Spring `SseEmitter` with an in-memory bounded replay buffer (latest 500 events) and client-side `EventSource` with polling fallback.
 * **Consequences**:
   - *Positive*: Real-time visualization of individual worker threads and stages without the connection overhead of full-duplex WebSockets.
@@ -93,7 +109,7 @@ This document records the foundational **Architecture Decision Records (ADRs)**,
 * **Status**: Accepted & Active
 * **Context**: Deprecated LLM models returned HTTP 404, and transient/rate-limit errors caused repeated retries that hung the research pipeline.
 * **Decision**:
-  1. Standardize on Google Gemini Flash models (`gemini-2.5-flash` / `gemini-3.5-flash-lite`).
+  1. Standardize on Google Gemini Flash models (`gemini-2.5-flash`).
   2. Implement `AiErrorClassifier` to categorize errors into `AUTHENTICATION_FAILURE`, `UNSUPPORTED_MODEL`, `RATE_LIMIT`, `TIMEOUT`, `NETWORK_FAILURE`, `SERVER_ERROR`, `STRUCTURED_PARSING_FAILURE`.
   3. Enforce safe credential redacting in diagnostic logs (`[REDACTED_API_KEY]`).
   4. Enforce 15-second bounded execution timeouts on LLM calls with immediate deterministic extraction fallback on permanent failures or daily quota exhaustion.
@@ -105,12 +121,11 @@ This document records the foundational **Architecture Decision Records (ADRs)**,
 
 ### ADR 08: Idempotent URL Normalization and Evidence Quality Tiering
 * **Status**: Accepted & Active
-* **Context**: Markdown-wrapped URLs (e.g. `[https://...](https://...)`) polluted canonical entity IDs, and search provider snippet fallbacks were conflated with direct verified crawl evidence.
+* **Context**: Markdown-wrapped URLs polluted canonical entity IDs, and search provider snippet fallbacks were conflated with direct verified crawl evidence.
 * **Decision**:
   1. Enforce strict link unwrapping (`unwrapLink`) and scheme normalization across all service boundaries, guaranteeing idempotency (`normalize(normalize(x)) == normalize(x)`).
   2. Define `EvidenceQuality` tiers (`DIRECT_SOURCE`, `SEARCH_SNIPPET`, `OTHER_PROVIDER_RESULT`, `DERIVED_INFERRED`).
   3. Search snippets used as fallback when direct crawling is blocked (e.g. anti-bot HTTP 999) are capped at `MEDIUM` confidence and yield to `DIRECT_SOURCE` in conflict resolution.
-  4. Anchor common names in discovery queries with known organization, canonical profile URL slugs, or roles.
 * **Consequences**:
   - *Positive*: Clean entity deduplication and canonical URLs free of markdown artifacts.
   - *Positive*: Transparent fact provenance distinguishing directly crawled pages from search engine snippets.
@@ -119,17 +134,16 @@ This document records the foundational **Architecture Decision Records (ADRs)**,
 
 ### ADR 09: Strict Segregation of Public Ingress DTOs and Internal Inter-Service DTOs
 * **Status**: Accepted & Active
-* **Context**: Microservices previously shared DTO models between public HTTP controllers, internal `RestClient` clients, and database persistence layers. Changes in internal communication schemas risked breaking external frontends or leaking internal system fields (such as token counts or raw HTML snippets).
+* **Context**: Microservices previously shared DTO models between public HTTP controllers, internal `RestClient` clients, and database persistence layers. Changes in internal communication schemas risked breaking external frontends or leaking internal system fields.
 * **Decision**:
   1. Enforce strict segregation across all microservices:
-     - **Public Ingress DTOs** reside exclusively in `api.dto.request` and `api.dto.response`.
-     - **Internal Inter-Service DTOs** reside in `integration.<service>.dto` (or `integration.client.dto`).
-     - **Persistence Entities** reside exclusively in feature-specific entity packages.
+     - **Public Ingress DTOs** reside exclusively in `<feature>.dto` and `api.dto`.
+     - **Internal Inter-Service DTOs** reside in `enrichment.client.dto` or `integration.ai.dto`.
+     - **Persistence Entities** reside exclusively in `entity.model`.
   2. Map explicitly between internal and public representations in service coordinators or dedicated mapper/helper components.
 * **Consequences**:
   - *Positive*: Public API contracts remain stable and backwards-compatible regardless of internal mesh evolution.
   - *Positive*: Sensitive internal execution fields are never inadvertently exposed to the web client.
-  - *Negative*: Minimal boilerplate for mapping between internal integration models and public response models.
 
 ---
 
@@ -158,7 +172,7 @@ timeline
     section Phase 5: Architecture Hardening
       API Gateway & Auth : JWT verification & anti-spoofing
       DTO Segregation : Public API vs Internal Inter-Service DTOs
-      Refactored Services : Feature-centric packaging in all microservices
+      Refactored Services : Simplified 5-package & 4-package architectures
 ```
 
 ---
